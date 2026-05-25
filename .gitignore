@@ -1,0 +1,77 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Build
+dist/
+.build/
+*.tsbuildinfo
+apps/web/dist/
+storybook-static/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# AI
+.claude/
+
+# Docker
+pgdata/
+
+# Python
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+
+# DB
+*.db
+*.sqlite3
+
+# Test
+coverage/
+htmlcov/
+.coverage
+playwright-report/
+test-results/
+
+# Secrets
+*.pem
+*.key
+*.crt
+credentials.json
+
+# OS
+Thumbs.db
+
+# AI / LLM cache
+*.gguf
+/models/
+
+# AI models (large files, downloaded separately)
+services/agent/models/
+services/perception/models/*.pt
+services/perception/models/models/
+
+# Local AI tool config
+.golutra/
+
+# Scripts temp
+infra/scripts/tmp/
+tmp/
+services/agent/.device-identity.json
+services/agent/openclaw.json.last-good

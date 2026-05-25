@@ -1,0 +1,64 @@
+[project]
+name = "studio-javis"
+version = "0.1.0"
+description = "工作室贾维斯 — 智能公告板系统"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.30",
+    "psycopg2-binary>=2.9",
+    "alembic>=1.14",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "bcrypt>=4.2",
+    "python-jose[cryptography]>=3.3",
+    "httpx>=0.28",
+    "structlog>=24.4",
+    "redis>=5.2",
+    "python-multipart>=0.0.18",
+    "websockets>=14.0",
+    "psutil>=7.2.2",
+]
+
+[tool.uv.workspace]
+members = ["services/api-gateway", "services/perception", "packages/contracts", "packages/skills"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=5.0",
+    "httpx>=0.28",
+    "ruff>=0.5",
+    "mypy>=1.12",
+    "schemathesis>=3.35",
+    "datamodel-code-generator>=0.26",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM", "RUF"]
+ignore = ["B008", "RUF001"]  # B008: FastAPI Depends pattern; RUF001: Chinese punctuation
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+explicit_package_bases = true
+mypy_path = "services/api-gateway:services/perception"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["services/api-gateway"]
+testpaths = ["services", "packages", "tests"]
+markers = [
+    "unit: 单元测试",
+    "integration: 集成测试，需要 testcontainers",
+    "live: 需要真 API key，CI 不跑",
+    "perf: 性能基线测试",
+]

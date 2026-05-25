@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "network.device_detail",
+  "version": "0.1.0",
+  "input": {
+    "type": "object",
+    "required": ["ip"],
+    "properties": {
+      "ip": { "type": "string", "description": "设备 IP 地址" }
+    }
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "device": {
+        "type": "object",
+        "properties": {
+          "ip": { "type": "string" },
+          "mac": { "type": "string" },
+          "hostname": { "type": "string" },
+          "vendor": { "type": "string" },
+          "online": { "type": "boolean" },
+          "open_ports": { "type": "array", "items": { "type": "integer" } },
+          "os_guess": { "type": "string" }
+        }
+      }
+    }
+  }
+}

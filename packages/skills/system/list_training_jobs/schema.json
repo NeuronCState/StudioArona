@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "system.list_training_jobs",
+  "version": "0.1.0",
+  "input": { "type": "object", "properties": {} },
+  "output": {
+    "type": "object",
+    "properties": {
+      "jobs": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "user": { "type": "string" },
+            "name": { "type": "string" },
+            "status": { "type": "string" },
+            "gpu_util_pct": { "type": "number" },
+            "current_step": { "type": "integer" },
+            "total_steps": { "type": "integer" },
+            "elapsed_h": { "type": "number" },
+            "eta_h": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+}

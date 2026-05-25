@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Studio Arona &mdash; &#x5de5;&#x4f5c;&#x5ba4;&#x963f;&#x6d1b;&#x5a1c;</title>
+            <style>
+/* From extension vscode.github */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+.vscode-dark img[src$=\#gh-light-mode-only],
+.vscode-light img[src$=\#gh-dark-mode-only],
+.vscode-high-contrast:not(.vscode-high-contrast-light) img[src$=\#gh-light-mode-only],
+.vscode-high-contrast-light img[src$=\#gh-dark-mode-only] {
+	display: none;
+}
+
+</style>
+            
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/markdown.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Microsoft/vscode/extensions/markdown-language-features/media/highlight.css">
+<style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', system-ui, 'Ubuntu', 'Droid Sans', sans-serif;
+                font-size: 14px;
+                line-height: 1.6;
+            }
+        </style>
+        <style>
+.task-list-item {
+    list-style-type: none;
+}
+
+.task-list-item-checkbox {
+    margin-left: -20px;
+    vertical-align: middle;
+    pointer-events: none;
+}
+</style>
+<style>
+:root {
+  --color-note: #0969da;
+  --color-tip: #1a7f37;
+  --color-warning: #9a6700;
+  --color-severe: #bc4c00;
+  --color-caution: #d1242f;
+  --color-important: #8250df;
+}
+
+</style>
+<style>
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-note: #2f81f7;
+    --color-tip: #3fb950;
+    --color-warning: #d29922;
+    --color-severe: #db6d28;
+    --color-caution: #f85149;
+    --color-important: #a371f7;
+  }
+}
+
+</style>
+<style>
+.markdown-alert {
+  padding: 0.5rem 1rem;
+  margin-bottom: 16px;
+  color: inherit;
+  border-left: .25em solid #888;
+}
+
+.markdown-alert>:first-child {
+  margin-top: 0
+}
+
+.markdown-alert>:last-child {
+  margin-bottom: 0
+}
+
+.markdown-alert .markdown-alert-title {
+  display: flex;
+  font-weight: 500;
+  align-items: center;
+  line-height: 1
+}
+
+.markdown-alert .markdown-alert-title .octicon {
+  margin-right: 0.5rem;
+  display: inline-block;
+  overflow: visible !important;
+  vertical-align: text-bottom;
+  fill: currentColor;
+}
+
+.markdown-alert.markdown-alert-note {
+  border-left-color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-note .markdown-alert-title {
+  color: var(--color-note);
+}
+
+.markdown-alert.markdown-alert-important {
+  border-left-color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-important .markdown-alert-title {
+  color: var(--color-important);
+}
+
+.markdown-alert.markdown-alert-warning {
+  border-left-color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-warning .markdown-alert-title {
+  color: var(--color-warning);
+}
+
+.markdown-alert.markdown-alert-tip {
+  border-left-color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-tip .markdown-alert-title {
+  color: var(--color-tip);
+}
+
+.markdown-alert.markdown-alert-caution {
+  border-left-color: var(--color-caution);
+}
+
+.markdown-alert.markdown-alert-caution .markdown-alert-title {
+  color: var(--color-caution);
+}
+
+</style>
+        
+        </head>
+        <body class="vscode-body vscode-light">
+            <span id="markdown-mermaid" aria-hidden="true" data-config="{&quot;darkModeTheme&quot;:&quot;dark&quot;,&quot;lightModeTheme&quot;:&quot;default&quot;,&quot;maxTextSize&quot;:50000,&quot;clickDrag&quot;:&quot;alt&quot;,&quot;showControls&quot;:&quot;onHoverOrFocus&quot;,&quot;resizable&quot;:true,&quot;maxHeight&quot;:&quot;&quot;}"></span>
+				<h1 id="studio-arona--工作室阿洛娜">Studio Arona — 工作室阿洛娜</h1>
+<blockquote>
+<p>部署在工作室 Ubuntu 物理主机上、有&quot;身体&quot;（屏幕 + 机械臂 + 摄像头）的智能公告板系统。<br>
+管理工作室 LAN（NAS / HomeAssistant / VMs / RSS / 日程），识别成员人脸，跨会话记忆，AI 驱动 UI。</p>
+</blockquote>
+<p><strong>当前阶段</strong>：Mac 开发环境，硬件接口 mock。</p>
+<hr>
+<h2 id="快速开始">快速开始</h2>
+<pre><code class="language-bash">./start.sh
+</code></pre>
+<ul>
+<li><strong>前端</strong>：<a href="http://localhost:5173">http://localhost:5173</a></li>
+<li><strong>API 文档</strong>：<a href="http://localhost:8080/docs">http://localhost:8080/docs</a></li>
+</ul>
+<pre><code class="language-bash">make bootstrap   <span class="hljs-comment"># 首次：安装依赖 + 启动 PG/Redis + 迁移 + 种子数据</span>
+</code></pre>
+<hr>
+<h2 id="项目结构">项目结构</h2>
+<pre><code>StudioArona/
+├── apps/web/                     # 前端 (Vite + React + TS + Tailwind)
+│   └── src/
+│       ├── pages/                # studio / feeds / memory / schedule / system / vms / voice / login
+│       ├── components/           # layout (ThemeToggle / LocaleToggle / DesignModeToggle) / arona / studio
+│       ├── hooks/                # useTheme / useSpeechRecognition / useWeather
+│       ├── lib/                  # api-client / sse-client / ui-actions / i18n
+│       ├── stores/               # zustand: auth / session / design-mode / locale / scene
+│       └── styles/               # globals.css + tokens + 1s theme transition
+│
+├── services/
+│   ├── agent/                    # OpenClaw + Node.js Bridge
+│   │   ├── bridge/               # server.js / web-watcher / rss-fetcher / minimax / tts / memory
+│   │   ├── skills/               # face / feeds / ha / meta / nas / network / schedules / system / ui / vm / weather
+│   │   ├── workspace/            # Agent 身份: IDENTITY / SOUL / TOOLS / HEARTBEAT
+│   │   └── data/pages/           # 网页监控提取内容 (Readability + 图片)
+│   ├── api-gateway/              # FastAPI 网关
+│   │   └── app/                  # api / auth / proxy / ws / memory / middleware / models
+│   ├── perception/               # 人脸识别 / 外设抽象 (FastAPI)
+│   └── rssany/                   # [submodule] RSSAny 引擎 (备选)
+│
+├── packages/
+│   ├── contracts/                # OpenAPI + TS/Python types
+│   ├── skills/                   # Python Skill handlers
+│   ├── ui-kit/                   # 20+ React 组件
+│   ├── theme-toggle/             # 白天黑夜切换 Web Component (1s 过渡)
+│   ├── live2d-arona/             # Spine/Live2D 模型 + 语音包
+│   └── voice-button/             # 语音交互按钮素材
+│
+├── infra/
+│   ├── compose/                  # Docker Compose (dev / test / prod)
+│   ├── docker/                   # Dockerfiles
+│   ├── db/                       # Alembic migrations
+│   └── scripts/                  # start.sh / bootstrap / smoke / backup
+│
+├── docs/                         # 按日期组织: 2026-05-21~24
+└── tests/                        # A(前端) / B(Agent) / C(Perception) / D(Gateway)
+</code></pre>
+<hr>
+<h2 id="核心特性">核心特性</h2>
+<h3 id="信息源统一-rss--网页监控">信息源（统一 RSS + 网页监控）</h3>
+<p>输入 URL 自动识别类型：</p>
+<ul>
+<li><strong>RSS/Atom</strong> → rss-fetcher 每 15 分钟抓取，新文章自动入库</li>
+<li><strong>网页</strong> → web-watcher 每 1 分钟检测变化 → cheerio 提取链接 → Readability 提取正文 → <strong>MiniMax AI 总结</strong> → 生成标题+摘要</li>
+</ul>
+<p>前端：统一列表展示，点击条目 → 干净阅读页（正文+图片），&quot;查看原文&quot;新标签打开。</p>
+<h3 id="主题切换">主题切换</h3>
+<ul>
+<li><code>&lt;theme-button&gt;</code> Web Component，胶囊按钮 280em 宽，1 秒平滑过渡</li>
+<li>Shadow DOM 内实现：云朵漂移、星星闪烁、月亮切换</li>
+<li>全局 CSS <code>transition: 1s</code> 确保深/浅色平滑</li>
+</ul>
+<h3 id="国际化">国际化</h3>
+<p>侧边栏中文/EN 切换，导航标签即时翻译。<code>useLocaleStore</code> 持久化到 localStorage。</p>
+<h3 id="天气">天气</h3>
+<p>基于 IP 自动定位（<a href="http://ip-api.com">ip-api.com</a>），Open-Meteo 免费数据，展示：温度、湿度、风力、体感、紫外线。</p>
+<h3 id="openclaw-agent-工作流">OpenClaw Agent 工作流</h3>
+<pre><code>┌─────────────────────────────────────────────────────┐
+│                    OpenClaw Agent                    │
+│                                                     │
+│  用户输入 (文本/语音)                                 │
+│      │                                              │
+│      ▼                                              │
+│  ┌──────────────┐    ┌─────────────────┐            │
+│  │ Prompt 组装   │───▶│ MiniMax-M2.7    │            │
+│  │ (7层动态)     │    │ (云端 Chat API)  │            │
+│  │ • IDENTITY   │    └────────┬────────┘            │
+│  │ • SOUL       │             │                     │
+│  │ • TOOLS      │             ▼                     │
+│  │ • Memory     │    ┌─────────────────┐            │
+│  │ • Context    │    │ 响应解析         │            │
+│  │ • History    │    │ • token 流式输出 │            │
+│  │ • Message    │    │ • tool_call 检测 │            │
+│  └──────────────┘    │ • ui_action 生成 │            │
+│                      └────────┬────────┘            │
+│                               │                     │
+│              ┌────────────────┼────────────────┐    │
+│              ▼                ▼                 ▼    │
+│       ┌──────────┐   ┌──────────────┐   ┌────────┐ │
+│       │ SSE 推流  │   │ Skill 调用    │   │ UI 控制│ │
+│       │ 前端渲染  │   │ curl API      │   │ 页面跳转│ │
+│       │ 打字效果  │   │ schedules     │   │ 卡片渲染│ │
+│       │          │   │ feeds/rss     │   │ Toast   │ │
+│       └──────────┘   │ weather/vm    │   └────────┘ │
+│                      └──────────────┘               │
+└─────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>7 层 Prompt 动态组装</strong>：每次对话前从 Identity → Soul → Tools → Memory Context → Runtime Context → Recent History → User Message 逐层构建，确保阿洛娜始终有完整上下文。</p>
+<p><strong>Skill 工具调用</strong>：Agent 可通过 HTTP API 调用 12 个 Skill —— 查询天气、管理日程、添加 RSS、操作 VM、搜索记忆等。Skill 定义在 <code>services/agent/skills/</code>，OpenClaw 自动发现并加载。</p>
+<p><strong>ui_action 前端控制</strong>：Agent 通过 SSE 流发出 <code>ui_action</code> 事件，前端组件注册表自动分发——页面跳转、卡片渲染、高亮、Toast 提示，无需硬编码路由。</p>
+<h3 id="对话管线云--离线双路径">对话管线（云 / 离线双路径）</h3>
+<pre><code>用户语音输入
+    │
+    ├── ☁️ 云端路径（当前）
+    │   ASR: MiniMax / Web Speech API
+    │   LLM: MiniMax-M2.7 (Chat Completions)
+    │   TTS: MiniMax TTS（支持声音克隆）
+    │   Tool Calling: OpenClaw Skills（12 个 HTTP API）
+    │
+    └── 📴 离线路径（规划中，Deepseek说我这个是天才方案）
+        LLM: fun-audio-chat 8B 4bit（本地量化推理）
+        TTS: CosyVoice3（零样本声音克隆）
+        Tool Calling: 本地 function calling + HTTP API
+        场景: 断网 / 隐私敏感 / 低延迟本地对话
+</code></pre>
+<p><strong>声音克隆</strong>：云端 MiniMax TTS 和离线 CosyVoice3 均支持用户声音克隆，阿洛娜可用你自己的声音说话。</p>
+<p><strong>离线工具调用</strong>：fun-audio-chat 8B 支持 function calling，离线模式下同样可调用本地 Skill API，完全对标云端能力。</p>
+<h3 id="跨会话记忆">跨会话记忆</h3>
+<p>Per-user memory，三层结构（raw → structured → embeddings），会话结束自动总结。</p>
+<hr>
+<h2 id="skills已落地-12-个">Skills（已落地 12 个）</h2>
+<table>
+<thead>
+<tr>
+<th>Skill</th>
+<th>触发</th>
+<th>端点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>rss</td>
+<td>RSS/网页订阅管理</td>
+<td><code>:18790/api/feeds</code></td>
+</tr>
+<tr>
+<td>weather</td>
+<td>天气查询</td>
+<td><code>:8080/api/weather</code></td>
+</tr>
+<tr>
+<td>schedules</td>
+<td>日程 CRUD</td>
+<td><code>:18790/api/schedules</code></td>
+</tr>
+<tr>
+<td>vm</td>
+<td>虚拟机管理</td>
+<td><code>:8002/api/vms</code></td>
+</tr>
+<tr>
+<td>system</td>
+<td>系统指标</td>
+<td><code>:8002/api/system/*</code></td>
+</tr>
+<tr>
+<td>meta</td>
+<td>偏好与记忆</td>
+<td><code>:18790/api/me/*</code></td>
+</tr>
+<tr>
+<td>face</td>
+<td>人脸识别</td>
+<td>perception</td>
+</tr>
+<tr>
+<td>ha / nas / network / ui</td>
+<td>各自领域</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<hr>
+<h2 id="架构">架构</h2>
+<h3 id="数据流">数据流</h3>
+<pre><code>  ┌─────────┐    读写     ┌──────────┐    SQL     ┌────────────┐
+  │  前端    │ ────────→  │ Backend  │ ────────→ │ PostgreSQL │
+  │ :5173   │ ←────────  │ :8080    │ ←──────── │            │
+  └─────────┘   JSON     │ :18790   │           └────────────┘
+                         │ :8002    │
+  ┌─────────┐    curl    │          │
+  │ OpenClaw│ ────────→  └──────────┘
+  │ :18789  │ ←────────
+  └─────────┘   JSON
+</code></pre>
+<p><strong>前端、OpenClaw、后端共享同一套 PostgreSQL</strong>，全部通过 HTTP API 读写：</p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>前端</th>
+<th>OpenClaw</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>添加 RSS</td>
+<td><code>POST /api/feeds</code></td>
+<td><code>curl :18790/api/feeds</code></td>
+<td>同一条 feed 记录</td>
+</tr>
+<tr>
+<td>查看日程</td>
+<td><code>GET /api/schedules</code></td>
+<td><code>curl :18790/api/schedules</code></td>
+<td>同一个 JSON 列表</td>
+</tr>
+<tr>
+<td>删除订阅</td>
+<td><code>DELETE /api/feeds/:id</code></td>
+<td><code>curl -X DELETE</code></td>
+<td>后台自动停止抓取</td>
+</tr>
+<tr>
+<td>天气查询</td>
+<td>天气卡片自动请求</td>
+<td><code>curl :8080/api/weather</code></td>
+<td>IP 自动定位</td>
+</tr>
+<tr>
+<td>AI 总结</td>
+<td>网页监控 → 生成的标题</td>
+<td>Skill 触发 <code>rss</code> → 读取摘要</td>
+<td>同一批 feed_item</td>
+</tr>
+<tr>
+<td>记忆管理</td>
+<td><code>/memory</code> 页面</td>
+<td><code>meta</code> skill → <code>recall_memory</code></td>
+<td>同一条 memory_entry</td>
+</tr>
+</tbody>
+</table>
+<p><strong>关键设计</strong>：任何一方写入的数据，另一方立即可见。删除即停止后台服务，保持一致。</p>
+<h3 id="服务端口">服务端口</h3>
+<table>
+<thead>
+<tr>
+<th>服务</th>
+<th>端口</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>前端 Vite</td>
+<td>5173</td>
+<td>React dev server，proxy <code>/api</code> → 8080</td>
+</tr>
+<tr>
+<td>API Gateway</td>
+<td>8080</td>
+<td>FastAPI 网关：鉴权、路由、SSE 中继</td>
+</tr>
+<tr>
+<td>Agent Bridge</td>
+<td>18790</td>
+<td>Node.js：feeds / schedules / memory / web-watcher</td>
+</tr>
+<tr>
+<td>OpenClaw</td>
+<td>18789</td>
+<td>Agent 网关，Skill 自动发现</td>
+</tr>
+<tr>
+<td>Perception</td>
+<td>8002</td>
+<td>人脸识别 / 外设 / 硬件监控</td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td>5432</td>
+<td>主数据库</td>
+</tr>
+<tr>
+<td>Redis</td>
+<td>6379</td>
+<td>缓存 / 会话</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="开发命令">开发命令</h2>
+<pre><code class="language-bash">make dev              <span class="hljs-comment"># 全栈启动</span>
+make <span class="hljs-built_in">test</span>             <span class="hljs-comment"># 所有单元测试</span>
+make lint             <span class="hljs-comment"># ruff + eslint + spectral</span>
+make typecheck        <span class="hljs-comment"># mypy + tsc</span>
+make db-migrate       <span class="hljs-comment"># 数据库迁移</span>
+</code></pre>
+<hr>
+<h2 id="环境变量">环境变量</h2>
+<p>复制 <code>.env.example</code> → <code>.env.local</code>，关键配置：</p>
+<pre><code class="language-bash">DATABASE_URL=postgresql+asyncpg://javis:javis@localhost:5432/javis
+MINIMAX_API_KEY=      <span class="hljs-comment"># 网页监控 AI 总结（web-watcher）</span>
+AGENT_URL=http://localhost:18790
+PERCEPTION_URL=http://localhost:8002
+</code></pre>
+<hr>
+<h2 id="license">License</h2>
+<p>私有项目，All Rights Reserved.</p>
+
+            
+            
+        </body>
+        </html>

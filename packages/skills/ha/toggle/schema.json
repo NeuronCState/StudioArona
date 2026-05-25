@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "ha.toggle",
+  "version": "0.1.0",
+  "input": {
+    "type": "object",
+    "required": ["entity_id"],
+    "properties": {
+      "entity_id": { "type": "string", "description": "设备 entity_id" }
+    }
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "ok": { "type": "boolean" },
+      "new_state": { "type": "string" }
+    }
+  }
+}

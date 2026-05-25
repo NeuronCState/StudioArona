@@ -1,0 +1,9 @@
+[project]
+name = "ui-kit"
+version = "0.1.0"
+description = "Studio Javis UI Kit — Claude Design 组件库"
+requires-python = ">=3.12"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

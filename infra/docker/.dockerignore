@@ -1,0 +1,66 @@
+# Git
+.git/
+.gitattributes
+
+# Dependencies
+node_modules/
+**/node_modules/
+.venv/
+**/__pycache__/
+*.py[cod]
+
+# Build outputs
+dist/
+.build/
+*.tsbuildinfo
+
+# Env & Secrets
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+
+# DB
+*.db
+*.sqlite3
+pgdata/
+
+# Test
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+coverage/
+htmlcov/
+playwright-report/
+test-results/
+
+# Docs (don't need inside image)
+docs/
+*.md
+
+# Large models
+*.gguf
+*.bin
+models/
+
+# Python
+*.egg-info/
+pip-wheel-metadata/
+
+# Misc
+tmp/
+*.log

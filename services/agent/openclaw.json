@@ -1,0 +1,22 @@
+{
+  "gateway": {
+    "mode": "local",
+    "port": 18789,
+    "bind": "loopback",
+    "remote": {
+      "token": "c67b3d83ba476762a7d66a66620fb96efc879a5fb9a5926c"
+    },
+    "auth": {
+      "mode": "token",
+      "token": "c67b3d83ba476762a7d66a66620fb96efc879a5fb9a5926c"
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "minimax-portal/MiniMax-M2.7"
+      },
+      "workspace": "/app/workspace"
+    }
+  }
+}

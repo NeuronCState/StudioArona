@@ -1,0 +1,20 @@
+{
+  "name": "@studio-javis/agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Studio Javis — Agent service (OpenClaw-based)",
+  "type": "module",
+  "scripts": {
+    "start": "openclaw gateway --port 18789 --verbose",
+    "bridge": "node bridge/server.js",
+    "onboard": "openclaw onboard"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "cheerio": "^1.2.0",
+    "jsdom": "^25.0.1",
+    "openclaw": "latest",
+    "pg": "^8.21.0",
+    "ws": "^8.20.1"
+  }
+}

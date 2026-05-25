@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "network.list_devices",
+  "version": "0.1.0",
+  "input": {
+    "type": "object",
+    "properties": {}
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "devices": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "ip": { "type": "string" },
+            "mac": { "type": "string" },
+            "hostname": { "type": "string" },
+            "vendor": { "type": "string" },
+            "online": { "type": "boolean" },
+            "last_seen": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    }
+  }
+}

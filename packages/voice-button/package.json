@@ -1,0 +1,21 @@
+{
+  "name": "@studiojavis/voice-button",
+  "version": "0.1.0",
+  "description": "Voice interaction button UI component for Studio Javis",
+  "files": [
+    "src/",
+    "docs/"
+  ],
+  "keywords": [
+    "voice",
+    "tts",
+    "speech",
+    "arona",
+    "web-component"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "directory": "packages/voice-button"
+  }
+}

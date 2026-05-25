@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "vm.upload_archive",
+  "version": "0.1.0",
+  "input": {
+    "type": "object",
+    "required": ["vm_id", "file_path"],
+    "properties": {
+      "vm_id": { "type": "string", "description": "VM ID" },
+      "file_path": { "type": "string", "description": "本地文件路径" },
+      "dst_path": { "type": "string", "default": "/tmp/upload", "description": "目标路径" }
+    }
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "ok": { "type": "boolean" },
+      "filename": { "type": "string" }
+    }
+  }
+}

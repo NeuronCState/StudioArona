@@ -1,0 +1,52 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * *"  # 每天 03:00 UTC
+  workflow_dispatch:  # 手动触发
+
+jobs:
+  # ── E2E tests (Playwright) ──────────────
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # TODO: start docker-compose.test.yml, run Playwright
+      - run: echo "E2E placeholder — implement with Playwright"
+
+  # ── Contract tests (schemathesis) ───────
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - run: uv sync
+      # TODO: start full stack, run schemathesis
+      - run: echo "Contract test placeholder — needs running services"
+
+  # ── Dependency security scan ────────────
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - run: uv sync
+      - name: pip-audit
+        run: uv run pip-audit --desc || true
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: 0  # warn only for now

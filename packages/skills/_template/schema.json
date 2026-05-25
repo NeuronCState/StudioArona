@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "{{skill_name}}",
+  "type": "object",
+  "properties": {
+    "inputs": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "outputs": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  }
+}
