@@ -141,16 +141,81 @@ StudioArona/
     │   TTS: MiniMax TTS（支持声音克隆）
     │   Tool Calling: OpenClaw Skills（12 个 HTTP API）
     │
-    └── 📴 离线路径（规划中，Deepseek说我这个是天才方案）
-        LLM: fun-audio-chat 8B 4bit（本地量化推理）
-        TTS: CosyVoice3（零样本声音克隆）
-        Tool Calling: 本地 function calling + HTTP API
+    └── 📴 离线路径（已验证可用）
+        ASR + LLM: Fun-Audio-Chat-8B-MNN（4bit 量化，MNN 引擎推理）
+        TTS: CosyVoice3-0.5B（零样本声音克隆）
+        Tool Calling: <tool_call> XML 标签 → 本地 HTTP API
         场景: 断网 / 隐私敏感 / 低延迟本地对话
 ```
 
+#### 离线管线架构
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                    离线语音对话管线                        │
+│                                                          │
+│  麦克风 ──▶ audio.mnn (编码器)                            │
+│              │  波形 → 音频 embedding                     │
+│              ▼                                          │
+│            llm.mnn (4bit 量化, ~6GB)                     │
+│              │  理解 + 推理 + 工具调用决策                  │
+│              │  输出: 文本 tokens + <tool_call> JSON       │
+│              ▼                                          │
+│       ┌──────┴──────┐                                    │
+│       │             │                                    │
+│       ▼             ▼                                    │
+│   纯文本回复     <tool_call> 工具调用                       │
+│       │             │                                    │
+│       │             ▼                                    │
+│       │      执行 HTTP API → 结果回传 llm.mnn               │
+│       │             │                                    │
+│       └──────┬──────┘                                    │
+│              ▼                                          │
+│        CosyVoice3-0.5B (TTS)                            │
+│          llm.pt + flow.pt + hift.pt                      │
+│          零样本声音克隆 · 9 语言 · 150ms 首包               │
+│              │                                          │
+│              ▼                                          │
+│           扬声器                                         │
+└──────────────────────────────────────────────────────────┘
+```
+
+**关键设计**：Fun-Audio-Chat 的 `audio.mnn` 编码器已集成在 `llm.mnn` 的 multimodal 推理管线中，无需单独调用。CosyVoice3 替换 Fun-Audio-Chat 内置 TTS 以获得更好的音质和声音克隆能力。
+
+**MNN Python API 调用示例**：
+
+```python
+import MNN
+
+# 加载模型（自动加载 llm.mnn + audio.mnn）
+llm = MNN.llm.create("config.json")
+llm.load()
+
+# 语音输入（支持文件路径或波形 tensor）
+result = llm.response({"audios": [{"file_path": "user_speech.wav"}]})
+
+# 工具调用 — 使用 Jinja template 定义的 <tool_call> 格式
+messages = [
+    {"role": "system", "content": "# Tools\n<tools>\n{...}\n</tools>\n..."},
+    {"role": "user", "content": "查询东京天气"}
+]
+prompt = llm.apply_chat_template(messages)
+output = llm.generate(llm.tokenizer_encode(prompt), max_new_tokens=200)
+# 输出示例: <tool_call>\n{"name": "get_weather", "arguments": {"city": "Tokyo"}}\n</tool_call>
+```
+
+**模型文件位置**：
+
+| 模型 | 路径 | 大小 |
+|------|------|------|
+| Fun-Audio-Chat-8B (LLM + Audio) | `services/agent/models/Fun-Audio-Chat-8B-MNN/` | 6.0GB |
+| CosyVoice3-0.5B (TTS) | `services/agent/models/Fun-CosyVoice3-0.5B-2512/` | 9.1GB |
+
+模型文件不上传 Git，通过 `modelscope download` 下载到上述路径。
+
 **声音克隆**：云端 MiniMax TTS 和离线 CosyVoice3 均支持用户声音克隆，阿洛娜可用你自己的声音说话。
 
-**离线工具调用**：fun-audio-chat 8B 支持 function calling，离线模式下同样可调用本地 Skill API，完全对标云端能力。
+**离线工具调用**：fun-audio-chat 8B 通过 Jinja template 原生支持 function calling（`<tool_call>` XML 标签），离线模式下同样可调用本地 Skill API，完全对标云端能力。
 
 ### 跨会话记忆
 
