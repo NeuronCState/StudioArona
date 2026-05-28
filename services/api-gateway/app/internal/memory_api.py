@@ -43,15 +43,30 @@ async def summarize_conversation(body: SummarizeRequest) -> list[dict]:
 
 
 @router.post("/entries")
-async def upsert_entry(body: MemoryEntryRequest) -> dict:
+async def upsert_entry(user_id: str, body: MemoryEntryRequest) -> dict:
     """Upsert a memory entry for a user (user_id via query param)."""
-    # user_id is passed by the bridge
+    from app.memory.provisioner import ensure_user_memory_db
+
+    ensure_user_memory_db(user_id)
+    repo = MemoryRepo(user_id)
+    entry = MemoryEntry(
+        id=body.id,
+        type=body.type,
+        summary=body.summary,
+        detail=body.detail,
+        source_session=body.source_session,
+        importance=body.importance,
+    )
+    repo.upsert_entry(entry)
     return {"ok": True, "entry_id": body.id}
 
 
 @router.get("/entries")
 async def list_entries(user_id: str, type: str | None = None, q: str | None = None, limit: int = 50) -> list[dict]:
     """List memory entries for a user."""
+    from app.memory.provisioner import ensure_user_memory_db
+
+    ensure_user_memory_db(user_id)
     repo = MemoryRepo(user_id)
     entries = repo.list_entries(type=type, q=q, limit=limit)
     return [e.to_dict() for e in entries]
@@ -60,6 +75,9 @@ async def list_entries(user_id: str, type: str | None = None, q: str | None = No
 @router.post("/entries/batch")
 async def upsert_entries(user_id: str, body: list[MemoryEntryRequest]) -> dict:
     """Batch upsert memory entries for a user."""
+    from app.memory.provisioner import ensure_user_memory_db
+
+    ensure_user_memory_db(user_id)
     repo = MemoryRepo(user_id)
     count = 0
     for item in body:
@@ -79,6 +97,9 @@ async def upsert_entries(user_id: str, body: list[MemoryEntryRequest]) -> dict:
 @router.get("/recall")
 async def recall_memory(user_id: str, query: str, k: int = 5) -> list[dict]:
     """Recall top-K memory entries for a user query."""
+    from app.memory.provisioner import ensure_user_memory_db
+
+    ensure_user_memory_db(user_id)
     entries = recall(user_id, query, k=k)
     return [e.to_dict() for e in entries]
 

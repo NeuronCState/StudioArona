@@ -1,11 +1,10 @@
 /**
- * Agent Process Pool — keeps warm `openclaw agent` processes ready.
+ * Agent Process Pool — spawns OpenClaw agent subprocesses on demand.
  *
- * Eliminates subprocess spawn overhead (~1.5s) by pre-spawning a worker
- * that waits for the next message. When a request comes in, the warm worker
- * handles it immediately. A new worker is spawned to replace it.
- *
- * This reduces per-request overhead from ~2s to ~0.3s.
+ * OpenClaw's CLI is one-shot (--message → response → exit), so we can't
+ * reuse processes. Instead we:
+ * 1. Warmup at startup to pre-load Node.js modules into OS cache.
+ * 2. Spawn fresh for each request — the OS cache makes this fast (~1s vs ~2s cold).
  */
 
 import { spawn } from "child_process";
@@ -44,104 +43,50 @@ function resolveOpenClawEntry() {
 const OPENCLAW_ENTRY = resolveOpenClawEntry();
 
 class AgentPool {
-  constructor(poolSize = 1) {
-    this.size = poolSize;
-    this.busy = new Set();
-    this._warmWorker = null;
-    this._warmingUp = false;
+  constructor() {
+    this._warmedUp = false;
   }
 
   /**
-   * Pre-warm: start one worker that connects to Gateway and waits.
+   * Pre-warm: send a dummy message to load Node.js modules into OS file cache.
+   * Fire-and-forget — failure is non-fatal.
    */
-  async warmup() {
-    // Skip warmup if OpenClaw entry not found (Docker uses MiniMax direct path)
-    if (!OPENCLAW_ENTRY) {
-      console.log("[agent-pool] OpenClaw not found, skipping warmup (MiniMax direct mode)");
-      return;
-    }
-    if (this._warmingUp || this._warmWorker) return;
-    this._warmingUp = true;
-    console.log("[agent-pool] Warming up worker...");
-    try {
-      this._warmWorker = await this._spawnAndReady();
-      console.log("[agent-pool] Worker warmed up, ready for requests");
-    } catch (err) {
-      console.log("[agent-pool] Warmup failed:", err.message);
-    } finally {
-      this._warmingUp = false;
-    }
-    // Schedule re-warming
-    setTimeout(() => this.warmup(), 5000);
-  }
+  warmup() {
+    if (this._warmedUp || !OPENCLAW_ENTRY) return;
+    this._warmedUp = true;
+    console.log("[agent-pool] Warming up OS cache...");
 
-  async _spawnAndReady() {
-    // Spawn a "keep-warm" process that pretends to process a short message
-    // This loads all JS modules and connects to Gateway
-    return new Promise((resolve, reject) => {
-      const warmArgs = OPENCLAW_ENTRY
-        ? [
-            OPENCLAW_ENTRY, "agent",
-            "--agent", "main",
-            "--message", ".",
-            "--thinking", "off",
-            "--session-id", `warm_${randomUUID().slice(0, 8)}`,
-            "--json",
-          ]
-        : [
-            "exec", "openclaw", "agent",
-            "--agent", "main",
-            "--message", ".",
-            "--thinking", "off",
-            "--session-id", `warm_${randomUUID().slice(0, 8)}`,
-            "--json",
-          ];
+    const child = spawn("node", [
+      OPENCLAW_ENTRY, "agent",
+      "--agent", "main",
+      "--message", ".",
+      "--thinking", "off",
+      "--session-id", `warm_${randomUUID().slice(0, 8)}`,
+      "--json",
+    ], {
+      cwd: AGENT_DIR,
+      env: { ...process.env, OPENCLAW_CONFIG_PATH: OPENCLAW_CONFIG },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
 
-      const child = OPENCLAW_ENTRY
-        ? spawn("node", warmArgs, {
-            cwd: AGENT_DIR,
-            env: { ...process.env, OPENCLAW_CONFIG_PATH: OPENCLAW_CONFIG },
-            stdio: ["ignore", "pipe", "pipe"],
-          })
-        : spawn("pnpm", warmArgs, {
-            cwd: AGENT_DIR,
-            env: { ...process.env, OPENCLAW_CONFIG_PATH: OPENCLAW_CONFIG },
-            stdio: ["ignore", "pipe", "pipe"],
-          });
+    child.stdout.resume(); // drain
+    child.stderr.resume();
 
-      let stdout = "";
-      const timer = setTimeout(() => {
-        child.kill();
-        reject(new Error("Warmup timeout"));
-      }, 15000);
-
-      child.on("close", (code) => {
-        clearTimeout(timer);
-        // Worker completed - mark as ready for next
-        this._warmWorker = null;
-        this.warmup(); // Schedule replacement
-      });
-
-      child.on("error", (err) => {
-        clearTimeout(timer);
-        reject(err);
-      });
-
-      // Worker is considered "warm" as soon as it starts
-      setTimeout(() => resolve(child), 1000);
+    const timer = setTimeout(() => child.kill(), 15000);
+    child.on("close", () => {
+      clearTimeout(timer);
+      console.log("[agent-pool] Warmup done, OS cache loaded");
     });
   }
 
   /**
-   * Execute a message using the warm worker if available,
-   * otherwise spawn fresh.
+   * Execute a message by spawning a fresh OpenClaw agent process.
    */
   async execute(message, sessionId) {
     return new Promise((resolve, reject) => {
       const sid = sessionId || `s_${randomUUID().slice(0, 12)}`;
       const startTime = Date.now();
 
-      // Use node + entry.js directly — skips pnpm exec overhead (~1-2s)
       const args = OPENCLAW_ENTRY
         ? [
             OPENCLAW_ENTRY, "agent",
@@ -165,13 +110,11 @@ class AgentPool {
             cwd: AGENT_DIR,
             env: { ...process.env, OPENCLAW_CONFIG_PATH: OPENCLAW_CONFIG },
             stdio: ["ignore", "pipe", "pipe"],
-            timeout: 60000,
           })
         : spawn("pnpm", args, {
             cwd: AGENT_DIR,
             env: { ...process.env, OPENCLAW_CONFIG_PATH: OPENCLAW_CONFIG },
             stdio: ["ignore", "pipe", "pipe"],
-            timeout: 60000,
           });
 
       let stdout = "";
@@ -180,11 +123,18 @@ class AgentPool {
       child.stdout.on("data", (c) => { stdout += c; });
       child.stderr.on("data", (c) => { stderr += c; });
 
-      child.on("close", (code) => {
-        const elapsed = Date.now() - startTime;
-        console.log(`[agent-pool] Response in ${elapsed}ms`);
+      // Timeout: kill process after 45s
+      const timeout = setTimeout(() => {
+        child.kill("SIGTERM");
+        reject(new Error("Agent timeout (45s)"));
+      }, 45000);
 
-        if (code !== 0) {
+      child.on("close", (code) => {
+        clearTimeout(timeout);
+        const elapsed = Date.now() - startTime;
+        console.log(`[agent-pool] Response in ${elapsed}ms (exit ${code})`);
+
+        if (code !== 0 && code !== null) {
           reject(new Error(stderr.slice(0, 200) || `exit ${code}`));
           return;
         }
@@ -203,4 +153,4 @@ class AgentPool {
   }
 }
 
-export const agentPool = new AgentPool(1);
+export const agentPool = new AgentPool();

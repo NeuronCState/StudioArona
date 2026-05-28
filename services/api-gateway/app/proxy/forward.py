@@ -19,7 +19,7 @@ logger = structlog.get_logger("proxy")
 import os
 
 SERVICE_URLS: dict[str, str] = {
-    "agent": os.environ.get("AGENT_URL", "http://localhost:8001"),
+    "agent": os.environ.get("AGENT_URL", "http://localhost:18790"),
     "perception": os.environ.get("PERCEPTION_URL", "http://localhost:8002"),
 }
 

@@ -208,14 +208,14 @@ async function streamAgentResponse(sessionId, userId, message, res, { lastEventI
     }, 3);
   }
 
-  // Build memory context for prompt injection
-  const memContext = await buildMemoryContext(userId);
+  // Build memory context + save user message in parallel
+  const [memContext] = await Promise.all([
+    buildMemoryContext(userId),
+    saveMessage(sessionId, userId, "user", message),
+  ]);
   const augmentedMessage = memContext
     ? `[最近对话记录]\n${memContext}\n\n[当前消息]\n${message}`
     : message;
-
-  // Save user message
-  await saveMessage(sessionId, userId, "user", message);
 
   // ── Agent response ──
   // Fast path: direct MiniMax API (bypasses OpenClaw spawn, saves ~3s).
@@ -229,7 +229,7 @@ async function streamAgentResponse(sessionId, userId, message, res, { lastEventI
   let evId = 10;
   let fullText = "";
   // Prefer OpenClaw for tool calling. MiniMax direct as fallback.
-  let useDirectMiniMax = !!(process.env.MINIMAX_API_KEY && !process.env.OPENCLAW_AVAILABLE) && !skillMatch;
+  let useDirectMiniMax = false; // disabled: all requests go through OpenClaw Gateway
   if (!useDirectMiniMax && skillMatch) {
     // Force OpenClaw path for skill commands
     useDirectMiniMax = false;
@@ -275,16 +275,19 @@ async function streamAgentResponse(sessionId, userId, message, res, { lastEventI
       // Simulated streaming (agentPool returns full text, split into tokens)
       const tokens = splitTokens(text);
       let idx = 0;
+      // Batch: send 2-3 tokens per tick at 30ms intervals (~100 tokens/sec)
       const interval = setInterval(() => {
-        if (idx < tokens.length) {
+        const batch = Math.min(3, tokens.length - idx);
+        for (let i = 0; i < batch; i++) {
           sseSend(res, "token", { delta: tokens[idx], index: idx }, evId++);
           idx++;
-        } else {
+        }
+        if (idx >= tokens.length) {
           clearInterval(interval);
           sseSend(res, "done", { message_id: messageId, tokens: idx }, evId);
           res.end();
         }
-      }, 8);
+      }, 30);
     }
 
     // Detect MiniMax tool-call hallucination — re-process via OpenClaw
@@ -300,8 +303,6 @@ async function streamAgentResponse(sessionId, userId, message, res, { lastEventI
     }
 
     if (fullText) {
-      saveMessage(sessionId, userId, "assistant", fullText);
-
       // TTS generation in background
       ttsConvert(fullText).then((ttsResult) => {
         if (ttsResult) {

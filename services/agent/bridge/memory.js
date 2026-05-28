@@ -126,6 +126,7 @@ export async function searchMessages(keyword, userId = null, limit = 10) {
  * Get recent cross-session context for a user from PG.
  */
 export async function getRecentContext(userId, maxMessages = 10) {
+  if (!isValidUUID(userId)) return [];
   const db = await getPool();
   const result = await db.query(
     `SELECT cm.session_id, cm.role, cm.content, cm.created_at
@@ -143,7 +144,15 @@ export async function getRecentContext(userId, maxMessages = 10) {
  * Combines PG recent messages + per-user SQLite memory entries via api-gateway.
  */
 export async function buildMemoryContext(userId) {
-  const recent = await getRecentContext(userId, 10);
+  // Parallel: PG query + HTTP fetch concurrently
+  const [recent, memoryEntries] = await Promise.all([
+    getRecentContext(userId, 10),
+    fetch(`${GATEWAY_URL}/internal/memory/entries?user_id=${encodeURIComponent(userId)}&limit=5`)
+      .then(r => r.ok ? r.json() : { entries: [] })
+      .then(d => d.entries || [])
+      .catch(() => []),
+  ]);
+
   const parts = [];
 
   if (recent.length > 0) {
@@ -153,22 +162,11 @@ export async function buildMemoryContext(userId) {
     }
   }
 
-  // Fetch per-user memory entries from api-gateway
-  try {
-    const resp = await fetch(
-      `${GATEWAY_URL}/internal/memory/entries?user_id=${encodeURIComponent(userId)}&limit=5`
-    );
-    if (resp.ok) {
-      const data = await resp.json();
-      if (data.entries && data.entries.length > 0) {
-        parts.push("\n[长期记忆]");
-        for (const entry of data.entries) {
-          parts.push(`- ${entry.summary}`);
-        }
-      }
+  if (memoryEntries.length > 0) {
+    parts.push("\n[长期记忆]");
+    for (const entry of memoryEntries) {
+      parts.push(`- ${entry.summary}`);
     }
-  } catch {
-    // api-gateway memory endpoint not available yet (Phase M2)
   }
 
   return parts.join("\n");

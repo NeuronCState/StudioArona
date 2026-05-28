@@ -208,7 +208,8 @@ if ! .venv/bin/python -c "import sqlalchemy" &>/dev/null; then
     exit 1
 fi
 
-alembic_log=$(mktemp /tmp/alembic-XXXXXX.log)
+rm -f /tmp/alembic-*.log 2>/dev/null || true
+alembic_log=$(mktemp /tmp/alembic-XXXXXXXX.log)
 trap 'err "alembic 迁移失败，日志: $alembic_log"; exit 1' ERR
 .venv/bin/alembic -c alembic.ini upgrade head > "$alembic_log" 2>&1
 trap - ERR

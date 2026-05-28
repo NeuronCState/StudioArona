@@ -4,11 +4,11 @@
     "port": 18789,
     "bind": "loopback",
     "remote": {
-      "token": "c67b3d83ba476762a7d66a66620fb96efc879a5fb9a5926c"
+      "token": "aea15c27b6b3cd8802c5002501a0ff921c170c2d2221bcc1"
     },
     "auth": {
       "mode": "token",
-      "token": "c67b3d83ba476762a7d66a66620fb96efc879a5fb9a5926c"
+      "token": "aea15c27b6b3cd8802c5002501a0ff921c170c2d2221bcc1"
     }
   },
   "agents": {
@@ -16,7 +16,7 @@
       "model": {
         "primary": "minimax-portal/MiniMax-M2.7"
       },
-      "workspace": "/app/workspace"
+      "workspace": "./workspace"
     }
   }
 }
