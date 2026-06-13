@@ -19,6 +19,7 @@ for _env_name in (".env.local", ".env"):
 
 from app.api import auth, health, me, users, weather, admin
 from app.api.skills_marketplace import router as marketplace_router
+from app.api.ocr import router as ocr_router
 from app.api.upload import router as upload_router
 from app.internal.events import router as internal_events_router
 from app.internal.memory_api import router as internal_memory_router
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router)
     app.include_router(upload_router)
     app.include_router(marketplace_router)
+    app.include_router(ocr_router)
     app.include_router(weather.router)
 
     # ── WebSocket event bus ────────────────
