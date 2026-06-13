@@ -6,7 +6,11 @@ import shutil
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from app.services.skill_downloader import download_from_github, get_user_skills_dir, install_skill_to_user
+from app.services.skill_downloader import (
+    download_from_github,
+    get_user_skills_dir,
+    install_skill_to_user,
+)
 from app.services.skill_scanner import scan_skill_files
 from app.services.skill_sources import search_all_sources
 from app.services.translator import translate_to_chinese
@@ -103,7 +107,11 @@ async def list_installed_skills(request: Request):
     for skill_dir in skills_dir.iterdir():
         if skill_dir.is_dir():
             skill_md = skill_dir / "SKILL.md"
-            content = skill_md.read_text(encoding="utf-8", errors="ignore") if skill_md.exists() else ""
+            content = (
+                skill_md.read_text(encoding="utf-8", errors="ignore")
+                if skill_md.exists()
+                else ""
+            )
             skills.append({
                 "slug": skill_dir.name,
                 "name": skill_dir.name,
