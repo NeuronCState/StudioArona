@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '@/stores/auth';
 import { api } from '@/lib/api/client';
 import type { VM, Schedule, Feed } from '@/types/contracts';
@@ -13,6 +14,9 @@ import { createSSEConnection, type SSEEvent } from '@/lib/sse-client';
 import { dispatchUIAction, onUIAction } from '@/lib/ui-actions';
 import type { UIAction } from '@/types/ui-actions';
 import { AgentPanel } from '@/components/agent/AgentPanel';
+import { FocusSidebar } from '@/components/studio/FocusSidebar';
+import { FocusToggle } from '@/components/studio/FocusToggle';
+import { useFocusModeStore } from '@/stores/focus-mode';
 
 type StudioMode = 'dashboard' | 'chat';
 
@@ -74,7 +78,18 @@ export function StudioHomePage() {
   const chatRef = useRef<HTMLDivElement>(null);
   const phaseTimerRef = useRef<number | null>(null);
   const replyTimerRef = useRef<number | null>(null);
-  const [agentOpen, setAgentOpen] = useState(false);
+
+  // Focus mode — 中心按钮扩散 + FocusSidebar 拉出
+  const focusMode = useFocusModeStore((s) => s.focusMode);
+  const setFocusMode = useFocusModeStore((s) => s.setFocusMode);
+  const focusSidebarOpen = useFocusModeStore((s) => s.focusSidebarOpen);
+  const toggleFocusSidebar = useFocusModeStore((s) => s.toggleFocusSidebar);
+
+  // 单一来源: focusMode 同时驱动 AgentPanel 的 open prop.
+  // 中心按钮 → focusMode = true (AgentPanel 自动展开)
+  // AgentPanel 关闭 → focusMode = false
+  const agentOpen = focusMode;
+  const setAgentOpen = setFocusMode;
 
   const { data: weather, isLoading: weatherLoading, error: weatherErr } = useQuery({
     queryKey: ['weather'],
@@ -134,8 +149,11 @@ export function StudioHomePage() {
       new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
     [],
   );
-  const isDashboard = mode === 'dashboard';
-  const isChat = mode === 'chat';
+  const isDashboard = mode === 'dashboard' && !focusMode;
+  const isChat = mode === 'chat' || focusMode;
+  // studio-stage 的 data-mode: dashboard / chat / focus
+  // focus 模式时 4 磁贴淡出, 中心按钮被 AgentPanel 接管
+  const stageMode: StudioMode | 'focus' = focusMode ? 'focus' : mode;
 
   const scheduleEvents = useMemo(() => {
     if (!scheduleData) return [];
@@ -232,7 +250,11 @@ export function StudioHomePage() {
   );
 
   return (
-    <div className="studio-page flex h-full flex-col px-6 pt-5 pb-4">
+    <div
+      className="studio-page relative flex h-full flex-col px-6 pt-5 pb-4"
+      data-focus-mode={focusMode ? 'true' : 'false'}
+      data-focus-sidebar-open={focusSidebarOpen ? 'true' : 'false'}
+    >
       <header className={`studio-home-header mb-5 shrink-0 ${isDashboard ? 'is-visible' : ''}`}>
         <div className="flex items-baseline justify-between">
           <h1
@@ -246,8 +268,8 @@ export function StudioHomePage() {
       </header>
 
       <div
-        className="studio-stage min-h-0 flex-1"
-        data-mode={mode}
+        className="studio-stage relative min-h-0 flex-1"
+        data-mode={stageMode}
         data-phase={phase}
       >
         <div className="tile-layer" aria-hidden={!isDashboard}>
@@ -298,16 +320,35 @@ export function StudioHomePage() {
           </div>
         </div>
 
-        {/* Center action button — opens the AgentPanel */}
-        <button
-          className="center-voice-btn"
-          aria-label="打开阿洛娜专注面板"
-          aria-expanded={agentOpen}
-          type="button"
-          onClick={() => setAgentOpen(true)}
-        >
-          <img src="/voice-btn.png" alt="阿洛娜专注" />
-        </button>
+        {/* Center action button — opens the AgentPanel via layoutId shared element.
+            When focusMode, an expanded backdrop with the same layoutId takes over,
+            and framer-motion animates the morph (ring → full rectangle). */}
+        <AnimatePresence mode="popLayout">
+          {!focusMode && (
+            <motion.button
+              key="center-btn"
+              layoutId="focus-ring"
+              className="center-voice-btn"
+              aria-label="打开阿洛娜专注面板"
+              aria-expanded={focusMode}
+              type="button"
+              onClick={() => setAgentOpen(true)}
+            >
+              <img src="/voice-btn.png" alt="阿洛娜专注" />
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {focusMode && (
+            <motion.div
+              key="focus-ring-expanded"
+              layoutId="focus-ring"
+              className="focus-ring-expanded"
+              aria-hidden="true"
+            />
+          )}
+        </AnimatePresence>
 
         <section className="conversation-stage" aria-hidden={!isChat}>
           <div ref={chatRef} className="conversation-panel">
@@ -353,6 +394,19 @@ export function StudioHomePage() {
           onSend={handleSend}
         />
       </div>
+
+      {/* FocusSidebar — 专注模式下拉出, 历史 + 3 区域 (240px 宽) */}
+      <FocusSidebar
+        open={focusMode && focusSidebarOpen}
+        onClose={() => toggleFocusSidebar()}
+      />
+
+      {/* FocusToggle — focus mode 才显示, 收回指示条 */}
+      <FocusToggle
+        visible={focusMode}
+        open={focusSidebarOpen}
+        onToggle={() => toggleFocusSidebar()}
+      />
     </div>
   );
 }
