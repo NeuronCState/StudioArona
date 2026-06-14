@@ -1,0 +1,226 @@
+/* ============================================================
+   Studio Arona — Global Animation Definitions
+   Reusable keyframes and transition utility classes.
+   ============================================================ */
+
+/* ---------- Fade ---------- */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* ---------- Slide ---------- */
+@keyframes slide-up {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translate3d(0, -12px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translate3d(16px, 0, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes slide-out-right {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to   { opacity: 0; transform: translate3d(16px, 0, 0); }
+}
+
+/* ---------- Scale ---------- */
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes scale-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.96); }
+}
+
+/* ---------- Shake ---------- */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 50%, 90% { transform: translateX(-4px); }
+  30%, 70% { transform: translateX(4px); }
+}
+
+/* ---------- Pulse (attract attention, NOT continuous) ---------- */
+@keyframes pulse-attention {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+/* ---------- Home ambient drift (compositor only) ---------- */
+@keyframes home-ambient-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(-2%, -1%, 0) scale(1.04); }
+}
+
+/* ---------- Transition Utility Classes ---------- */
+.motion-fade-in {
+  animation: fade-in var(--duration-base) var(--ease-out) both;
+}
+
+.motion-slide-up {
+  animation: slide-up var(--duration-base) var(--ease-out) both;
+}
+
+.motion-scale-in {
+  animation: scale-in var(--duration-fast) var(--ease-elastic) both;
+}
+
+.motion-shake {
+  animation: shake var(--duration-fast) var(--ease-in-out) both;
+}
+
+/* Stagger children: add to parent for staggered entrance */
+.motion-stagger > * {
+  opacity: 0;
+  animation: slide-up var(--duration-base) var(--ease-out) forwards;
+}
+
+.motion-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.motion-stagger > *:nth-child(2) { animation-delay: 60ms; }
+.motion-stagger > *:nth-child(3) { animation-delay: 120ms; }
+.motion-stagger > *:nth-child(4) { animation-delay: 180ms; }
+.motion-stagger > *:nth-child(5) { animation-delay: 240ms; }
+.motion-stagger > *:nth-child(6) { animation-delay: 300ms; }
+.motion-stagger > *:nth-child(7) { animation-delay: 360ms; }
+.motion-stagger > *:nth-child(8) { animation-delay: 420ms; }
+
+/* ---------- Card hover/press micro-interactions ---------- */
+.motion-lift {
+  transition: transform var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.motion-lift:hover {
+  transform: translate3d(0, -2px, 0);
+}
+
+.motion-lift:active {
+  transform: translate3d(0, 0, 0) scale(0.99);
+}
+
+/* ---------- Route transition ---------- */
+.route-enter {
+  opacity: 0;
+  transform: translate3d(0, 8px, 0);
+}
+
+.route-enter-active {
+  opacity: 1;
+  transform: none;
+  transition: var(--motion-route);
+}
+
+.route-exit {
+  opacity: 1;
+}
+
+.route-exit-active {
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+/* ---------- Route mount animation (key-based, for RouteTransition) ---------- */
+@keyframes route-enter-anim {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.route-stage {
+  animation: route-enter-anim var(--duration-slow) var(--ease-out) both;
+}
+
+/* ---------- Motion press (active-state micro-interaction) ---------- */
+.motion-press {
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.motion-press:active {
+  transform: scale(0.98);
+}
+
+/* ---------- Skeleton pulse (loading placeholder shimmer) ---------- */
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* ---------- Toast slide-in (from right, staggered) ---------- */
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translate3d(12px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* ---------- Modal scale-in (backdrop fade + content scale) ---------- */
+@keyframes modal-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ---------- Route exit animation (key-based remount path) ---------- */
+@keyframes route-exit-anim {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0);
+  }
+}
+
+/* ---------- Sidebar collapse (always mounted, width transition) ---------- */
+.sidebar-transition-width {
+  transition: width var(--duration-base) var(--ease-out);
+}
+
+/* ============================================================
+   prefers-reduced-motion: reduce — all animations instant
+   This is the nuclear option: catches any animation/transition
+   regardless of whether it uses our CSS variables.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+  }
+}

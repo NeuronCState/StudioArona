@@ -1,0 +1,179 @@
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+    transition: background-color 1s ease, color 1s ease, border-color 1s ease;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    color: var(--color-text-primary);
+    background-color: var(--color-bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 1s ease, color 1s ease;
+  }
+
+  /* ───── 滚动条: 完全隐藏 (最稳定的方案) ─────
+     完全不渲染滚动条 UI — 不会跨浏览器不一致、不会因 scrollbar-gutter 抖动。
+     用户依然可以用滚轮 / 触摸板 / 方向键滚动。
+     移动端本来就不显示滚动条, 此样式对移动端无影响。 */
+  ::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+  /* Firefox */
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  code, pre {
+    font-family: var(--font-mono);
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors;
+    background-color: var(--color-accent);
+  }
+  .btn-primary:hover {
+    background-color: var(--color-accent-hover);
+  }
+  .btn-primary:focus-visible {
+    @apply outline-none ring-2 ring-offset-2;
+    ring-color: var(--color-accent);
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors;
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
+    color: var(--color-text-primary);
+  }
+  .btn-secondary:hover {
+    background-color: var(--color-bg);
+  }
+  .btn-secondary:focus-visible {
+    @apply outline-none ring-2 ring-offset-2;
+    ring-color: var(--color-accent);
+  }
+
+  .card {
+    @apply rounded-xl border p-4;
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
+    box-shadow: var(--shadow-1);
+  }
+
+  .input {
+    @apply w-full rounded-lg border px-3 py-2 text-sm transition-colors;
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
+    color: var(--color-text-primary);
+    border-radius: var(--radius-sm);
+  }
+  .input::placeholder {
+    color: var(--color-text-muted);
+  }
+  .input:focus-visible {
+    @apply outline-none ring-2 ring-offset-2;
+    ring-color: var(--color-accent);
+  }
+}
+
+/* Markdown prose styles (Claude-inspired) */
+.prose-javis {
+  @apply text-sm leading-relaxed;
+  color: var(--color-text-primary);
+}
+.prose-javis p { @apply mb-2 last:mb-0; }
+.prose-javis ul, .prose-javis ol { @apply mb-2 pl-5; }
+.prose-javis ul { @apply list-disc; }
+.prose-javis ol { @apply list-decimal; }
+.prose-javis li { @apply mb-0.5; }
+
+.prose-javis code {
+  @apply rounded px-1.5 py-0.5 font-mono text-xs;
+  background-color: var(--color-bg);
+  color: var(--color-accent);
+}
+
+.prose-javis pre {
+  @apply mb-2 overflow-x-auto rounded-lg p-3 text-xs;
+  background-color: var(--color-bg);
+}
+
+.prose-javis pre code {
+  @apply bg-transparent p-0;
+  color: var(--color-accent);
+}
+
+.prose-javis blockquote {
+  @apply mb-2 border-l-2 pl-3 italic;
+  border-color: var(--color-accent);
+  color: var(--color-text-secondary);
+}
+
+.prose-javis a {
+  @apply underline underline-offset-2;
+  color: var(--color-accent);
+}
+.prose-javis a:hover {
+  color: var(--color-accent-hover);
+}
+
+.prose-javis table {
+  @apply mb-2 w-full text-xs;
+}
+
+.prose-javis th {
+  @apply border-b pb-1 text-left font-medium;
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.prose-javis td {
+  @apply border-b py-1;
+  border-color: var(--color-border-subtle);
+}
+
+.prose-javis hr {
+  @apply my-3;
+  border-color: var(--color-border);
+}
+.prose-javis strong { @apply font-semibold; }
+.prose-javis em { @apply italic; }
+
+/* Streaming cursor */
+.stream-cursor > *:last-child::after {
+  content: '▌';
+  animation: cursorBlink 1s step-end infinite;
+  color: var(--color-accent);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply rounded-full;
+  background-color: var(--color-border-subtle);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-muted);
+}
