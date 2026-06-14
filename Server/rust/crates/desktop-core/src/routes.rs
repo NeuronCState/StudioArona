@@ -29,6 +29,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/admin/system", get(get_system_info))
         .route("/api/admin/users", get(list_users))
         .route("/api/admin/stats", get(get_admin_stats))
+        .route("/api/weather", get(get_weather))
         .layer(middleware::from_fn(auth_middleware));
 
     // 不需要认证的路由
