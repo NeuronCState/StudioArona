@@ -12,7 +12,6 @@ import { QuickChatBar } from './tiles/QuickChatBar';
 import { createSSEConnection, type SSEEvent } from '@/lib/sse-client';
 import { dispatchUIAction, onUIAction } from '@/lib/ui-actions';
 import type { UIAction } from '@/types/ui-actions';
-import { Sparkles } from 'lucide-react';
 import { AgentPanel } from '@/components/agent/AgentPanel';
 
 type StudioMode = 'dashboard' | 'chat';
@@ -307,7 +306,7 @@ export function StudioHomePage() {
           type="button"
           onClick={() => setAgentOpen(true)}
         >
-          <Sparkles size={64} aria-hidden="true" strokeWidth={1.5} />
+          <img src="/voice-btn.png" alt="阿洛娜专注" />
         </button>
 
         <section className="conversation-stage" aria-hidden={!isChat}>
