@@ -3,7 +3,7 @@
 use crate::services::*;
 use crate::state::AppState;
 use axum::{
-    routing::{get, post, delete, patch},
+    routing::{get, post, delete, patch, put},
     Router,
 };
 use std::sync::Arc;
@@ -29,6 +29,15 @@ pub fn router(state: AppState) -> Router {
         .route("/api/memory", get(list_memories).post(create_memory))
         .route("/api/memory/:id", delete(delete_memory))
         .route("/api/memory/search", post(search_memory))
+        
+        // Feeds (RSS)
+        .route("/api/feeds", get(list_feeds).post(create_feed))
+        .route("/api/feeds/:id", delete(delete_feed))
+        .route("/api/feeds/:id/items", get(list_feed_items))
+        
+        // Schedules
+        .route("/api/schedules", get(list_schedules).post(create_schedule))
+        .route("/api/schedules/:id", put(update_schedule).delete(delete_schedule))
         
         // TODO: 顶替 v2 api-gateway 全部 endpoint:
         //   /api/users (admin)
