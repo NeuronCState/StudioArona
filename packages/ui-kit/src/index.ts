@@ -1,4 +1,4 @@
-// Studio Javis UI Kit — Claude-inspired design system
+// Studio Arona UI Kit — Claude-inspired design system
 // Re-export all components
 
 export { Button } from './components/Button';

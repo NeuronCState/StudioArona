@@ -20,6 +20,16 @@ async def proxy_chat(path: str, request: Request, user: User = _CurrentUser):
     _set_user_state(request, user)
     return await forward_to('agent', f'api/chat/{path}', request)
 
+@router.api_route('/api/page-content/{path:path}', methods=['GET'])
+async def proxy_page_content(path: str, request: Request, user: User = _CurrentUser):
+    _set_user_state(request, user)
+    return await forward_to('agent', f'api/page-content/{path}', request)
+
+@router.api_route('/api/article-content', methods=['GET'])
+async def proxy_article_content(request: Request, user: User = _CurrentUser):
+    _set_user_state(request, user)
+    return await forward_to('agent', 'api/article-content', request)
+
 @router.api_route('/api/feeds/{path:path}', methods=['GET','POST','DELETE'])
 async def proxy_feeds(path: str, request: Request, user: User = _CurrentUser):
     _set_user_state(request, user)
@@ -91,3 +101,22 @@ async def proxy_network(path: str, request: Request, user: User = _CurrentUser):
 @router.api_route('/api/speech/{path:path}', methods=['POST'])
 async def proxy_speech(path: str, request: Request):
     return await forward_to('perception', f'api/speech/{path}', request)
+
+# ── LLM Gateway (services/llm_gateway) ──
+# OpenAI-compatible /v1/chat/completions + per-user skills/memory/sessions.
+# LLM Gateway uses X-Arona-User header (set by get_current_user) for routing.
+# /v1/chat/completions does NOT require auth — the agent bridge hits it with
+# X-User-Id directly. Per-user routes (/v1/users/...) DO require auth.
+
+@router.api_route('/api/v1/chat/{path:path}', methods=['POST'])
+async def proxy_v1_chat(path: str, request: Request):
+    return await forward_to('llm_gateway', f'v1/chat/{path}', request)
+
+@router.api_route('/api/v1/models', methods=['GET'])
+async def proxy_v1_models(request: Request):
+    return await forward_to('llm_gateway', 'v1/models', request)
+
+@router.api_route('/api/v1/users/{path:path}', methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
+async def proxy_v1_users(path: str, request: Request, user: User = _CurrentUser):
+    _set_user_state(request, user)
+    return await forward_to('llm_gateway', f'v1/users/{path}', request)

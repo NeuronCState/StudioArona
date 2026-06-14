@@ -27,7 +27,7 @@ async def nas_auto_login(
     return {
         "url": NAS_WEB_URL,
         "username": user.username,
-        "message": "NAS account uses the same credentials as Studio Javis",
+        "message": "NAS account uses the same credentials as Studio Arona",
     }
 
 

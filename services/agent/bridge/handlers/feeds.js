@@ -5,6 +5,7 @@
  */
 
 import { query, requireUserId } from "../db/index.js";
+import { createMonitor as createPageMonitor } from "./page-monitor.js";
 
 // ── Feeds ──────────────────────────────────────────────────────
 
@@ -13,10 +14,14 @@ import { query, requireUserId } from "../db/index.js";
  */
 export async function listFeeds(req, ctx) {
   const userId = requireUserId(ctx);
+  // 注意：前端 FeedsPage 同时调 /api/feeds 和 /api/page-monitors，
+  // 列表/删除/详情/标记已读/星标 都按 kind 走对应表
+  // 这里只返回真正的 RSS feed 行 (URL 以 http(s):// 开头)，不返回 web-watcher 写的 page:// 合成 feed
   const result = await query(
     `SELECT id, user_id, url, title, category, enabled, last_fetched_at, created_at
      FROM feed
      WHERE user_id = $1
+       AND url NOT LIKE 'page://%'
      ORDER BY created_at DESC`,
     [userId],
   );
@@ -26,6 +31,29 @@ export async function listFeeds(req, ctx) {
 /**
  * POST /api/feeds — add a feed.
  */
+
+// ── URL type sniff: "feed" (RSS/Atom/JSON) vs "page" (普通网页) ─────
+function sniffFeedType(url) {
+  try {
+    const u = new URL(url);
+    const p = u.pathname.toLowerCase();
+    const q = u.search.toLowerCase();
+    const host = u.hostname.toLowerCase();
+    // 1) pathname 含 /feed /rss /atom
+    if (/\/(feed|rss|atom)(\/|$|\?)/.test(p)) return "feed";
+    // 2) 扩展名 .xml / .atom / .json (JSON Feed 常见)
+    if (/\.(xml|atom|rss)$/.test(p)) return "feed";
+    if (/\.json(\?|$)/.test(p) && /[?&]format=(feed|atom|rss)/.test(q)) return "feed";
+    // 3) 查询参数 ?feed= / ?format=atom/rss/xml
+    if (/[?&](feed|rss|atom|format)=(atom|rss|xml|feed)/.test(q)) return "feed";
+    // 4) hostname 含 RSS 平台关键字
+    if (host.includes("rss") || host.includes("rsshub") || host.includes("feedburner") || host.includes("feedly") || host.includes("feedproxy")) return "feed";
+    return "page";
+  } catch {
+    return "page";
+  }
+}
+
 export async function createFeed(req, ctx) {
   const userId = requireUserId(ctx);
   const { url, title, category } = req;
@@ -36,6 +64,22 @@ export async function createFeed(req, ctx) {
     throw err;
   }
 
+  const kind = sniffFeedType(url);
+
+  if (kind === "page") {
+    // 普通网页：走 web-watcher（page_monitor）
+    const monitor = await createPageMonitor({ url, label: title || url, css_selector: "body", check_interval_min: 5 }, ctx);
+    return {
+      id: monitor.id,
+      url: monitor.url,
+      title: monitor.label,
+      category: category || null,
+      kind: "page",
+      message: "已加入智能监控（web-watcher 5 min 轮询）",
+    };
+  }
+
+  // 标准 RSS/Atom/JSON Feed
   const result = await query(
     `INSERT INTO feed (user_id, url, title, category)
      VALUES ($1, $2, $3, $4)
@@ -43,7 +87,7 @@ export async function createFeed(req, ctx) {
      RETURNING *`,
     [userId, url, title || null, category || null],
   );
-  return result.rows[0];
+  return { ...result.rows[0], kind: "feed" };
 }
 
 /**

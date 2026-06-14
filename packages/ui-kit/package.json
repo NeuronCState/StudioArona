@@ -10,6 +10,7 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
+    "framer-motion": "^11.11.0",
     "lucide-react": "^0.460.0"
   },
   "peerDependencies": {

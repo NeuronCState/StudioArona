@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -74,7 +75,7 @@ class CalibConfig:
 
     # Output
     save_frames: bool = True
-    output_dir: str = "/tmp/calibration"
+    output_dir: str = str(Path(tempfile.gettempdir()) / "calibration")
 
 
 # ---------------------------------------------------------------------------

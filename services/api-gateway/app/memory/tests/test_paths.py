@@ -17,9 +17,10 @@ def test_get_user_data_dir_default():
 
 
 def test_get_user_data_dir_from_env():
-    os.environ["JAVIS_USER_DATA_DIR"] = "/tmp/javis-test"
+    test_dir = os.path.join(tempfile.gettempdir(), "javis-test")
+    os.environ["JAVIS_USER_DATA_DIR"] = test_dir
     d = get_user_data_dir()
-    assert str(d) == "/tmp/javis-test"
+    assert str(d) == test_dir
     del os.environ["JAVIS_USER_DATA_DIR"]
 
 

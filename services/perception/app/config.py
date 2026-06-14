@@ -15,12 +15,23 @@ from pydantic import BaseModel
 class Platform(str, Enum):
     MAC = "mac"
     LINUX = "linux"
+    WINDOWS = "windows"
+
+
+def _detect_platform() -> str:
+    """Auto-detect platform from sys.platform."""
+    import sys
+    if sys.platform == "darwin":
+        return "mac"
+    elif sys.platform == "win32":
+        return "windows"
+    return "linux"
 
 
 class Settings(BaseModel):
     """Perception service settings loaded from environment."""
 
-    platform: Literal["mac", "linux"] = "mac"
+    platform: Literal["mac", "linux", "windows", "auto"] = "auto"
     camera_device: int | str = 0
     face_threshold: float = 0.62
     track_fps: int = 15
@@ -49,8 +60,11 @@ class Settings(BaseModel):
 
     @classmethod
     def from_env(cls) -> Settings:
+        raw_platform = os.getenv("PERCEPTION_PLATFORM", "auto")
+        if raw_platform == "auto":
+            raw_platform = _detect_platform()
         return cls(
-            platform=os.getenv("PERCEPTION_PLATFORM", "mac"),  # type: ignore[arg-type]
+            platform=raw_platform,  # type: ignore[arg-type]
             camera_device=_parse_camera_device(os.getenv("PERCEPTION_CAMERA_DEVICE", "0")),
             face_threshold=float(os.getenv("PERCEPTION_FACE_THRESHOLD", "0.62")),
             track_fps=int(os.getenv("PERCEPTION_TRACK_FPS", "15")),

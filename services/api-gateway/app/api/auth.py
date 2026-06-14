@@ -1,10 +1,12 @@
 """Auth endpoints: login / refresh / logout."""
 
+import re
+
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,15 +20,30 @@ from app.models.user import User
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
-
+# Invitation code is deprecated. Kept as a constant so any in-flight /register
+# calls with the old body still get a 403 (loud) instead of silently going
+# through. New clients should omit the field.
 VALID_INVITATION_CODE = "arona"
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class RegisterRequest(BaseModel):
     username: str
     display_name: str
     password: str
-    invitation_code: str
+    invitation_code: str | None = None  # deprecated, ignored if present
+    email: str | None = None  # optional — used for email notifications
+
+    @field_validator("email")
+    @classmethod
+    def _validate_email(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return None
+        v = v.strip()
+        if not _EMAIL_RE.match(v):
+            raise ValueError("invalid email format")
+        return v.lower()
 
 
 class LoginRequest(BaseModel):
@@ -46,10 +63,12 @@ class RefreshRequest(BaseModel):
 
 @router.post("/register", status_code=201)
 async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
-    if body.invitation_code != VALID_INVITATION_CODE:
+    # If client still sends the old invitation_code, reject loudly so they fix it
+    if body.invitation_code is not None:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "JAVIS_INVALID_INVITATION", "message": "识别码无效"},
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"code": "JAVIS_INVITATION_REMOVED",
+                    "message": "邀请码已废弃，注册请用可选的 email 字段"},
         )
 
     existing = await db.execute(select(User).where(User.username == body.username))
@@ -59,12 +78,21 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
             detail={"code": "JAVIS_USER_EXISTS", "message": "用户名已存在"},
         )
 
+    # If email provided, ensure uniqueness
+    if body.email:
+        existing_email = await db.execute(select(User).where(User.email == body.email))
+        if existing_email.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"code": "JAVIS_EMAIL_TAKEN", "message": "邮箱已被使用"},
+            )
+
     user = User(
         username=body.username,
         display_name=body.display_name,
         password_hash=hash_password(body.password),
         role="member",
-        invitation_code=body.invitation_code,
+        email=body.email,
     )
     db.add(user)
     await db.flush()
@@ -94,6 +122,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
             "id": user.id,
             "username": user.username,
             "display_name": user.display_name,
+            "email": user.email,
             "role": user.role,
             "created_at": user.created_at.isoformat(),
         },

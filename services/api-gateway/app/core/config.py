@@ -20,8 +20,9 @@ class Settings(BaseSettings):
     # ── Auth ────────────────────────────────
     JWT_SECRET: str = "dev-only-replace-me"
     JWT_ALGORITHM: str = "HS256"
-    JWT_TTL_MIN: int = 60
-    JWT_REFRESH_TTL_DAY: int = 7
+    # 短 access + 长 refresh, 配合前端 401 自动 refresh 续期
+    JWT_TTL_MIN: int = 30  # access token 30 分钟过期
+    JWT_REFRESH_TTL_DAY: int = 30  # refresh token 30 天过期
 
     model_config = {"env_file": ".env.local", "env_file_encoding": "utf-8", "extra": "ignore"}
 

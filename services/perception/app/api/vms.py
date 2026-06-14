@@ -10,6 +10,8 @@ POST   /api/vms/{vmId}/exec_enable → toggle exec_enabled
 
 from __future__ import annotations
 
+import tempfile
+
 from fastapi import APIRouter, HTTPException, Query, UploadFile
 
 from app.core.vm.base import VM, VMSpec
@@ -58,7 +60,8 @@ async def upload_to_vm(vm_id: str, file: UploadFile) -> dict:
     backend = _get_vm_backend()
     try:
         # In mock mode, just log the upload
-        await backend.upload(vm_id, file.filename or "unknown", f"/tmp/{file.filename}")
+        tmp_path = f"{tempfile.gettempdir()}/{file.filename}"
+        await backend.upload(vm_id, file.filename or "unknown", tmp_path)
         return {"ok": True, "filename": file.filename}
     except KeyError:
         raise HTTPException(status_code=404, detail=f"VM {vm_id} not found")

@@ -1,24 +1,24 @@
 /**
- * TTS Module — text-to-speech via OpenClaw Gateway (MiniMax backend).
+ * TTS Module — text-to-speech (legacy, OpenClaw removed).
  *
  * Flow:
  *   1. Agent generates text response
- *   2. Bridge calls ttsConvert(text) → spawns `openclaw infer tts convert`
- *   3. Audio saved to /tmp/arona_tts/<id>.mp3
+ *   2. Bridge calls ttsConvert(text) → currently returns null (OpenClaw removed)
+ *   3. Audio saved to <tmpdir>/arona_tts/<id>.mp3
  *   4. Bridge serves audio via GET /api/tts/:id
  *   5. Bridge sends SSE ui_action: live2d.lipsync_audio → frontend plays + lip-sync
+ *
+ * TODO: Re-implement TTS via Hermes or direct MiniMax TTS API.
  */
 
-import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const AGENT_DIR = path.resolve(__dirname, "..");
-const OPENCLAW_CONFIG = path.join(AGENT_DIR, "openclaw.json");
-const TTS_DIR = path.join("/tmp", "arona_tts");
+const TTS_DIR = path.join(os.tmpdir(), "arona_tts");
 
 // Ensure TTS output directory exists
 if (!fs.existsSync(TTS_DIR)) {
@@ -26,71 +26,13 @@ if (!fs.existsSync(TTS_DIR)) {
 }
 
 /**
- * Convert text to speech via OpenClaw Gateway.
- * Returns the audio file path on success, null on failure.
+ * Convert text to speech.
+ * Currently disabled — OpenClaw TTS backend removed.
+ * Returns null until a new TTS backend is implemented.
  */
 export function ttsConvert(text, voice = null) {
-  return new Promise((resolve) => {
-    if (!text || text.trim().length === 0) {
-      resolve(null);
-      return;
-    }
-
-    const ttsId = randomUUID().slice(0, 8);
-    const outputPath = path.join(TTS_DIR, `${ttsId}.mp3`);
-
-    const args = [
-      "exec", "openclaw", "infer", "tts", "convert",
-      "--text", text,
-      "--output", outputPath,
-      "--gateway",
-      "--json",
-    ];
-
-    if (voice) {
-      args.push("--voice", voice);
-    }
-
-    const child = spawn("pnpm", args, {
-      cwd: AGENT_DIR,
-      env: { ...process.env, OPENCLAW_CONFIG_PATH: OPENCLAW_CONFIG },
-      stdio: ["ignore", "pipe", "pipe"],
-      timeout: 30000,
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    child.stdout.on("data", (c) => { stdout += c; });
-    child.stderr.on("data", (c) => { stderr += c; });
-
-    child.on("close", (code) => {
-      if (code !== 0) {
-        console.error(`[tts] Convert failed: ${stderr.slice(0, 200)}`);
-        resolve(null);
-        return;
-      }
-
-      try {
-        const result = JSON.parse(stdout);
-        if (result.ok && fs.existsSync(outputPath)) {
-          console.log(`[tts] Generated: ${outputPath} (${fs.statSync(outputPath).size} bytes)`);
-          resolve({ path: outputPath, id: ttsId });
-        } else {
-          console.error("[tts] No output file");
-          resolve(null);
-        }
-      } catch (err) {
-        console.error("[tts] Parse error:", err.message);
-        resolve(null);
-      }
-    });
-
-    child.on("error", (err) => {
-      console.error("[tts] Spawn error:", err.message);
-      resolve(null);
-    });
-  });
+  // TODO: Re-implement via Hermes TTS or MiniMax TTS API
+  return Promise.resolve(null);
 }
 
 /**

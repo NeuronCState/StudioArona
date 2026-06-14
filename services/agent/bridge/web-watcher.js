@@ -10,107 +10,44 @@
  */
 
 import * as cheerio from "cheerio";
-import crypto from "node:crypto";
-import { readFileSync } from "node:fs";
-import { writeFile, mkdir } from "node:fs/promises";
-import { JSDOM } from "jsdom";
-import { Readability } from "@mozilla/readability";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { mkdir } from "node:fs/promises";
 import { query } from "./db.js";
 import { log } from "./logger.js";
+import { fetchArticle, saveReadingPage, hashContent, sanitizeName } from "./lib/article.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.resolve(__dirname, "..", "data", "pages");
+
+
 const MINIMAX_API_KEY = process.env.MINIMAX_API_KEY || "";
 const MINIMAX_URL = "https://api.minimaxi.com/v1/chat/completions";
 const KNOWN_LINKS = new Map(); // monitor_id → Set of known article URLs
 
 // ── helpers ──────────────────────────────────────────────────
 
-function hashContent(text) {
-  return crypto.createHash("sha256").update(text.trim()).digest("hex");
-}
 
-function sanitizeName(name) {
-  return name.replace(/[^a-zA-Z0-9一-鿿_-]/g, "_").slice(0, 80);
-}
-
-// ── Article extraction with readability ─────────────────────
-
-async function fetchArticle(url, siteDir, monitorId) {
-  try {
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(15000),
-      headers: { "User-Agent": "StudioJavis-ArticleBot/1.0" },
-    });
-    if (!res.ok) return null;
-    const html = await res.text();
-    const dom = new JSDOM(html, { url });
-    const reader = new Readability(dom.window.document);
-    const article = reader.parse();
-    if (!article) return null;
-
-    // Extract content images (skip tiny icons, ads, trackers)
-    const imgUrls = [];
-    const contentDom = new JSDOM(article.content || "");
-    const imgs = contentDom.window.document.querySelectorAll("img");
-    for (const img of imgs) {
-      const src = img.getAttribute("src");
-      const w = parseInt(img.getAttribute("width") || "0");
-      const h = parseInt(img.getAttribute("height") || "0");
-      if (src && (w > 100 || h > 100 || (!w && !h))) {
-        // Filter likely ads/trackers
-        if (!/pixel|track|beacon|ads|analytics|1x1/i.test(src)) {
-          imgUrls.push(new URL(src, url).href);
-        }
-      }
-    }
-
-    // Download and save images
-    const savedImgs = [];
-    for (const imgUrl of imgUrls.slice(0, 5)) {
-      try {
-        const imgRes = await fetch(imgUrl, {
-          signal: AbortSignal.timeout(10000),
-          headers: { "User-Agent": "StudioJavis-ArticleBot/1.0" },
-        });
-        if (!imgRes.ok) continue;
-        const buf = Buffer.from(await imgRes.arrayBuffer());
-        const ext = imgUrl.split(".").pop()?.split("?")[0] || "jpg";
-        const imgName = `${crypto.randomUUID().slice(0, 8)}.${ext}`;
-        await writeFile(path.join(siteDir, imgName), buf);
-        savedImgs.push(imgName);
-      } catch { /* skip failed image downloads */ }
-    }
-
-    return {
-      title: article.title || "",
-      text: article.textContent || "",
-      content: article.content || "",
-      imageCount: savedImgs.length,
-      siteDir: path.relative(DATA_DIR, siteDir),
-    };
-  } catch (e) {
-    log.warn(`[web-watcher] article fetch failed for ${url}: ${e.message}`);
-    return null;
-  }
-}
 
 // ── Extract article links from monitored page ───────────────
 
 function extractLinks(html, baseUrl) {
   const $ = cheerio.load(html);
   const links = new Set();
+  const base = new URL(baseUrl);
   $("a[href]").each((_, el) => {
     const href = $(el).attr("href");
     if (!href) return;
     try {
       const full = new URL(href, baseUrl).href;
-      // Skip anchors, javascript, mailto, same-page links
-      if (full.startsWith("http") && full !== baseUrl && !full.includes("#")) {
-        links.add(full);
-      }
+      const u = new URL(full);
+      // Skip non-article pages: anchors, javascript, mailto, off-site, list pages
+      if (!full.startsWith("http")) return;
+      if (full === baseUrl || full.includes("#")) return;
+      if (u.host !== base.host) return;          // 跨站不算
+      if (/\/rss|\/feed|\/tag|\/category|\/list\b/i.test(u.pathname)) return;
+      if (/\/(app|quan|wap|m|static)\//i.test(u.pathname)) return;
+      // Must look like an article: has digit segment in path
+      if (!/\d+\.\w+$|\/\d+\b|\/\d+\/\d+\b/.test(u.pathname)) return;
+      links.add(full);
     } catch { /* skip invalid URLs */ }
   });
   return [...links];
@@ -173,27 +110,9 @@ async function ensureFeed(monitor) {
   return result.rows[0].id;
 }
 
-async function createFeedItem(feedId, monitor, summary, article, originalUrl) {
-  const guid = crypto.createHash("md5").update(originalUrl).digest("hex");
-
-  // Save article HTML for reading page
-  const htmlPath = `${article.siteDir}/${guid}.html`;
-  const readingPage = `<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${summary.title}</title>
-<style>body{font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:0 auto;padding:24px 16px;line-height:1.8;color:#1a1a1a}
-img{max-width:100%;height:auto;border-radius:8px;margin:16px 0}
-h1{font-size:1.6em;margin-bottom:8px}a{color:#2563eb;text-decoration:none}
-.meta{color:#888;font-size:.85em;margin-bottom:24px}.source{margin-top:32px;padding-top:16px;border-top:1px solid #eee}
-</style></head><body>
-<h1>${summary.title}</h1>
-<div class="meta">来源: ${new URL(originalUrl).hostname} · ${new Date().toLocaleDateString("zh-CN")}</div>
-${article.content}
-<div class="source"><a href="${originalUrl}" target="_blank">查看原文 →</a></div>
-</body></html>`;
-  const htmlFullPath = path.join(DATA_DIR, htmlPath);
-  await mkdir(path.dirname(htmlFullPath), { recursive: true });
-  await writeFile(htmlFullPath, readingPage, "utf-8");
+async function createFeedItem(feedId, monitor, summary, article, originalUrl, siteDir) {
+  // Save the rendered reading page (title + content + original URL link)
+  const { guid, htmlPath } = await saveReadingPage(siteDir, article, originalUrl);
 
   await query(
     `INSERT INTO feed_item (feed_id, guid, title, link, summary, published_at, read, starred)
@@ -204,17 +123,30 @@ ${article.content}
   );
 }
 
+
 // ── Main check logic ─────────────────────────────────────────
 
 async function checkOne(monitor) {
   try {
     const res = await fetch(monitor.url, {
       signal: AbortSignal.timeout(15000),
-      headers: { "User-Agent": "StudioJavis-WebWatcher/1.0" },
+      headers: { "User-Agent": "StudioArona-WebWatcher/1.0" },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const html = await res.text();
-    const hash = hashContent(html);
+    // 用 css_selector 提取关注区（默认 body）。空/null/未指定则用全页。
+    const sel = (monitor.css_selector || "body").trim();
+    let watchHtml = html;
+    if (sel && sel !== "body") {
+      const $w = cheerio.load(html);
+      const $slice = $w(sel);
+      if ($slice.length === 0) {
+        log.warn(`[web-watcher] selector "${sel}" matched 0 nodes for ${monitor.label}, using full page`);
+      } else {
+        watchHtml = $slice.html() || html;
+      }
+    }
+    const hash = hashContent(watchHtml);
 
     if (hash === monitor.last_hash) {
       await query("UPDATE page_monitor SET last_checked_at = now() WHERE id = $1", [monitor.id]);
@@ -229,8 +161,8 @@ async function checkOne(monitor) {
       [hash, monitor.id],
     );
 
-    // Extract article links from the page
-    const links = extractLinks(html, monitor.url);
+    // Extract article links from the watched region (or full page if body)
+    const links = extractLinks(watchHtml, monitor.url);
     log.info(`[web-watcher] found ${links.length} links on ${monitor.label}`);
 
     // Track known links per monitor
@@ -253,15 +185,56 @@ async function checkOne(monitor) {
     let count = 0;
     for (const link of newLinks.slice(0, 10)) {
       known.add(link);
-      const article = await fetchArticle(link, siteDir, monitor.id);
-      if (!article || !article.text) continue;
-
-      const summary = await summarizeWithMiniMax(article.text, link);
-      await createFeedItem(feedId, monitor, summary, article, link);
-      count++;
+      try {
+        const article = await fetchArticle(link, siteDir);
+        if (!article || !article.text) continue;
+        let summary = await summarizeWithMiniMax(article.text, link);
+        // 兜底：AI 总结失败时（无 key / API 错），用文章自己的 title + 开头段落
+        if (!summary) {
+          summary = {
+            title: article.title || link.slice(-40),
+            summary: article.text.slice(0, 300),
+          };
+        }
+        await createFeedItem(feedId, monitor, summary, article, link, siteDir);
+        count++;
+      } catch (e) {
+        log.warn(`[web-watcher] article failed ${link}: ${e.message}`);
+      }
     }
 
     log.info(`[web-watcher] processed ${count} new articles for ${monitor.label}`);
+
+    // 通知用户 (only if any new articles were processed)
+    if (count > 0 && monitor.user_id) {
+      // 收集本次 processed 0..count 的链接 → 拉回数据库刚写的
+      try {
+        const { rows } = await query(
+          `SELECT title, link, summary, published_at FROM feed_item
+           WHERE feed_id = $1
+           ORDER BY published_at DESC
+           LIMIT 20`,
+          [feedId]
+        );
+        const items = rows.map((r) => ({
+          title: r.title,
+          link: r.link,
+          summary: (r.summary || "").slice(0, 280),
+          published: r.published_at,
+        }));
+        const url = `http://127.0.0.1:${process.env.GATEWAY_PORT || 8080}/internal/notify/rss`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: monitor.user_id, items }),
+          signal: AbortSignal.timeout(5000),
+        });
+        const data = await res.json().catch(() => ({}));
+        log.info(`[web-watcher] notify user ${monitor.user_id.slice(0,8)}…: ${res.status} ${JSON.stringify(data).slice(0, 80)}`);
+      } catch (e) {
+        log.warn(`[web-watcher] notify user failed: ${e.message}`);
+      }
+    }
 
     // Save article content to disk
     const indexPath = path.join(siteDir, "_index.json");
@@ -304,4 +277,15 @@ export function startWebWatcher(intervalMs = 60000) {
 export function stopWebWatcher() {
   if (timer) { clearInterval(timer); timer = null; }
   log.info("[web-watcher] stopped");
+}
+
+// ── Standalone entrypoint ─────────────────────────────────────
+// If invoked directly (e.g. by start.py as a separate process),
+// start the polling loop. Otherwise the parent (server.js) imports
+// startWebWatcher() and manages the timer.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const intervalMs = parseInt(process.env.WEB_WATCHER_INTERVAL_MS || "60000", 10);
+  startWebWatcher(intervalMs);
+  process.on("SIGINT", stopWebWatcher);
+  process.on("SIGTERM", stopWebWatcher);
 }

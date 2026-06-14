@@ -48,7 +48,7 @@ services:
 
   # --- 网关 ---
   api-gateway:
-    image: studio-javis/api-gateway:${IMAGE_TAG:-latest}
+    image: studio-arona/api-gateway:${IMAGE_TAG:-latest}
     env_file: .env.production
     environment:
       SERVICE_NAME: api-gateway
@@ -73,7 +73,7 @@ services:
 
   # --- Agent (Node.js bridge server) ---
   agent:
-    image: studio-javis/agent:${IMAGE_TAG:-latest}
+    image: studio-arona/agent:${IMAGE_TAG:-latest}
     env_file: .env.production
     environment:
       SERVICE_NAME: agent
@@ -97,7 +97,7 @@ services:
 
   # --- Perception ---
   perception:
-    image: studio-javis/perception:${IMAGE_TAG:-latest}
+    image: studio-arona/perception:${IMAGE_TAG:-latest}
     env_file: .env.production
     environment:
       SERVICE_NAME: perception
@@ -129,7 +129,7 @@ services:
 
   # --- 前端 Nginx ---
   web:
-    image: studio-javis/web:${IMAGE_TAG:-latest}
+    image: studio-arona/web:${IMAGE_TAG:-latest}
     ports:
       - "80:80"
       - "443:443"

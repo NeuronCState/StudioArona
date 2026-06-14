@@ -20,7 +20,7 @@ import { query } from "./db/index.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ── Config ─────────────────────────────────────────────────────
-const REFRESH_INTERVAL_MS = 15 * 60 * 1000; // 15 min
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 min
 const FETCH_TIMEOUT_MS = 15000;              // 15s per feed
 const MAX_RETRIES = 3;
 const RETRY_BASE_MS = 2000;                  // 2s base for exponential backoff
@@ -82,7 +82,7 @@ async function fetchFeedsFromDB() {
     const { rows } = await query(
       `SELECT id, user_id, url, title, category, enabled, last_fetched_at, created_at
        FROM feed
-       WHERE enabled = true
+       WHERE enabled = true AND url NOT LIKE 'page://%'
        ORDER BY last_fetched_at ASC NULLS FIRST`
     );
     return rows;
@@ -204,24 +204,34 @@ async function withRetry(fn, label = "operation") {
 
 // ── Store feed items in PostgreSQL ─────────────────────────────
 async function storeFeedItems(feedId, items) {
-  if (!items.length) return 0;
+  if (!items.length) return { inserted: 0, newItems: [] };
 
   let inserted = 0;
+  const newItems = [];
   for (const item of items) {
     try {
       // ON CONFLICT (feed_id, guid) DO NOTHING — dedup by guid
       const result = await query(
         `INSERT INTO feed_item (feed_id, guid, title, link, summary, published_at, fetched_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (feed_id, guid) DO NOTHING`,
+         ON CONFLICT (feed_id, guid) DO NOTHING
+         RETURNING id`,
         [feedId, item.guid, item.title, item.link, item.summary, item.published_at, item.fetched_at]
       );
-      if (result.rowCount > 0) inserted++;
+      if (result.rowCount > 0) {
+        inserted++;
+        newItems.push({
+          title: item.title || "(无标题)",
+          link: item.link,
+          summary: (item.summary || "").slice(0, 280),
+          published: item.published_at,
+        });
+      }
     } catch (err) {
       console.error(`[rss-fetcher] insert error for feed=${feedId} guid=${item.guid}:`, err.message);
     }
   }
-  return inserted;
+  return { inserted, newItems };
 }
 
 // ── Update last_fetched_at ─────────────────────────────────────
@@ -255,6 +265,8 @@ async function pollAll() {
 
   console.log(`[rss-fetcher] found ${feeds.length} enabled feed(s)`);
   let totalNew = 0;
+  // 按 user_id 聚合新条目 (用于末尾发邮件)
+  const newByUser = new Map();
 
   for (const feed of feeds) {
     console.log(`[rss-fetcher] fetching: ${feed.url} (feed_id=${feed.id})`);
@@ -275,12 +287,20 @@ async function pollAll() {
 
     // Store in PG — dedup by (feed_id, guid)
     try {
-      const inserted = await withRetry(
+      const { inserted, newItems } = await withRetry(
         () => storeFeedItems(feed.id, items),
         `storeFeedItems(${feed.id})`
       );
       console.log(`[rss-fetcher] ${feed.url}: ${items.length} parsed, ${inserted} new`);
       totalNew += inserted;
+      if (newItems.length > 0 && feed.user_id) {
+        const arr = newByUser.get(feed.user_id) || [];
+        // 一封邮件最多 20 条（notifier 内部也截断）
+        if (arr.length < 20) {
+          arr.push(...newItems.slice(0, 20 - arr.length));
+          newByUser.set(feed.user_id, arr);
+        }
+      }
     } catch {
       console.error(`[rss-fetcher] failed to store items for feed ${feed.id}`);
       continue;
@@ -291,6 +311,23 @@ async function pollAll() {
   }
 
   console.log(`[rss-fetcher] cycle complete: ${totalNew} new items across ${feeds.length} feed(s)`);
+
+  // 通知用户有新 RSS 更新（按 user_id 聚合，跨多个 feed）
+  for (const [userId, items] of newByUser.entries()) {
+    try {
+      const url = `http://127.0.0.1:${process.env.GATEWAY_PORT || 8080}/internal/notify/rss`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId, items }),
+        signal: AbortSignal.timeout(5000),
+      });
+      const data = await res.json().catch(() => ({}));
+      console.log(`[rss-fetcher] notify user ${userId.slice(0, 8)}…: ${res.status} ${JSON.stringify(data).slice(0, 80)}`);
+    } catch (e) {
+      console.warn(`[rss-fetcher] notify user ${userId.slice(0, 8)}… failed: ${e.message}`);
+    }
+  }
 }
 
 // ── Bootstrap ──────────────────────────────────────────────────

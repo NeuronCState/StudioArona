@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# Studio Javis 通用 entrypoint
+# Studio Arona 通用 entrypoint
 # 职责：等待 PG/Redis 就绪 → 跑 DB 迁移 → exec 服务 CMD
 # ============================================================
 set -euo pipefail

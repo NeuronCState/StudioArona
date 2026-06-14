@@ -1,8 +1,8 @@
 /**
- * Studio Arona — OpenClaw ↔ Frontend Bridge
+ * Studio Arona — Agent Bridge
  *
  * - Accepts SSE connections from frontend (aligned with 00 §3.2)
- * - Calls OpenClaw CLI as subprocess for AI responses
+ * - Calls LLM Gateway as subprocess for AI responses
  * - Session lifecycle: TTL cleanup, reconnection via Last-Event-ID
  * - Safety policy: risk-based skill execution (low/medium/high)
  * - Feeds, schedules, preferences CRUD (in-memory, W4+ → PG)
@@ -11,15 +11,43 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import os from "node:os";
 import path from "node:path";
 import { scanInjection } from "./injection-guard.js";
 import { saveMessage, getSessionMessages, searchMessages, buildMemoryContext, ensureSession, endSession } from "./memory.js";
 import { runSummarizerPipeline } from "./summarizer-pipeline.js";
 import { handlePresenceEvent, adoptGuestHistory, getActiveGuests } from "./voice-flow.js";
-import { agentPool } from "./agent-pool.js";
 import { ttsConvert, cleanupTTS } from "./tts.js";
+import { fetchArticle, saveReadingPage, sanitizeName, DATA_DIR as ARTICLE_DIR } from "./lib/article.js";
+
+// LLM Gateway direct URL (services/llm_gateway) — used to fetch per-user
+// USER.md / MEMORY.md so the agent has user identity in its context.
+const LLM_GATEWAY_DIRECT = process.env.LLM_GATEWAY_DIRECT_URL || "http://127.0.0.1:8645";
+
+/**
+ * Fetch per-user profile (USER.md + MEMORY.md) from LLM Gateway. Returns
+ * {user_md, memory_md} or null on failure (silent — non-fatal).
+ */
+async function fetchUserProfile(userId) {
+  if (!userId) return null;
+  try {
+    const r = await fetch(`${LLM_GATEWAY_DIRECT}/v1/users/${encodeURIComponent(userId)}/memory`, {
+      // LLM Gateway memory endpoint has no auth requirement; we add X-User-Id
+      // for log correlation.
+      headers: { "X-User-Id": String(userId) },
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (!data.user_md && !data.memory_md) return null;
+    return { user_md: data.user_md || "", memory_md: data.memory_md || "" };
+  } catch {
+    return null;
+  }
+}
 import { streamMinimax, warmupCache } from "./minimax.js";
 import fs from "node:fs";
+import { query } from "./db.js";
 import * as scheduleHandler from "./handlers/schedules.js";
 import * as feedHandler from "./handlers/feeds.js";
 import * as memoryHandler from "./handlers/memory.js";
@@ -31,7 +59,6 @@ const AGENT_DIR = path.resolve(__dirname, "..");
 const DATA_DIR = path.resolve(AGENT_DIR, "data", "pages");
 
 const PORT = process.env.BRIDGE_PORT || 8001;
-const OPENCLAW_CONFIG = path.join(AGENT_DIR, "openclaw.json");
 const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minute session TTL
 
 // ── In-memory stores ──────────────────────────────────────────
@@ -174,8 +201,6 @@ async function streamAgentResponse(sessionId, userId, message, res, { lastEventI
   }
 
   // Check message for skill invocation patterns
-  // Check if message needs tool/skill support (routing to OpenClaw)
-  // Phase7: tool routing disabled — OpenClaw too slow without ACP. Only !cmd uses it.
   const skillMatch = message.match(/^!(\S+)\s*(.*)$/);
   if (skillMatch) {
     const [_, skill, args] = skillMatch;
@@ -209,98 +234,48 @@ async function streamAgentResponse(sessionId, userId, message, res, { lastEventI
   }
 
   // Build memory context + save user message in parallel
-  const [memContext] = await Promise.all([
+  const [memContext, _saved, userProfile] = await Promise.all([
     buildMemoryContext(userId),
     saveMessage(sessionId, userId, "user", message),
+    fetchUserProfile(userId),  // USER.md + MEMORY.md from LLM Gateway
   ]);
-  const augmentedMessage = memContext
-    ? `[最近对话记录]\n${memContext}\n\n[当前消息]\n${message}`
+  const contextBlocks = [];
+  if (userProfile?.user_md) {
+    contextBlocks.push(`[用户档案]\n${userProfile.user_md}`);
+  }
+  if (userProfile?.memory_md) {
+    contextBlocks.push(`[长期记忆]\n${userProfile.memory_md}`);
+  }
+  if (memContext) {
+    contextBlocks.push(`[最近对话记录]\n${memContext}`);
+  }
+  const augmentedMessage = contextBlocks.length
+    ? `${contextBlocks.join("\n\n")}\n\n[当前消息]\n${message}`
     : message;
 
   // ── Agent response ──
-  // Fast path: direct MiniMax API (bypasses OpenClaw spawn, saves ~3s).
-  // Fallback: agentPool via OpenClaw Gateway (for tool use, skills, etc.).
-  //
-  // Session reuse: per-user session IDs let the Gateway keep workspace +
-  // tool definitions warm across messages. First message warms the session;
-  // subsequent messages in the same user session hit the warm Gateway.
+  // Call LLM Gateway (services/llm_gateway) which handles per-user Hermes
+  // daemon lifecycle, context injection, and thinking-tag stripping.
   const startTime = Date.now();
   const userSessionId = `user-${userId}`;
   let evId = 10;
   let fullText = "";
-  // Prefer OpenClaw for tool calling. MiniMax direct as fallback.
-  let useDirectMiniMax = false; // disabled: all requests go through OpenClaw Gateway
-  if (!useDirectMiniMax && skillMatch) {
-    // Force OpenClaw path for skill commands
-    useDirectMiniMax = false;
-  }
 
   try {
-    if (useDirectMiniMax) {
-      // ── Fast path: direct MiniMax API with true SSE streaming ──
+    // ── LLM Gateway streaming via MiniMax-compatible SSE ──
       const ttsPromise = ttsConvert(augmentedMessage);
       let firstToken = true;
 
       for await (const token of streamMinimax(augmentedMessage, memContext)) {
         if (firstToken) {
-          console.log(`[bridge] MiniMax TTFT: ${Date.now() - startTime}ms`);
+          console.log(`[bridge] LLM TTFT: ${Date.now() - startTime}ms`);
           firstToken = false;
         }
         fullText += token;
         sseSend(res, "token", { delta: token, index: evId++ }, evId++);
       }
 
-      console.log(`[bridge] MiniMax total: ${Date.now() - startTime}ms, ${fullText.length} chars`);
-    } else {
-      // ── Fallback: agentPool via OpenClaw Gateway ──
-      const { text, sessionId: _, elapsed } = await agentPool.execute(
-        augmentedMessage,
-        userSessionId,  // reuse per-user session → warm Gateway context
-      );
-
-      console.log(
-        `[bridge] Agent response in ${elapsed}ms (wall ${Date.now() - startTime}ms)`,
-      );
-
-      if (!text) {
-        sseSend(res, "error", { code: "EMPTY_RESPONSE", message: "无回复内容" }, evId++);
-        sseSend(res, "done", { message_id: messageId, tokens: 0 }, evId);
-        return;
-      }
-      fullText = text;
-
-      // Save assistant response
-      saveMessage(sessionId, userId, "assistant", text);
-
-      // Simulated streaming (agentPool returns full text, split into tokens)
-      const tokens = splitTokens(text);
-      let idx = 0;
-      // Batch: send 2-3 tokens per tick at 30ms intervals (~100 tokens/sec)
-      const interval = setInterval(() => {
-        const batch = Math.min(3, tokens.length - idx);
-        for (let i = 0; i < batch; i++) {
-          sseSend(res, "token", { delta: tokens[idx], index: idx }, evId++);
-          idx++;
-        }
-        if (idx >= tokens.length) {
-          clearInterval(interval);
-          sseSend(res, "done", { message_id: messageId, tokens: idx }, evId);
-          res.end();
-        }
-      }, 30);
-    }
-
-    // Detect MiniMax tool-call hallucination — re-process via OpenClaw
-    if (useDirectMiniMax && /<minimax:tool_call|<invoke|<function_call/i.test(fullText)) {
-      console.log("[bridge] Tool call detected in MiniMax response, retrying via OpenClaw");
-      useDirectMiniMax = false;
-      try {
-        const { text: retryText } = await agentPool.execute(augmentedMessage, sessionId);
-        if (retryText) fullText = retryText;
-      } catch {
-        // keep original MiniMax response on OpenClaw failure
-      }
-    }
+      console.log(`[bridge] LLM total: ${Date.now() - startTime}ms, ${fullText.length} chars`);
 
     if (fullText) {
       // TTS generation in background
@@ -384,7 +359,7 @@ async function readJsonBody(req) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
-  const { pathname: path } = url;
+  const { pathname: pathName } = url;
   const method = req.method;
   const ctx = getUserCtx(req, url);
 
@@ -412,26 +387,18 @@ const server = http.createServer(async (req, res) => {
   // ── Chat ──────────────────────────────────────────────────────
 
   // Create session
-  if (method === "POST" && path === "/api/chat/sessions") {
+  if (method === "POST" && pathName === "/api/chat/sessions") {
     const body = await readBody();
     const userId = body.user_id || req.headers["x-arona-user"] || "default";
     const mode = body.mode || "text";
     const sid = await createSession(userId, mode);
     json({ session_id: sid, user_id: userId, mode });
-
-    // Background warmup: pre-load workspace + tools into Gateway session cache.
-    // Sends a lightweight heartbeat with user context so the first real message
-    // hits a warm Gateway (~3s instead of ~9s cold start).
-    agentPool.execute(
-      "[系统预热] 加载工作区、工具定义、用户上下文。不需要回复。",
-      `user-${userId}`,
-    ).catch(() => {});
     return;
   }
 
   // SSE: send message
-  if (method === "POST" && path.match(/^\/api\/chat\/sessions\/[^/]+\/messages$/)) {
-    const sessionId = path.split("/")[4];
+  if (method === "POST" && pathName.match(/^\/api\/chat\/sessions\/[^/]+\/messages$/)) {
+    const sessionId = pathName.split("/")[4];
     const body = await readBody();
     const lastEventId = req.headers["last-event-id"] || null;
     const sess = sessions.get(sessionId);
@@ -448,8 +415,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   // End session
-  if (method === "POST" && path.match(/^\/api\/chat\/sessions\/[^/]+\/end$/)) {
-    const sessionId = path.split("/")[4];
+  if (method === "POST" && pathName.match(/^\/api\/chat\/sessions\/[^/]+\/end$/)) {
+    const sessionId = pathName.split("/")[4];
     const sess = sessions.get(sessionId);
     const userId = sess ? sess.user_id : "default";
     // Trigger summarizer pipeline asynchronously
@@ -461,8 +428,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Get message history
-  if (method === "GET" && path.match(/^\/api\/chat\/sessions\/[^/]+\/messages$/)) {
-    const sessionId = path.split("/")[4];
+  if (method === "GET" && pathName.match(/^\/api\/chat\/sessions\/[^/]+\/messages$/)) {
+    const sessionId = pathName.split("/")[4];
     const sess = sessions.get(sessionId);
     json({ session_id: sessionId, messages: sess?.message_ids || [] });
     return;
@@ -470,7 +437,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── Feeds ─────────────────────────────────────────────────────
 
-  if (path === "/api/feeds") {
+  if (pathName === "/api/feeds") {
     if (method === "GET") {
       try { json(await feedHandler.listFeeds(null, ctx)); } catch (e) { json({ error: e.message }, e.statusCode || 500); }
       return;
@@ -485,8 +452,8 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  if (method === "DELETE" && path.match(/^\/api\/feeds\/[^/]+$/)) {
-    const feedCtx = { ...ctx, feedId: path.split("/")[3] };
+  if (method === "DELETE" && pathName.match(/^\/api\/feeds\/[^/]+$/)) {
+    const feedCtx = { ...ctx, feedId: pathName.split("/")[3] };
     try {
       json(await feedHandler.deleteFeed(null, feedCtx));
       broadcastUiAction({ type: 'data.changed', resource: 'feeds' });
@@ -495,22 +462,22 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Get single feed
-  if (method === "GET" && path.match(/^\/api\/feeds\/[^/]+$/)) {
-    const feedCtx = { ...ctx, feedId: path.split("/")[3] };
+  if (method === "GET" && pathName.match(/^\/api\/feeds\/[^/]+$/)) {
+    const feedCtx = { ...ctx, feedId: pathName.split("/")[3] };
     try { json(await feedHandler.getFeed(null, feedCtx)); } catch (e) { json({ error: e.message }, e.statusCode || 500); }
     return;
   }
 
   // Feed items list
-  if (method === "GET" && path.match(/^\/api\/feeds\/[^/]+\/items$/)) {
-    const itemCtx = { ...ctx, feedId: path.split("/")[3] };
+  if (method === "GET" && pathName.match(/^\/api\/feeds\/[^/]+\/items$/)) {
+    const itemCtx = { ...ctx, feedId: pathName.split("/")[3] };
     try { json(await feedHandler.listFeedItems(null, itemCtx)); } catch (e) { json({ error: e.message }, e.statusCode || 500); }
     return;
   }
 
   // Mark feed item read
-  if (method === "POST" && path.match(/^\/api\/feeds\/items\/[^/]+\/read$/)) {
-    const itemCtx = { ...ctx, itemId: path.split("/")[3] };
+  if (method === "POST" && pathName.match(/^\/api\/feeds\/items\/[^/]+\/read$/)) {
+    const itemCtx = { ...ctx, itemId: pathName.split("/")[3] };
     try {
       const body = await readJsonBody(req);
       json(await feedHandler.markRead(body, itemCtx));
@@ -519,8 +486,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Toggle feed item star
-  if (method === "POST" && path.match(/^\/api\/feeds\/items\/[^/]+\/star$/)) {
-    const itemCtx = { ...ctx, itemId: path.split("/")[3] };
+  if (method === "POST" && pathName.match(/^\/api\/feeds\/items\/[^/]+\/star$/)) {
+    const itemCtx = { ...ctx, itemId: pathName.split("/")[3] };
     try {
       const body = await readJsonBody(req);
       json(await feedHandler.toggleStar(body, itemCtx));
@@ -530,7 +497,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── Schedules ─────────────────────────────────────────────────
 
-  if (path === "/api/schedules") {
+  if (pathName === "/api/schedules") {
     if (method === "GET") {
       try { json(await scheduleHandler.listSchedules(null, ctx)); } catch (e) { json({ error: e.message }, e.statusCode || 500); }
       return;
@@ -545,8 +512,8 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  if (method === "PATCH" && path.match(/^\/api\/schedules\/[^/]+$/)) {
-    const schedCtx = { ...ctx, scheduleId: path.split("/")[3] };
+  if (method === "PATCH" && pathName.match(/^\/api\/schedules\/[^/]+$/)) {
+    const schedCtx = { ...ctx, scheduleId: pathName.split("/")[3] };
     try {
       const body = await readJsonBody(req);
       json(await scheduleHandler.updateSchedule(body, schedCtx));
@@ -555,8 +522,8 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (method === "DELETE" && path.match(/^\/api\/schedules\/[^/]+$/)) {
-    const schedCtx = { ...ctx, scheduleId: path.split("/")[3] };
+  if (method === "DELETE" && pathName.match(/^\/api\/schedules\/[^/]+$/)) {
+    const schedCtx = { ...ctx, scheduleId: pathName.split("/")[3] };
     try {
       json(await scheduleHandler.deleteSchedule(null, schedCtx));
       broadcastUiAction({ type: 'data.changed', resource: 'schedules' });
@@ -566,7 +533,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── Page Monitors ───────────────────────────────────────────────
 
-  if (path === "/api/page-monitors") {
+  if (pathName === "/api/page-monitors") {
     if (method === "GET") {
       try { json(await pageMonitorHandler.listMonitors(null, ctx)); } catch (e) { json({ error: e.message }, e.statusCode || 500); }
       return;
@@ -580,8 +547,8 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  if (method === "PATCH" && path.match(/^\/api\/page-monitors\/[^/]+$/)) {
-    const monCtx = { ...ctx, monitorId: path.split("/")[3] };
+  if (method === "PATCH" && pathName.match(/^\/api\/page-monitors\/[^/]+$/)) {
+    const monCtx = { ...ctx, monitorId: pathName.split("/")[3] };
     try {
       const body = await readJsonBody(req);
       json(await pageMonitorHandler.updateMonitor(body, monCtx));
@@ -589,15 +556,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (method === "DELETE" && path.match(/^\/api\/page-monitors\/[^/]+$/)) {
-    const monCtx = { ...ctx, monitorId: path.split("/")[3] };
+  if (method === "DELETE" && pathName.match(/^\/api\/page-monitors\/[^/]+$/)) {
+    const monCtx = { ...ctx, monitorId: pathName.split("/")[3] };
     try { json(await pageMonitorHandler.deleteMonitor(null, monCtx)); } catch (e) { json({ error: e.message }, e.statusCode || 500); }
     return;
   }
 
   // ── Memory ────────────────────────────────────────────────────
 
-  if (path === "/api/memory/entries") {
+  if (pathName === "/api/memory/entries") {
     if (method === "GET") {
       try { json(await memoryHandler.listEntries(null, ctx)); } catch (e) { json({ error: e.message }, e.statusCode || 500); }
       return;
@@ -611,8 +578,8 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  if (path.match(/^\/api\/memory\/entries\/[^/]+$/)) {
-    const memCtx = { ...ctx, entryId: path.split("/")[4] };
+  if (pathName.match(/^\/api\/memory\/entries\/[^/]+$/)) {
+    const memCtx = { ...ctx, entryId: pathName.split("/")[4] };
     if (method === "GET") {
       try { json(await memoryHandler.getEntry(null, memCtx)); } catch (e) { json({ error: e.message }, e.statusCode || 500); }
       return;
@@ -625,7 +592,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── User preferences ──────────────────────────────────────────
 
-  if (path === "/api/me/preferences") {
+  if (pathName === "/api/me/preferences") {
     const userId = req.headers["x-arona-user"] || "default";
     const userPrefs = preferences.get(userId) || {};
 
@@ -640,7 +607,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── UI Actions ────────────────────────────────────────────────
 
-  if (method === "POST" && path === "/api/ui/action") {
+  if (method === "POST" && pathName === "/api/ui/action") {
     const body = await readBody();
     broadcastUiAction(body);
     json({ ok: true });
@@ -648,7 +615,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // SSE subscription for UI events
-  if (method === "GET" && path === "/api/ui/stream") {
+  if (method === "GET" && pathName === "/api/ui/stream") {
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
@@ -661,7 +628,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── Confirm response ──────────────────────────────────────────
 
-  if (method === "POST" && path === "/api/ui/confirm") {
+  if (method === "POST" && pathName === "/api/ui/confirm") {
     const body = await readBody();
     // In future: proceed with the held skill execution
     json({ ok: true, confirmed: body.confirm_id });
@@ -670,9 +637,9 @@ const server = http.createServer(async (req, res) => {
 
   // ── TTS audio serving ──────────────────────────────────────────
 
-  if (method === "GET" && path.startsWith("/api/tts/")) {
-    const ttsId = path.split("/").pop();
-    const filePath = `/tmp/arona_tts/${ttsId}.mp3`;
+  if (method === "GET" && pathName.startsWith("/api/tts/")) {
+    const ttsId = pathName.split("/").pop();
+    const filePath = path.join(os.tmpdir(), "arona_tts", `${ttsId}.mp3`);
     try {
       const stat = fs.statSync(filePath);
       const audio = fs.readFileSync(filePath);
@@ -691,7 +658,7 @@ const server = http.createServer(async (req, res) => {
 
   // ── Memory search ────────────────────────────────────────────
 
-  if (method === "GET" && path === "/api/memory/search") {
+  if (method === "GET" && pathName === "/api/memory/search") {
     const q = url.searchParams.get("q") || "";
     const limit = parseInt(url.searchParams.get("limit") || "10");
     const results = await searchMessages(q, null, limit);
@@ -702,7 +669,7 @@ const server = http.createServer(async (req, res) => {
   // ── Voice Flow ─────────────────────────────────────────────────
 
   // Presence event from perception service
-  if (method === "POST" && path === "/internal/voice/presence") {
+  if (method === "POST" && pathName === "/internal/voice/presence") {
     const body = await readBody();
     const result = await handlePresenceEvent(body);
     json(result || { action: "noop" });
@@ -710,13 +677,13 @@ const server = http.createServer(async (req, res) => {
   }
 
   // List active guest users
-  if (method === "GET" && path === "/api/voice/guests") {
+  if (method === "GET" && pathName === "/api/voice/guests") {
     json({ guests: getActiveGuests() });
     return;
   }
 
   // Adopt guest history → registered user
-  if (method === "POST" && path === "/api/users/adopt-guest") {
+  if (method === "POST" && pathName === "/api/users/adopt-guest") {
     const body = await readBody();
     const result = await adoptGuestHistory(body.guest_id, body.user_id);
     json(result);
@@ -725,11 +692,11 @@ const server = http.createServer(async (req, res) => {
 
   // ── Health ────────────────────────────────────────────────────
 
-  // Serve extracted page content
-  if (method === "GET" && path.startsWith("/api/page-content/")) {
-    const contentPath = decodeURIComponent(path.slice("/api/page-content/".length));
-    const safe = path.resolve(DATA_DIR, contentPath);
-    if (!safe.startsWith(DATA_DIR)) { json({ error: "invalid path" }, 403); return; }
+  // Serve extracted page content (file path mode)
+  if (method === "GET" && pathName.startsWith("/api/page-content/")) {
+    const contentPath = decodeURIComponent(pathName.slice("/api/page-content/".length));
+    const safe = path.resolve(ARTICLE_DIR, contentPath);
+    if (!safe.startsWith(ARTICLE_DIR)) { json({ error: "invalid path" }, 403); return; }
     try {
       const content = fs.readFileSync(safe, "utf-8");
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -738,7 +705,67 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (path === "/health") {
+  // Lazy-extract article body on demand (RSS items lack content_path until clicked)
+  // GET /api/article-content?url=<encoded>&feed=<feedId>&guid=<guid>
+  if (method === "GET" && pathName === "/api/article-content") {
+    const qs = new URL(req.url, "http://localhost").searchParams;
+    const url = qs.get("url");
+    const feedId = qs.get("feed") || "ad-hoc";
+    const guid = qs.get("guid") || "manual";
+    if (!url) { json({ error: "missing url" }, 400); return; }
+    try {
+      const date = new Date().toISOString().slice(0, 10);
+      const siteName = sanitizeName(new URL(url).hostname);
+      const siteDir = path.join(ARTICLE_DIR, siteName, date);
+      // Check cache first (by guid under today's dir)
+      const cachedPath = path.join(siteDir, `${guid}.html`);
+      if (fs.existsSync(cachedPath)) {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(fs.readFileSync(cachedPath, "utf-8"));
+        return;
+      }
+      // Cache miss — fetch + extract
+      const article = await fetchArticle(url, siteDir);
+      if (!article) {
+        // 抽取失败 (反爬 / paywall / 404) — 返 fallback 页面（带原文链接）而不是 502
+        // 让前端能展示 fallback 而非 "agent 服务不可用"
+        const fallbackHtml = `<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>无法抽取正文</title>
+<style>body{font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:0 auto;padding:48px 24px;text-align:center;color:#1a1a1a;background:#fff}
+h1{font-size:1.4em;margin-bottom:12px}p{color:#666;margin-bottom:24px}a.btn{display:inline-block;padding:10px 20px;background:#c9a875;color:#fff;border-radius:8px;text-decoration:none}
+@media (prefers-color-scheme: dark){body{background:#1a1a1a;color:#e6e6e6}p{color:#aaa}}</style>
+</head><body>
+<h1>📄 暂时无法抽取正文</h1>
+<p>该网站可能启用了反爬、付费墙或响应超时。请点击下方按钮跳转到原文阅读。</p>
+<a class="btn" href="${url}" target="_blank" rel="noopener noreferrer">打开原文 →</a>
+</body></html>`;
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(fallbackHtml);
+        return;
+      }
+      const { htmlPath } = await saveReadingPage(siteDir, article, url);
+      // Also update feed_item.content_path so future loads go via /api/page-content (cheap)
+      try {
+        await query(
+          `UPDATE feed_item SET summary = summary || $1
+           WHERE feed_id = $2 AND guid = $3`,
+          [`\n\n<!-- content_path:${htmlPath} -->`, feedId, guid]
+        );
+      } catch (e) {
+        log.warn(`[bridge] failed to back-fill content_path for ${guid}: ${e.message}`);
+      }
+      const content = fs.readFileSync(path.join(ARTICLE_DIR, htmlPath), "utf-8");
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(content);
+    } catch (e) {
+      log.warn(`[bridge] /api/article-content failed: ${e.message}`);
+      json({ error: e.message }, 500);
+    }
+    return;
+  }
+
+  if (pathName === "/health") {
     json({
       status: "ok",
       service: "agent-bridge",
@@ -757,11 +784,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, "127.0.0.1", () => {
   console.log(`[bridge] Studio Arona bridge on http://127.0.0.1:${PORT}`);
-  console.log(`[bridge] OpenClaw config: ${OPENCLAW_CONFIG}`);
   console.log(`[bridge] Session TTL: ${SESSION_TTL_MS / 60000}min`);
-  // Pre-warm agent process pool for lower TTFT
-  agentPool.warmup();
-  console.log(`[bridge] Agent pool warming up...`);
 
   // Periodic TTS file cleanup
   cleanupTTS();

@@ -33,13 +33,21 @@ async def download_from_github(raw_url: str) -> dict[str, str]:
 async def download_skill_folder(
     repo_url: str, folder_path: str = ""
 ) -> dict[str, str]:
-    """Download all files from a GitHub folder."""
+    """Download all files from a GitHub folder.
+
+    URL 形式: https://github.com/{owner}/{repo}/tree/{branch}/{path...}
+    或         https://github.com/{owner}/{repo}/blob/{branch}/{file}
+    """
     parts = repo_url.replace("https://github.com/", "").split("/")
     if len(parts) < 2:
         return {}
 
     owner, repo = parts[0], parts[1]
-    path = folder_path or "/".join(parts[3:]) if len(parts) > 3 else ""
+    # /tree/ 或 /blob/ 之后: parts[2] = 'tree' or 'blob', parts[3] = branch, parts[4:] = path
+    if len(parts) > 3 and parts[2] in ("tree", "blob"):
+        path = folder_path or "/".join(parts[4:])
+    else:
+        path = folder_path or ("/".join(parts[3:]) if len(parts) > 3 else "")
 
     api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
 
@@ -79,6 +87,23 @@ def install_skill_to_user(
         (target_dir / filename).write_text(content, encoding="utf-8")
 
     return target_dir
+
+
+def mark_marketplace_skill(
+    user_id: str, slug: str, source: str, source_url: str
+) -> None:
+    """Mark a skill directory as installed from marketplace (not user-written).
+
+    写一个 .marketplace_source 文件到 skill dir, 之后 list_installed_skills
+    通过这个标记判断是否是 marketplace 来源.
+    """
+    target_dir = get_user_skills_dir(user_id) / slug
+    if not target_dir.exists():
+        return
+    (target_dir / ".marketplace_source").write_text(
+        f"{source}\t{source_url}\n",
+        encoding="utf-8",
+    )
 
 
 def remove_skill_from_user(user_id: str, slug: str) -> bool:

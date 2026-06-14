@@ -21,11 +21,15 @@ import os
 SERVICE_URLS: dict[str, str] = {
     "agent": os.environ.get("AGENT_URL", "http://localhost:18790"),
     "perception": os.environ.get("PERCEPTION_URL", "http://localhost:8002"),
+    "llm_gateway": os.environ.get("LLM_GATEWAY_SERVICE_URL", "http://localhost:8645"),
 }
 
 # Paths that should be proxied to each service
 AGENT_PREFIXES = ("/api/chat", "/api/feeds", "/api/schedules")
 PERCEPTION_PREFIXES = ("/api/system", "/api/vms", "/api/network", "/api/speech")
+# LLM Gateway (services/llm_gateway/main.py) — OpenAI-compatible /v1/* + per-user
+# routes for skills/memory/sessions
+LLM_GATEWAY_PREFIXES = ("/api/v1",)
 
 # Hop-by-hop headers to strip
 _HOP_BY_HOP = {"host", "transfer-encoding", "connection", "keep-alive", "te"}
@@ -43,6 +47,9 @@ async def _get_client() -> httpx.AsyncClient:
 
 def resolve_service(path: str) -> str | None:
     """Determine which downstream service handles this path."""
+    for prefix in LLM_GATEWAY_PREFIXES:
+        if path.startswith(prefix):
+            return "llm_gateway"
     for prefix in AGENT_PREFIXES:
         if path.startswith(prefix):
             return "agent"

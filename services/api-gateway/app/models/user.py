@@ -38,6 +38,7 @@ class User(Base, TimestampMixin):
     )
     memory_db_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
     invitation_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True, index=True)
 
     preferences: Mapped[list["UserPreference"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"

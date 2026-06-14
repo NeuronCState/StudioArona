@@ -1,6 +1,6 @@
 openapi: "3.1.0"
 info:
-  title: Studio Javis API
+  title: Studio Arona API
   version: "0.2.0"
   description: 工作室贾维斯 API 契约 — Phase 5 数据真实化版
 

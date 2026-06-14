@@ -1,9 +1,9 @@
-.PHONY: bootstrap dev down test lint typecheck contract-test clean generate-types generate-types-py generate-types-ts agent agent-bridge agent-rss agent-onboard agent-eval agent-perf agent-injection-test
+.PHONY: bootstrap dev down test lint typecheck contract-test clean generate-types generate-types-py generate-types-ts agent agent-bridge agent-rss agent-onboard agent-eval agent-perf agent-injection-test hermes llm-gateway
 
 # ── 一键启动 ──────────────────────────────
 
 bootstrap:
-	@echo "=== Studio Javis: 环境初始化 ==="
+	@echo "=== Studio Arona: 环境初始化 ==="
 	pnpm install
 	uv sync --all-packages
 	cp -n .env.example .env.local || true
@@ -16,10 +16,15 @@ bootstrap:
 dev:
 	docker compose -f infra/compose/docker-compose.yml up
 
-# ── Agent (OpenClaw) ──────────────────────
+# ── Agent (Hermes + LLM Gateway) ──────────────
+# 前端默认指向 http://localhost:18789（OpenAI 兼容端点）
+
+llm-gateway:
+	uv run python -m uvicorn main:app --app-dir services/llm_gateway --host 127.0.0.1 --port 8645
 
 agent:
-	cd services/agent && OPENCLAW_CONFIG_PATH=./openclaw.json pnpm openclaw gateway --port 18789 --verbose
+	@echo "=== 启动 LLM Gateway + Agent Bridge ==="
+	$(MAKE) llm-gateway
 
 agent-bridge:
 	cd services/agent && node bridge/server.js
@@ -36,8 +41,25 @@ agent-perf:
 agent-injection-test:
 	node tests/B/injection-test.js
 
+# ── Hermes Agent (CLI / 桌面 / TUI) ──────────
+# 详见 docs/hermes-integration.md
+
+hermes:
+	hermes chat
+
+hermes-tui:
+	hermes
+
+hermes-gateway:
+	hermes gateway run
+
+hermes-proxy:
+	hermes proxy start --host 127.0.0.1 --port 8645
+
+# 旧的 agent-onboard 命令（已废弃）
 agent-onboard:
-	cd services/agent && pnpm openclaw onboard
+	@echo "已废弃，请改用 'make hermes'（详见 docs/hermes-integration.md）"
+	@exit 1
 
 down:
 	docker compose -f infra/compose/docker-compose.yml down

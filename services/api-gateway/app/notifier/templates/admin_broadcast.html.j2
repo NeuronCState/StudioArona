@@ -1,0 +1,7 @@
+{% extends "base.html.j2" %}
+{% block subject %}{{ subject }}{% endblock %}
+{% block body %}
+<h1>📢 公告</h1>
+<div class="meta">来自 StudioArona 团队</div>
+<div>{{ body|safe }}</div>
+{% endblock %}

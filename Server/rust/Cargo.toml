@@ -1,0 +1,97 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/desktop-core",
+    "crates/protocol",
+    "crates/tauri-bridge",
+    "crates/center-client",
+]
+
+# 共享依赖 — 所有 crate 用同一版本, 避免 Rust type system 痛点
+[workspace.dependencies]
+# async runtime
+tokio = { version = "1.40", features = ["full"] }
+axum = { version = "0.7", features = ["macros", "ws"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# HTTP client
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+
+# DB
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+deadpool-postgres = "0.14"
+redis = { version = "0.27", features = ["tokio-comp"] }
+
+# 序列化
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+# 时间
+chrono = { version = "0.4", features = ["serde"] }
+time = { version = "0.3", features = ["serde", "macros"] }
+
+# 异步工具
+futures = "0.3"
+async-trait = "0.1"
+
+# 日志
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# 错误
+thiserror = "1"
+anyhow = "1"
+
+# 安全
+jsonwebtoken = "9"
+argon2 = "0.5"
+bcrypt = "0.16"
+
+# 邮件
+lettre = { version = "0.11", default-features = false, features = ["rustls-tls", "smtp-transport"] }
+
+# RSS / HTML
+rss = "2"
+atom_syndication = "0.12"
+scraper = "0.20"
+html5ever = "0.27"
+
+# 文本处理
+readability = "0.4"  # Rust 移植 — https://github.com/kumabook/readability
+
+# Cache
+moka = { version = "0.12", features = ["future"] }
+
+# SQLite (离线草稿)
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# UUID
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# 配置
+config = "0.14"
+figment = { version = "0.10", features = ["env", "toml", "yaml"] }
+
+# 协议 (跟前端 codegen 同步) — Phase 1 暂用 ts-rs, Phase 2 再加 specta 生成 .d.ts
+ts-rs = { version = "10", features = ["serde-compat", "chrono-impl", "serde-json-impl"] }
+
+[profile.dev]
+opt-level = 0
+debug = 1
+incremental = true
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
+# 每个 crate 的 lint 严格度, 全 workspace 一致
+[workspace.lints.rust]
+unsafe_code = "deny"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }

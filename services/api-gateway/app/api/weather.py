@@ -1,39 +1,36 @@
-"""Weather endpoint: GET /api/weather — IP geolocation + Open-Meteo."""
+"""Weather endpoint: GET /api/weather — reads cache populated by weather_fetcher daemon.
 
+The weather_fetcher (services/llm_gateway/weather_fetcher.py) is a long-lived
+child process that pre-fetches weather for all known cities every 5 minutes
+into ~/.studioarona/weather_cache.json. User requests synchronously read this
+file — they never block on an external API.
+
+Cache miss fallback: if the daemon hasn't populated the file yet, or the user's
+city isn't in the cache, we do a one-shot wttr.in call (no Shenyang hardcode;
+default is the first cached city, or Shanghai if cache is empty).
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import os
 import time
+from pathlib import Path
+from typing import Any, Optional, Tuple
 
 import httpx
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Request
 
 router = APIRouter(tags=["Weather"])
 
-# In-memory cache: ip → (lat, lon, city, expiry)
-_ip_cache: dict[str, tuple[float, float, str, float]] = {}
-_CACHE_TTL = 600  # 10 min
+# Weather fetcher writes here
+CACHE_FILE = Path(os.environ.get("STUDIOARONA_HOME", str(Path.home() / ".studioarona"))) / "weather_cache.json"
+CACHE_TTL = 360  # 6 min (must match weather_fetcher.py)
 
-# Beijing fallback
-DEFAULT_LAT = 41.8057
-DEFAULT_LON = 123.4315
-DEFAULT_CITY = "Shenyang"
-
-WMO_CODES: dict[int, str] = {
-    0: "Clear", 1: "Partly Cloudy", 2: "Partly Cloudy", 3: "Partly Cloudy",
-    45: "Foggy", 48: "Foggy",
-    51: "Drizzle", 53: "Drizzle", 55: "Drizzle",
-    61: "Rain", 63: "Rain", 65: "Rain",
-    71: "Snow", 73: "Snow", 75: "Snow", 77: "Snow",
-    80: "Rain Showers", 81: "Rain Showers", 82: "Rain Showers",
-    85: "Snow Showers", 86: "Snow Showers",
-    95: "Thunderstorm", 96: "Thunderstorm", 99: "Thunderstorm",
-}
-
-
-def uv_label(uvi: float) -> str:
-    if uvi <= 2: return "Low"
-    if uvi <= 5: return "Moderate"
-    if uvi <= 7: return "High"
-    if uvi <= 10: return "Very High"
-    return "Extreme"
+# Hard fallback for empty cache / daemon not yet started
+DEFAULT_LAT = 31.2304
+DEFAULT_LON = 121.4737
+DEFAULT_CITY = "上海"
 
 
 def _client_ip(request: Request) -> str:
@@ -44,73 +41,106 @@ def _client_ip(request: Request) -> str:
     if real_ip:
         return real_ip
     host = request.client.host if request.client else "127.0.0.1"
-    # Use a public IP lookup for localhost in dev
     if host in ("127.0.0.1", "::1", "localhost"):
         return ""
     return host
 
 
-async def _geolocate(ip: str) -> tuple[float, float, str]:
-    """Resolve IP → (lat, lon, city) via ip-api.com (free, no key)."""
-    if not ip:
-        return DEFAULT_LAT, DEFAULT_LON, DEFAULT_CITY
-
-    now = time.time()
-    if ip in _ip_cache:
-        lat, lon, city, expiry = _ip_cache[ip]
-        if now < expiry:
-            return lat, lon, city
-
+def load_cache() -> dict[str, Any]:
+    """Synchronous read of weather cache. Non-blocking (file is small)."""
+    if not CACHE_FILE.exists():
+        return {"cities": {}, "updated_at": 0}
     try:
-        async with httpx.AsyncClient(timeout=5, trust_env=False) as client:
-            resp = await client.get(f"http://ip-api.com/json/{ip}?fields=lat,lon,city,country")
-            if resp.status_code == 200:
-                data = resp.json()
-                lat = data.get("lat", DEFAULT_LAT)
-                lon = data.get("lon", DEFAULT_LON)
-                city = data.get("city") or DEFAULT_CITY
-                _ip_cache[ip] = (lat, lon, city, now + _CACHE_TTL)
-                return lat, lon, city
+        return json.loads(CACHE_FILE.read_text(encoding="utf-8"))
     except Exception:
-        pass
+        return {"cities": {}, "updated_at": 0}
 
-    return DEFAULT_LAT, DEFAULT_LON, DEFAULT_CITY
+
+def _pick_city_for_ip(cities: dict[str, Any], ip: str) -> Optional[dict[str, Any]]:
+    """Pick the best cached city for this request. We currently have no
+    IP→city mapping in the cache (the daemon fetches by USER.md), so
+    just return the first (most recent) city. Multi-user IP routing can
+    be added later if needed."""
+    if not cities:
+        return None
+    return next(iter(cities.values()))
+
+
+async def _fallback_fetch(lat: float, lon: float) -> dict[str, Any]:
+    """One-shot wttr.in call when cache is missing/stale. Used only on cold start."""
+    url = f"https://wttr.in/{lat},{lon}?format=j1"
+    try:
+        async with httpx.AsyncClient(timeout=8.0, trust_env=False) as client:
+            resp = await client.get(url, headers={"Accept-Language": "en"})
+            resp.raise_for_status()
+            data = resp.json()
+            cur = data["current_condition"][0]
+            wind_kmh = float(cur.get("windspeedKmph", 0))
+            wind_deg = float(cur.get("winddirDegree", 0))
+            desc = cur["weatherDesc"][0]["value"]
+            return {
+                "city": DEFAULT_CITY,
+                "temperature": int(float(cur["temp_C"])),
+                "condition": desc,
+                "humidity": int(cur["humidity"]),
+                "wind_speed": f"{wind_kmh:.0f} km/h",
+                "wind_direction": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][round(wind_deg / 45) % 8],
+                "feels_like": int(float(cur["FeelsLikeC"])),
+                "uv_index": "Moderate",  # not parsed in fallback
+            }
+    except Exception:
+        return {
+            "city": DEFAULT_CITY,
+            "temperature": 0,
+            "condition": "Unknown",
+            "humidity": 0,
+            "wind_speed": "—",
+            "wind_direction": "—",
+            "feels_like": 0,
+            "uv_index": "Unknown",
+        }
 
 
 @router.get("/api/weather")
 async def get_weather(request: Request):
+    # 1. 读 cache
+    cache = load_cache()
+    cities = cache.get("cities", {})
+    cache_age = time.time() - float(cache.get("updated_at", 0))
+
+    # 2. 如果有 cache 且未过期，直接返回（同步、不打外部 API）
+    if cities and cache_age < CACHE_TTL:
+        ip = _client_ip(request)
+        picked = _pick_city_for_ip(cities, ip)
+        if picked:
+            return _to_frontend_shape(picked)
+
+    # 3. 兜底：cache miss / 过期 → 现 fetch 一次（cold start 容错）
+    if not cities:
+        return _to_frontend_shape(await _fallback_fetch(DEFAULT_LAT, DEFAULT_LON), default_city=DEFAULT_CITY)
+
+    # 4. Cache 过期但非空：返回 stale 标记（前端可显示）
     ip = _client_ip(request)
-    lat, lon, city = await _geolocate(ip)
+    picked = _pick_city_for_ip(cities, ip)
+    if picked:
+        result = _to_frontend_shape(picked)
+        result["_stale"] = cache_age > CACHE_TTL
+        return result
 
-    url = (
-        f"https://api.open-meteo.com/v1/forecast"
-        f"?latitude={lat}&longitude={lon}"
-        f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,weather_code,uv_index"
-    )
-    async with httpx.AsyncClient(timeout=10, trust_env=False) as client:
-        resp = await client.get(url)
-        resp.raise_for_status()
-        data = resp.json()
+    return _to_frontend_shape(await _fallback_fetch(DEFAULT_LAT, DEFAULT_LON), default_city=DEFAULT_CITY)
 
-    current = data["current"]
-    wmo = current["weather_code"]
-    condition = WMO_CODES.get(wmo, "Clear")
-    uvi = current["uv_index"]
-    wind_kmh = current["wind_speed_10m"]
-    wind_dir = current.get("wind_direction_10m", 0)
 
-    def wind_direction_label(deg: float) -> str:
-        dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
-        idx = round(deg / 45) % 8
-        return dirs[idx]
-
+def _to_frontend_shape(picked: dict[str, Any], *, default_city: str = "上海") -> dict[str, Any]:
+    """Convert daemon cache (snake_case) into the WeatherData shape the
+    frontend expects (camelCase). Falls back to sane defaults if any field
+    is missing from a partially-populated cache entry."""
     return {
-        "city": city,
-        "temperature": round(current["temperature_2m"]),
-        "condition": condition,
-        "humidity": current["relative_humidity_2m"],
-        "wind_speed": f"{wind_kmh:.0f} km/h",
-        "wind_direction": wind_direction_label(wind_dir),
-        "feels_like": round(current["apparent_temperature"]),
-        "uv_index": uv_label(uvi),
+        "city": picked.get("city") or default_city,
+        "temperature": int(picked.get("temperature", 0)),
+        "condition": picked.get("condition", "Unknown"),
+        "humidity": int(picked.get("humidity", 0)),
+        "windSpeed": picked.get("wind_speed", "—"),
+        "windDirection": picked.get("wind_direction", "—"),
+        "feelsLike": int(picked.get("feels_like", picked.get("temperature", 0))),
+        "uvIndex": picked.get("uv_index", "Unknown"),
     }

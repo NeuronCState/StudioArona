@@ -3,8 +3,8 @@
 import asyncio
 import logging
 import os
+import shutil
 import subprocess
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +48,8 @@ if not NAS_RSA_PRIVATE_KEY:
         NAS_RSA_PRIVATE_KEY = _fetched
         logger.info("RSA private key loaded from NAS")
 
-_SSHPASS = "sshpass"
-if Path("/opt/homebrew/bin/sshpass").exists():
-    _SSHPASS = "/opt/homebrew/bin/sshpass"
+_SSHPASS = shutil.which("sshpass") or "sshpass"
+_KNOWN_HOSTS_FILE = "NUL" if os.name == "nt" else "/dev/null"
 
 
 def _nas_ssh(args: list[str], timeout: int = 30) -> subprocess.CompletedProcess:
@@ -59,7 +58,7 @@ def _nas_ssh(args: list[str], timeout: int = 30) -> subprocess.CompletedProcess:
         "ssh",
         "-o", "ConnectTimeout=5",
         "-o", "StrictHostKeyChecking=no",
-        "-o", "UserKnownHostsFile=/dev/null",
+        "-o", f"UserKnownHostsFile={_KNOWN_HOSTS_FILE}",
         "-p", NAS_SSH_PORT,
         f"{NAS_SSH_USER}@{NAS_HOST}",
     ] + args

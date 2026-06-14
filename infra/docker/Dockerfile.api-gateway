@@ -1,6 +1,6 @@
 # ============================================================
 # api-gateway — FastAPI 网关，鉴权 / 限流 / SSE + WS 中转
-# 使用: docker buildx build -f infra/docker/Dockerfile.api-gateway -t studio-javis/api-gateway:dev .
+# 使用: docker buildx build -f infra/docker/Dockerfile.api-gateway -t studio-arona/api-gateway:dev .
 # ============================================================
 
 # ---------- Stage 1: Builder ----------

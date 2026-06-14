@@ -1,7 +1,9 @@
 """Admin-only user management endpoints."""
 
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,17 +18,42 @@ from app.utils.audit import write_audit_log
 router = APIRouter(tags=["User"])
 
 
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
 class CreateUserRequest(BaseModel):
     username: str
     display_name: str
     password: str
     role: str = "member"
+    email: str | None = None
+
+    @field_validator("email")
+    @classmethod
+    def _validate_email(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return None
+        v = v.strip().lower()
+        if not _EMAIL_RE.match(v):
+            raise ValueError("invalid email format")
+        return v
 
 
 class UpdateUserRequest(BaseModel):
     display_name: str | None = None
     role: str | None = None
     password: str | None = None
+    email: str | None = None  # admin can also set/clear user email
+
+    @field_validator("email")
+    @classmethod
+    def _validate_email(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return None
+        v = v.strip().lower()
+        if not _EMAIL_RE.match(v):
+            raise ValueError("invalid email format")
+        return v
 
 
 @router.get("/api/users")
@@ -41,6 +68,7 @@ async def list_users(
             "id": u.id,
             "username": u.username,
             "display_name": u.display_name,
+            "email": u.email,
             "role": u.role,
             "created_at": u.created_at.isoformat(),
         }
@@ -63,6 +91,14 @@ async def create_user(
             detail={"code": "JAVIS_USER_EXISTS", "message": "用户名已存在"},
         )
 
+    if body.email:
+        existing_email = await db.execute(select(User).where(User.email == body.email))
+        if existing_email.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"code": "JAVIS_EMAIL_TAKEN", "message": "邮箱已被使用"},
+            )
+
     if body.role not in ("admin", "member"):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -74,6 +110,7 @@ async def create_user(
         display_name=body.display_name,
         password_hash=hash_password(body.password),
         role=body.role,
+        email=body.email,
     )
     db.add(user)
     await db.flush()
@@ -99,7 +136,7 @@ async def create_user(
         actor=admin.id,
         action="user.create",
         target=user.id,
-        payload={"username": body.username, "role": body.role},
+        payload={"username": body.username, "role": body.role, "email": body.email},
         ip=request.client.host if request.client else None,
     )
 
@@ -107,6 +144,7 @@ async def create_user(
         "id": user.id,
         "username": user.username,
         "display_name": user.display_name,
+        "email": user.email,
         "role": user.role,
         "created_at": user.created_at.isoformat(),
     }
@@ -139,6 +177,19 @@ async def update_user(
         user.role = body.role
     if body.password is not None:
         user.password_hash = hash_password(body.password)
+    if body.email is not None:
+        if body.email == "":
+            user.email = None
+        else:
+            clash = await db.execute(
+                select(User).where(User.email == body.email, User.id != user_id)
+            )
+            if clash.scalar_one_or_none() is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={"code": "JAVIS_EMAIL_TAKEN", "message": "邮箱已被使用"},
+                )
+            user.email = body.email
 
     await db.flush()
 
@@ -155,6 +206,7 @@ async def update_user(
         "id": user.id,
         "username": user.username,
         "display_name": user.display_name,
+        "email": user.email,
         "role": user.role,
         "created_at": user.created_at.isoformat(),
     }

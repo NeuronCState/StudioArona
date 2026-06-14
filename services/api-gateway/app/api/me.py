@@ -1,9 +1,10 @@
 """Current user endpoints: GET /api/me, PATCH /api/me, PATCH /api/me/preferences."""
 
 import json
+import re
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,9 +15,23 @@ from app.models.user import User, UserPreference
 router = APIRouter(tags=["User"])
 
 
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
 class ProfileUpdate(BaseModel):
     username: str | None = None
     display_name: str | None = None
+    email: str | None = None  # optional notification email
+
+    @field_validator("email")
+    @classmethod
+    def _validate_email(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return None  # allow clearing
+        v = v.strip().lower()
+        if not _EMAIL_RE.match(v):
+            raise ValueError("invalid email format")
+        return v
 
 
 class PreferenceUpdate(BaseModel):
@@ -50,6 +65,7 @@ async def get_me(
         "id": user.id,
         "username": user.username,
         "display_name": user.display_name,
+        "email": user.email,
         "role": user.role,
         "created_at": user.created_at.isoformat(),
         "preferences": prefs,
@@ -67,12 +83,27 @@ async def update_me(
         user.username = body.username
     if body.display_name is not None:
         user.display_name = body.display_name
+    if body.email is not None:
+        # empty string → clear; non-empty → validate uniqueness
+        if body.email == "":
+            user.email = None
+        else:
+            clash = await db.execute(
+                select(User).where(User.email == body.email, User.id != user.id)
+            )
+            if clash.scalar_one_or_none() is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={"code": "JAVIS_EMAIL_TAKEN", "message": "邮箱已被使用"},
+                )
+            user.email = body.email
     await db.commit()
     await db.refresh(user)
     return {
         "id": user.id,
         "username": user.username,
         "display_name": user.display_name,
+        "email": user.email,
         "role": user.role,
     }
 
@@ -113,6 +144,7 @@ async def update_preferences(
         "id": user.id,
         "username": user.username,
         "display_name": user.display_name,
+        "email": user.email,
         "role": user.role,
         "preferences": prefs,
     }
