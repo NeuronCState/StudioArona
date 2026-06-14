@@ -15,6 +15,7 @@ use tracing::info;
 
 mod config;
 mod error;
+mod middleware;
 mod routes;
 mod services;
 mod state;
