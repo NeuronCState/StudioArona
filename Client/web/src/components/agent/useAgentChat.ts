@@ -2,9 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * Agent attachment — single file/folder the user dragged or picked.
- * We only keep lightweight metadata (no real upload happens here yet).
- * `__TODO__: 接 Hermes OpenAI 兼容端点` will turn this into a real file
- * reference when task 4 wires the real backend.
+ * We only keep lightweight metadata; when the backend supports multimodal
+ * inputs we can promote `file` to a base64 data URL or upload handle.
  */
 export interface AgentAttachment {
   id: string;
@@ -24,11 +23,15 @@ export interface AgentMessage {
   attachments?: AgentAttachment[];
   /** True while the assistant is still streaming. */
   pending?: boolean;
+  /** Set when the stream errored out — surfaces a user-friendly banner. */
+  error?: string;
 }
 
 export interface UseAgentChat {
   messages: AgentMessage[];
   isStreaming: boolean;
+  /** Latest human-readable error from the last send attempt (cleared on next send). */
+  lastError: string | null;
   attachments: AgentAttachment[];
   send: (text: string, attachments: AgentAttachment[]) => Promise<void>;
   cancel: () => void;
@@ -38,26 +41,67 @@ export interface UseAgentChat {
 }
 
 let _id = 0;
-const nextId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${(_id++).toString(36)}`;
+const nextId = (prefix: string) =>
+  `${prefix}-${Date.now().toString(36)}-${(_id++).toString(36)}`;
+
+/* ───────────────────────  Hermes endpoint config  ─────────────────────── */
 
 /**
- * useAgentChat — UI-only chat state. Currently backed by a deterministic
- * mock (chunked typing simulation). When task 4 lands, swap the body of `send`
- * for a fetch/streaming call against the Hermes OpenAI-compatible endpoint
- * and replace the chunked setTimeout chain with real token events.
+ * Hermes OpenAI-compatible local endpoint.
  *
- * __TODO__: 接 Hermes OpenAI 兼容端点 (replace mock with real stream).
+ * Hermes (>= 0.16) exposes a local OpenAI-compatible proxy via
+ *   `hermes proxy start`         (default: 127.0.0.1:8645, provider: nous)
+ * The proxy serves the standard OpenAI chat surface:
+ *   - POST /v1/chat/completions   (supports stream:true → SSE)
+ *   - GET  /v1/models
+ * See `HERMES_INTEGRATION.md` for setup details and `hermes proxy start
+ * --help` for the full flag set (--host, --port, --provider nous|xai).
+ *
+ * Override at build time with `VITE_HERMES_BASE_URL`, e.g. when Hermes
+ * lives on a different host (Docker, remote workstation).
+ */
+const HERMES_BASE_URL: string =
+  (import.meta.env.VITE_HERMES_BASE_URL as string | undefined) ??
+  'http://127.0.0.1:8645';
+
+/** Default model id sent in the OpenAI request body. Hermes maps it to
+ *  the upstream provider's model. Override with `VITE_HERMES_MODEL`. */
+const HERMES_MODEL: string =
+  (import.meta.env.VITE_HERMES_MODEL as string | undefined) ?? 'gpt-4o-mini';
+
+/** Public bearer token for the local proxy. The proxy ignores the token
+ *  for localhost and accepts any string. Set `VITE_HERMES_API_KEY` if
+ *  you've fronted Hermes with a real auth layer. */
+const HERMES_API_KEY: string =
+  (import.meta.env.VITE_HERMES_API_KEY as string | undefined) ?? 'local-hermes';
+
+/* ───────────────────────────  Hook  ─────────────────────────── */
+
+/**
+ * useAgentChat — UI state + real Hermes OpenAI-compatible streaming.
+ *
+ * Each `send` POSTs the conversation so far to
+ *   `${HERMES_BASE_URL}/v1/chat/completions` with `stream: true`, then
+ * incrementally decodes the SSE deltas into the trailing assistant message.
+ *
+ * Failure modes the UI surfaces:
+ *  - Hermes not running / network down       → fetch rejects → "Hermes 未启动"
+ *  - Hermes returns 4xx/5xx (auth, upstream) → bubble shows error banner
+ *  - User cancels / unmount                  → AbortController, partial bubble kept
  */
 export function useAgentChat(): UseAgentChat {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<AgentAttachment[]>([]);
   const cancelRef = useRef<{ cancelled: boolean }>({ cancelled: false });
+  const abortRef = useRef<AbortController | null>(null);
 
   // Mark everything as cancelled if the hook unmounts mid-stream.
   useEffect(() => {
     return () => {
       cancelRef.current.cancelled = true;
+      abortRef.current?.abort();
     };
   }, []);
 
@@ -71,78 +115,212 @@ export function useAgentChat(): UseAgentChat {
 
   const cancel = useCallback(() => {
     cancelRef.current.cancelled = true;
+    abortRef.current?.abort();
+    abortRef.current = null;
     setIsStreaming(false);
-    setMessages((prev) => prev.map((m) => (m.pending ? { ...m, pending: false } : m)));
+    setMessages((prev) =>
+      prev.map((m) => (m.pending ? { ...m, pending: false } : m)),
+    );
   }, []);
 
   const clear = useCallback(() => {
     cancelRef.current.cancelled = true;
+    abortRef.current?.abort();
+    abortRef.current = null;
     setMessages([]);
     setIsStreaming(false);
     setAttachments([]);
+    setLastError(null);
   }, []);
 
-  const send = useCallback(async (text: string, items: AgentAttachment[]) => {
-    const trimmed = text.trim();
-    if (!trimmed && items.length === 0) return;
+  const send = useCallback(
+    async (text: string, items: AgentAttachment[]) => {
+      const trimmed = text.trim();
+      if (!trimmed && items.length === 0) return;
 
-    cancelRef.current.cancelled = false;
-    const token = cancelRef.current;
+      cancelRef.current.cancelled = false;
+      const token = cancelRef.current;
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setLastError(null);
 
-    // 1. Append user message immediately.
-    const userMsg: AgentMessage = {
-      id: nextId('u'),
-      role: 'user',
-      content: trimmed,
-      createdAt: Date.now(),
-      attachments: items.length > 0 ? items : undefined,
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    setAttachments([]);
-
-    // 2. Append a pending assistant bubble.
-    const assistantId = nextId('a');
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: assistantId,
-        role: 'assistant',
-        content: '',
+      // 1. Append user message immediately.
+      const userMsg: AgentMessage = {
+        id: nextId('u'),
+        role: 'user',
+        content: trimmed,
         createdAt: Date.now(),
-        pending: true,
-      },
-    ]);
-    setIsStreaming(true);
+        attachments: items.length > 0 ? items : undefined,
+      };
+      setMessages((prev) => [...prev, userMsg]);
+      setAttachments([]);
 
-    // __TODO__: 接 Hermes OpenAI 兼容端点 — replace the mock below with a
-    // streaming fetch against `/api/hermes/chat` or the OpenAI-compatible
-    // endpoint exposed by the runtime. The hook signature stays the same.
-    const reply = mockReply(trimmed, items);
-    const chunks = chunkString(reply, 18);
-    const chunkDelay = 220; // ms — feels like real typing
+      // 2. Append a pending assistant bubble.
+      const assistantId = nextId('a');
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: 'assistant',
+          content: '',
+          createdAt: Date.now(),
+          pending: true,
+        },
+      ]);
+      setIsStreaming(true);
 
-    for (let i = 0; i < chunks.length; i++) {
-      if (token.cancelled) return;
-      await sleep(chunkDelay);
-      if (token.cancelled) return;
-      const isLast = i === chunks.length - 1;
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId
-            ? { ...m, content: m.content + chunks[i], pending: !isLast }
-            : m,
-        ),
+      // 3. Build the OpenAI request body from the full conversation so far.
+      const conversation: OpenAIChatMessage[] = buildOpenAIMessages(
+        messages,
+        userMsg,
       );
-    }
 
-    if (!token.cancelled) {
-      setIsStreaming(false);
-    }
-  }, []);
+      let response: Response;
+      try {
+        response = await fetch(`${HERMES_BASE_URL}/v1/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${HERMES_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: HERMES_MODEL,
+            messages: conversation,
+            stream: true,
+            temperature: 0.7,
+          }),
+          signal: controller.signal,
+        });
+      } catch (err) {
+        // Network-level failure — Hermes not running, port closed, CORS, etc.
+        if (token.cancelled) return;
+        const msg = humanizeNetworkError(err, HERMES_BASE_URL);
+        finalizeWithError(assistantId, msg);
+        setLastError(msg);
+        return;
+      }
+
+      if (!response.ok) {
+        // Hermes returned a non-2xx (auth failure, upstream 5xx, etc.).
+        let detail = `${response.status} ${response.statusText}`;
+        try {
+          const body = (await response.json()) as { error?: { message?: string } };
+          if (body?.error?.message) detail = body.error.message;
+        } catch {
+          /* body wasn't JSON — keep the status text */
+        }
+        const friendly =
+          response.status === 401 || response.status === 403
+            ? `Hermes 鉴权失败 (${response.status})。请检查 API key 或重新登录上游 provider。`
+            : `Hermes 返回 ${detail}`;
+        finalizeWithError(assistantId, friendly);
+        setLastError(friendly);
+        return;
+      }
+
+      if (!response.body) {
+        const msg = 'Hermes 没有返回可读流 (response.body 为空)。';
+        finalizeWithError(assistantId, msg);
+        setLastError(msg);
+        return;
+      }
+
+      // 4. Stream SSE deltas into the trailing assistant bubble.
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+      let totalContent = '';
+
+      try {
+        // SSE records are separated by a blank line. We parse per record
+        // so a chunk that splits mid-record is handled on the next read.
+        // While inside the loop, an empty `delta` means heartbeat/comment
+        // and a `null` means the [DONE] sentinel.
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (token.cancelled) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          let sepIdx = buffer.indexOf('\n\n');
+          while (sepIdx !== -1) {
+            const record = buffer.slice(0, sepIdx);
+            buffer = buffer.slice(sepIdx + 2);
+            const delta = parseSSERecord(record);
+            if (delta === null) {
+              // [DONE] sentinel — the upstream is signalling end of stream.
+              // We still rely on the chunked-transfer close to fully exit.
+            } else if (delta) {
+              totalContent += delta;
+              appendDelta(assistantId, delta);
+            }
+            sepIdx = buffer.indexOf('\n\n');
+          }
+        }
+
+        // Flush any trailing partial record (some upstreams don't end with
+        // a blank line, especially when the connection is RST'd).
+        if (buffer.trim().length > 0) {
+          const delta = parseSSERecord(buffer);
+          if (delta && delta.length > 0) {
+            totalContent += delta;
+            appendDelta(assistantId, delta);
+          }
+        }
+      } catch (err) {
+        if (token.cancelled) return; // expected on cancel
+        const msg =
+          err instanceof Error
+            ? `流式连接中断: ${err.message}`
+            : '流式连接中断。';
+        finalizeWithError(assistantId, msg);
+        setLastError(msg);
+        return;
+      } finally {
+        try {
+          reader.releaseLock();
+        } catch {
+          /* reader already released */
+        }
+        abortRef.current = null;
+      }
+
+      // 5. Mark the assistant bubble as finished.
+      if (!token.cancelled) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, content: totalContent || m.content, pending: false }
+              : m,
+          ),
+        );
+        setIsStreaming(false);
+      }
+    },
+    [messages],
+  );
+
+  function appendDelta(id: string, delta: string) {
+    setMessages((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, content: m.content + delta } : m)),
+    );
+  }
+
+  function finalizeWithError(id: string, message: string) {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === id ? { ...m, pending: false, error: message } : m,
+      ),
+    );
+    setIsStreaming(false);
+    abortRef.current = null;
+  }
 
   return {
     messages,
     isStreaming,
+    lastError,
     attachments,
     send,
     cancel,
@@ -152,31 +330,102 @@ export function useAgentChat(): UseAgentChat {
   };
 }
 
-/* ───────────────────────────  helpers  ─────────────────────────── */
+/* ───────────────────────────  SSE / OpenAI helpers  ─────────────────────────── */
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+interface OpenAIChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
 }
 
-function chunkString(s: string, size: number): string[] {
-  if (s.length === 0) return [];
-  const out: string[] = [];
-  for (let i = 0; i < s.length; i += size) {
-    out.push(s.slice(i, i + size));
+/**
+ * Build the OpenAI chat-completions `messages` array from our internal
+ * `AgentMessage` history plus the just-appended user turn. Attachments
+ * are flattened to a text hint in the user content; once Hermes/multimodal
+ * supports real images, swap this for the proper `content: [{type, ...}]`
+ * shape.
+ */
+function buildOpenAIMessages(
+  history: AgentMessage[],
+  newUser: AgentMessage,
+): OpenAIChatMessage[] {
+  const out: OpenAIChatMessage[] = [];
+
+  for (const m of history) {
+    if (m.role === 'user') {
+      out.push({ role: 'user', content: stringifyUserContent(m) });
+    } else if (m.role === 'assistant' && m.content) {
+      out.push({ role: 'assistant', content: m.content });
+    }
   }
+  out.push({ role: 'user', content: stringifyUserContent(newUser) });
   return out;
 }
 
-function mockReply(text: string, attachments: AgentAttachment[]): string {
-  const n = attachments.length;
-  const fileNote =
-    n === 0
-      ? ''
-      : `\n\n我看到你发了 ${n} 个附件 — 等真后端接好就能帮你看里面的内容了。`;
-  const greet = text ? `关于「${truncate(text, 24)}」` : '你好';
-  return `${greet}，这是个 mock 回复 — UI 层先跑通, 真正接 Hermes OpenAI 兼容端点是 task 4 的事。${fileNote}`;
+function stringifyUserContent(m: AgentMessage): string {
+  if (!m.attachments || m.attachments.length === 0) return m.content;
+  const lines = m.attachments.map(
+    (a) => `- [${a.kind}] ${a.name} (${formatBytes(a.size)})`,
+  );
+  return `${m.content}\n\n附件:\n${lines.join('\n')}`;
 }
 
-function truncate(s: string, max: number): string {
-  return s.length <= max ? s : `${s.slice(0, max)}…`;
+interface OpenAIStreamChunk {
+  choices?: Array<{
+    delta?: { content?: string };
+    finish_reason?: string | null;
+  }>;
+  error?: { message?: string };
+}
+
+/**
+ * Parse one SSE record (possibly multi-line `data: ...` joined by newlines,
+ * optionally preceded by `event:` / `id:` / `retry:`). Returns:
+ *   - the extracted `delta.content` string when the payload is a valid
+ *     OpenAI streaming chunk,
+ *   - `null` if the record was the `[DONE]` sentinel,
+ *   - `''` if the record had no `data` line (heartbeat / comment).
+ *
+ * Throws if the upstream sent a structured error inside the data payload
+ * (matches `{ error: { message } }`), so the caller's stream loop can
+ * surface it.
+ */
+function parseSSERecord(record: string): string | null {
+  const dataLines: string[] = [];
+  for (const rawLine of record.split('\n')) {
+    const line = rawLine.replace(/\r$/, '');
+    if (!line || line.startsWith(':')) continue;
+    if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).trimStart());
+    }
+  }
+  if (dataLines.length === 0) return '';
+  const payload = dataLines.join('\n');
+  if (payload === '[DONE]') return null;
+
+  const parsed = JSON.parse(payload) as OpenAIStreamChunk;
+  if (parsed.error?.message) {
+    throw new Error(parsed.error.message);
+  }
+  return parsed.choices?.[0]?.delta?.content ?? '';
+}
+
+function humanizeNetworkError(err: unknown, baseUrl: string): string {
+  if (err instanceof Error) {
+    if (err.name === 'AbortError') {
+      return '请求已取消。';
+    }
+    // TypeError is what `fetch` throws on a connection refused.
+    if (err instanceof TypeError) {
+      return `连不上 Hermes (${baseUrl})。请确认已运行 \`hermes proxy start\`，或检查端口是否被防火墙挡住。`;
+    }
+    return `Hermes 请求失败: ${err.message}`;
+  }
+  return `Hermes 请求失败: ${String(err)}`;
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${(n / 1024 / 1024 / 1024).toFixed(1)} GB`;
 }
