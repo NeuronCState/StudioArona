@@ -9,6 +9,9 @@ interface AgentMessageListProps {
   isStreaming: boolean;
   agentName: string;
   onRemoveAttachment: (id: string) => void;
+  /** Re-trigger the previous user message. Wired by the panel to the
+   *  inline retry button on failed assistant bubbles. */
+  onRetry?: (assistantId: string) => void;
 }
 
 export function AgentMessageList({
@@ -16,6 +19,7 @@ export function AgentMessageList({
   isStreaming,
   agentName,
   onRemoveAttachment,
+  onRetry,
 }: AgentMessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -52,6 +56,7 @@ export function AgentMessageList({
               message={msg}
               onRemoveAttachment={onRemoveAttachment}
               agentName={agentName}
+              onRetry={onRetry}
             />
           ))}
           <div ref={bottomRef} />

@@ -5,6 +5,7 @@ import { useAgentChat } from './useAgentChat';
 import { AgentPanelHeader } from './AgentPanelHeader';
 import { AgentMessageList } from './AgentMessageList';
 import { AgentInput } from './AgentInput';
+import { AgentErrorToast } from './AgentErrorToast';
 
 interface AgentPanelProps {
   open: boolean;
@@ -19,8 +20,10 @@ const DEFAULT_AGENT_NAME = '阿洛娜';
  * trigger button. Lives inside the right content area only (sidebar + header
  * remain visible). Supports Esc / outside-click to close and traps focus.
  *
- * __TODO__: 接 Hermes OpenAI 兼容端点 — the `useAgentChat` hook currently
- * returns deterministic mock data. Swap for a real stream in task 4.
+ * The chat itself is backed by `useAgentChat`, which talks to the local
+ * Hermes OpenAI-compatible endpoint via SSE. Connection / streaming
+ * failures surface as a top-of-panel toast (dismissible) AND as an inline
+ * banner on the failed assistant bubble.
  */
 export function AgentPanel({ open, onClose, agentName = DEFAULT_AGENT_NAME }: AgentPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -102,13 +105,28 @@ export function AgentPanel({ open, onClose, agentName = DEFAULT_AGENT_NAME }: Ag
             style={{ transformOrigin: '50% 50%' }}
             className="absolute inset-y-0 right-0 z-40 flex w-full max-w-[480px] flex-col overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-3)] max-md:max-w-full max-md:inset-x-0"
           >
-            <AgentPanelHeader agentName={agentName} onClose={onClose} />
-            <AgentMessageList
-              messages={chat.messages}
-              isStreaming={chat.isStreaming}
+            <AgentPanelHeader
               agentName={agentName}
-              onRemoveAttachment={chat.removeAttachment}
+              onClose={onClose}
+              hermesReady={chat.hermesReady}
+              onRetryConnection={chat.probeHermes}
             />
+            <div className="relative flex-1 overflow-hidden">
+              <AgentMessageList
+                messages={chat.messages}
+                isStreaming={chat.isStreaming}
+                agentName={agentName}
+                onRemoveAttachment={chat.removeAttachment}
+                onRetry={chat.retry}
+              />
+              {/* Floating toast for the latest send failure. Sits at the top
+                  of the message area so it doesn't shift the conversation
+                  layout when it appears / disappears. */}
+              <AgentErrorToast
+                message={chat.lastError}
+                onDismiss={chat.dismissError}
+              />
+            </div>
             <AgentInput
               attachments={chat.attachments}
               isStreaming={chat.isStreaming}

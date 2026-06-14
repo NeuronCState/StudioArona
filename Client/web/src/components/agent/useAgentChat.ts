@@ -23,21 +23,38 @@ export interface AgentMessage {
   attachments?: AgentAttachment[];
   /** True while the assistant is still streaming. */
   pending?: boolean;
-  /** Set when the stream errored out — surfaces a user-friendly banner. */
+  /** Set when the stream errored out — surfaces a user-friendly banner
+   *  inline on the bubble so the user sees which turn failed. */
   error?: string;
 }
 
 export interface UseAgentChat {
   messages: AgentMessage[];
   isStreaming: boolean;
-  /** Latest human-readable error from the last send attempt (cleared on next send). */
+  /** Latest human-readable error from the last send attempt. Cleared
+   *  on the next successful `send`; persists across renders until then.
+   *  Drives the toast / banner surfaced by the panel. */
   lastError: string | null;
   attachments: AgentAttachment[];
+  /** True until we've completed at least one health probe against the
+   *  Hermes endpoint (success or failure). The panel can show a header
+   *  chip of "Hermes: ok / Hermes: 未启动" once `hermesReady` is known. */
+  hermesReady: boolean | null;
   send: (text: string, attachments: AgentAttachment[]) => Promise<void>;
+  /** Re-send the user message that preceded the given assistant bubble.
+   *  Wired to the inline "重试" button on failed assistant messages.
+   *  No-op if the message isn't a failed assistant bubble or the
+   *  matching user turn is missing. */
+  retry: (assistantId: string) => Promise<void>;
   cancel: () => void;
   removeAttachment: (id: string) => void;
   addAttachments: (items: AgentAttachment[]) => void;
   clear: () => void;
+  /** Re-probe Hermes `/v1/models`. Called automatically on mount; can be
+   *  re-invoked by the header's "retry" chip. */
+  probeHermes: () => Promise<void>;
+  /** Manual error dismiss — used by the toast / banner close button. */
+  dismissError: () => void;
 }
 
 let _id = 0;
@@ -54,26 +71,46 @@ const nextId = (prefix: string) =>
  * The proxy serves the standard OpenAI chat surface:
  *   - POST /v1/chat/completions   (supports stream:true → SSE)
  *   - GET  /v1/models
+ *   - GET  /health
  * See `HERMES_INTEGRATION.md` for setup details and `hermes proxy start
  * --help` for the full flag set (--host, --port, --provider nous|xai).
  *
  * Override at build time with `VITE_HERMES_BASE_URL`, e.g. when Hermes
  * lives on a different host (Docker, remote workstation).
  */
-const HERMES_BASE_URL: string =
-  (import.meta.env.VITE_HERMES_BASE_URL as string | undefined) ??
-  'http://127.0.0.1:8645';
+export interface HermesConfig {
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+}
 
-/** Default model id sent in the OpenAI request body. Hermes maps it to
- *  the upstream provider's model. Override with `VITE_HERMES_MODEL`. */
-const HERMES_MODEL: string =
-  (import.meta.env.VITE_HERMES_MODEL as string | undefined) ?? 'gpt-4o-mini';
+export const DEFAULT_HERMES_CONFIG: HermesConfig = {
+  baseUrl: 'http://127.0.0.1:8645',
+  model: 'gpt-4o-mini',
+  apiKey: 'local-hermes',
+};
 
-/** Public bearer token for the local proxy. The proxy ignores the token
- *  for localhost and accepts any string. Set `VITE_HERMES_API_KEY` if
- *  you've fronted Hermes with a real auth layer. */
-const HERMES_API_KEY: string =
-  (import.meta.env.VITE_HERMES_API_KEY as string | undefined) ?? 'local-hermes';
+let _runtimeConfig: HermesConfig = {
+  baseUrl:
+    (import.meta.env.VITE_HERMES_BASE_URL as string | undefined) ??
+    DEFAULT_HERMES_CONFIG.baseUrl,
+  model:
+    (import.meta.env.VITE_HERMES_MODEL as string | undefined) ??
+    DEFAULT_HERMES_CONFIG.model,
+  apiKey:
+    (import.meta.env.VITE_HERMES_API_KEY as string | undefined) ??
+    DEFAULT_HERMES_CONFIG.apiKey,
+};
+
+/** Test-only override; production code should set env vars instead. */
+export function __setHermesConfigForTests(partial: Partial<HermesConfig>): void {
+  _runtimeConfig = { ..._runtimeConfig, ...partial };
+}
+
+/** Test-only reset; mirrors the env-var fallback. */
+export function __resetHermesConfigForTests(): void {
+  _runtimeConfig = { ...DEFAULT_HERMES_CONFIG };
+}
 
 /* ───────────────────────────  Hook  ─────────────────────────── */
 
@@ -81,7 +118,7 @@ const HERMES_API_KEY: string =
  * useAgentChat — UI state + real Hermes OpenAI-compatible streaming.
  *
  * Each `send` POSTs the conversation so far to
- *   `${HERMES_BASE_URL}/v1/chat/completions` with `stream: true`, then
+ *   `${baseUrl}/v1/chat/completions` with `stream: true`, then
  * incrementally decodes the SSE deltas into the trailing assistant message.
  *
  * Failure modes the UI surfaces:
@@ -93,9 +130,24 @@ export function useAgentChat(): UseAgentChat {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [hermesReady, setHermesReady] = useState<boolean | null>(null);
   const [attachments, setAttachments] = useState<AgentAttachment[]>([]);
   const cancelRef = useRef<{ cancelled: boolean }>({ cancelled: false });
   const abortRef = useRef<AbortController | null>(null);
+  // Mirror of the latest `messages` so `retry` (a useCallback) can read
+  // the current history without having `messages` in its deps. This is
+  // the standard "latest ref" pattern; it sidesteps the stale-closure
+  // problem when the user clicks "重试" right after a render.
+  const messagesRef = useRef<AgentMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+  // Send is declared further down; hold a ref so `retry` (defined before
+  // `send`) can call the current implementation without a forward
+  // declaration.
+  const sendRef = useRef<(text: string, items: AgentAttachment[]) => Promise<void>>(
+    async () => {},
+  );
 
   // Mark everything as cancelled if the hook unmounts mid-stream.
   useEffect(() => {
@@ -113,6 +165,8 @@ export function useAgentChat(): UseAgentChat {
     setAttachments((prev) => [...prev, ...items]);
   }, []);
 
+  const dismissError = useCallback(() => setLastError(null), []);
+
   const cancel = useCallback(() => {
     cancelRef.current.cancelled = true;
     abortRef.current?.abort();
@@ -121,6 +175,22 @@ export function useAgentChat(): UseAgentChat {
     setMessages((prev) =>
       prev.map((m) => (m.pending ? { ...m, pending: false } : m)),
     );
+  }, []);
+
+  const retry = useCallback(async (assistantId: string) => {
+    // Walk the current `messages` (captured at click time) to find the
+    // failed assistant bubble and the user turn that immediately
+    // preceded it. We re-send that turn as a brand-new conversation
+    // turn — the failed assistant is left in place for history; a
+    // fresh assistant bubble is appended by `send`.
+    const all = messagesRef.current;
+    const failedIdx = all.findIndex(
+      (m) => m.id === assistantId && m.role === 'assistant' && m.error,
+    );
+    if (failedIdx < 0) return;
+    const userMsg = all[failedIdx - 1];
+    if (!userMsg || userMsg.role !== 'user') return;
+    await sendRef.current(userMsg.content, userMsg.attachments ?? []);
   }, []);
 
   const clear = useCallback(() => {
@@ -132,6 +202,28 @@ export function useAgentChat(): UseAgentChat {
     setAttachments([]);
     setLastError(null);
   }, []);
+
+  const probeHermes = useCallback(async () => {
+    const ac = new AbortController();
+    const timer = window.setTimeout(() => ac.abort(), 3000);
+    try {
+      const res = await fetch(`${_runtimeConfig.baseUrl}/v1/models`, {
+        method: 'GET',
+        signal: ac.signal,
+      });
+      setHermesReady(res.ok);
+    } catch {
+      setHermesReady(false);
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }, []);
+
+  // Probe Hermes once on mount so the header can render a status chip
+  // before the user ever sends a message.
+  useEffect(() => {
+    void probeHermes();
+  }, [probeHermes]);
 
   const send = useCallback(
     async (text: string, items: AgentAttachment[]) => {
@@ -177,14 +269,14 @@ export function useAgentChat(): UseAgentChat {
 
       let response: Response;
       try {
-        response = await fetch(`${HERMES_BASE_URL}/v1/chat/completions`, {
+        response = await fetch(`${_runtimeConfig.baseUrl}/v1/chat/completions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${HERMES_API_KEY}`,
+            Authorization: `Bearer ${_runtimeConfig.apiKey}`,
           },
           body: JSON.stringify({
-            model: HERMES_MODEL,
+            model: _runtimeConfig.model,
             messages: conversation,
             stream: true,
             temperature: 0.7,
@@ -194,9 +286,10 @@ export function useAgentChat(): UseAgentChat {
       } catch (err) {
         // Network-level failure — Hermes not running, port closed, CORS, etc.
         if (token.cancelled) return;
-        const msg = humanizeNetworkError(err, HERMES_BASE_URL);
+        const msg = humanizeNetworkError(err, _runtimeConfig.baseUrl);
         finalizeWithError(assistantId, msg);
         setLastError(msg);
+        setHermesReady(false);
         return;
       }
 
@@ -215,6 +308,9 @@ export function useAgentChat(): UseAgentChat {
             : `Hermes 返回 ${detail}`;
         finalizeWithError(assistantId, friendly);
         setLastError(friendly);
+        if (response.status === 401 || response.status === 403) {
+          setHermesReady(false);
+        }
         return;
       }
 
@@ -234,8 +330,8 @@ export function useAgentChat(): UseAgentChat {
       try {
         // SSE records are separated by a blank line. We parse per record
         // so a chunk that splits mid-record is handled on the next read.
-        // While inside the loop, an empty `delta` means heartbeat/comment
-        // and a `null` means the [DONE] sentinel.
+        // Inside the loop an empty `delta` means heartbeat/comment and a
+        // `null` means the [DONE] sentinel.
         while (true) {
           const { value, done } = await reader.read();
           if (done) break;
@@ -250,7 +346,6 @@ export function useAgentChat(): UseAgentChat {
             const delta = parseSSERecord(record);
             if (delta === null) {
               // [DONE] sentinel — the upstream is signalling end of stream.
-              // We still rely on the chunked-transfer close to fully exit.
             } else if (delta) {
               totalContent += delta;
               appendDelta(assistantId, delta);
@@ -296,10 +391,13 @@ export function useAgentChat(): UseAgentChat {
           ),
         );
         setIsStreaming(false);
+        setHermesReady(true);
       }
     },
     [messages],
   );
+  // Keep the ref in sync so `retry` always calls the latest `send`.
+  sendRef.current = send;
 
   function appendDelta(id: string, delta: string) {
     setMessages((prev) =>
@@ -321,20 +419,32 @@ export function useAgentChat(): UseAgentChat {
     messages,
     isStreaming,
     lastError,
+    hermesReady,
     attachments,
     send,
+    retry,
     cancel,
     removeAttachment,
     addAttachments,
     clear,
+    probeHermes,
+    dismissError,
   };
 }
 
 /* ───────────────────────────  SSE / OpenAI helpers  ─────────────────────────── */
 
-interface OpenAIChatMessage {
+export interface OpenAIChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+}
+
+interface OpenAIStreamChunk {
+  choices?: Array<{
+    delta?: { content?: string };
+    finish_reason?: string | null;
+  }>;
+  error?: { message?: string };
 }
 
 /**
@@ -344,7 +454,7 @@ interface OpenAIChatMessage {
  * supports real images, swap this for the proper `content: [{type, ...}]`
  * shape.
  */
-function buildOpenAIMessages(
+export function buildOpenAIMessages(
   history: AgentMessage[],
   newUser: AgentMessage,
 ): OpenAIChatMessage[] {
@@ -369,14 +479,6 @@ function stringifyUserContent(m: AgentMessage): string {
   return `${m.content}\n\n附件:\n${lines.join('\n')}`;
 }
 
-interface OpenAIStreamChunk {
-  choices?: Array<{
-    delta?: { content?: string };
-    finish_reason?: string | null;
-  }>;
-  error?: { message?: string };
-}
-
 /**
  * Parse one SSE record (possibly multi-line `data: ...` joined by newlines,
  * optionally preceded by `event:` / `id:` / `retry:`). Returns:
@@ -389,7 +491,7 @@ interface OpenAIStreamChunk {
  * (matches `{ error: { message } }`), so the caller's stream loop can
  * surface it.
  */
-function parseSSERecord(record: string): string | null {
+export function parseSSERecord(record: string): string | null {
   const dataLines: string[] = [];
   for (const rawLine of record.split('\n')) {
     const line = rawLine.replace(/\r$/, '');
@@ -409,7 +511,7 @@ function parseSSERecord(record: string): string | null {
   return parsed.choices?.[0]?.delta?.content ?? '';
 }
 
-function humanizeNetworkError(err: unknown, baseUrl: string): string {
+export function humanizeNetworkError(err: unknown, baseUrl: string): string {
   if (err instanceof Error) {
     if (err.name === 'AbortError') {
       return '请求已取消。';
@@ -423,7 +525,7 @@ function humanizeNetworkError(err: unknown, baseUrl: string): string {
   return `Hermes 请求失败: ${String(err)}`;
 }
 
-function formatBytes(n: number): string {
+export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;

@@ -1,4 +1,4 @@
-import { X, Sparkles } from 'lucide-react';
+import { Circle, CircleAlert, CircleCheck, RefreshCw, Sparkles, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { motion as m } from '@/lib/motion';
 import { Avatar } from '@javis/ui-kit';
@@ -6,9 +6,20 @@ import { Avatar } from '@javis/ui-kit';
 interface AgentPanelHeaderProps {
   agentName: string;
   onClose: () => void;
+  /** Hermes health probe result. `null` = still probing, `true` = ok,
+   *  `false` = connection refused / not authenticated. */
+  hermesReady: boolean | null;
+  /** Re-probe Hermes. Surfaced as a "重试连接" button when hermesReady
+   *  is `false` so the user doesn't have to close + reopen the panel. */
+  onRetryConnection: () => void | Promise<void>;
 }
 
-export function AgentPanelHeader({ agentName, onClose }: AgentPanelHeaderProps) {
+export function AgentPanelHeader({
+  agentName,
+  onClose,
+  hermesReady,
+  onRetryConnection,
+}: AgentPanelHeaderProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: -8 }}
@@ -25,6 +36,10 @@ export function AgentPanelHeader({ agentName, onClose }: AgentPanelHeaderProps) 
           <p className="flex items-center gap-1 text-[10px] text-[var(--color-text-muted)]">
             <Sparkles size={10} aria-hidden="true" className="text-[var(--color-accent)]" />
             <span>专注模式</span>
+            <HermesStatusChip
+              ready={hermesReady}
+              onRetry={onRetryConnection}
+            />
           </p>
         </div>
       </div>
@@ -37,5 +52,59 @@ export function AgentPanelHeader({ agentName, onClose }: AgentPanelHeaderProps) 
         <X size={16} aria-hidden="true" />
       </button>
     </motion.div>
+  );
+}
+
+/** Tiny inline status chip + optional retry button. Visible at all times
+ *  so the user always knows whether the panel can talk to Hermes. */
+function HermesStatusChip({
+  ready,
+  onRetry,
+}: {
+  ready: boolean | null;
+  onRetry: () => void | Promise<void>;
+}) {
+  if (ready === null) {
+    return (
+      <span
+        data-testid="hermes-status"
+        data-ready="probing"
+        className="ml-1 inline-flex items-center gap-1 rounded-full border border-[var(--color-border)] bg-[var(--color-bg)] px-1.5 py-px text-[9px] text-[var(--color-text-muted)]"
+      >
+        <Circle size={8} aria-hidden="true" className="animate-pulse" />
+        <span>检查 Hermes…</span>
+      </span>
+    );
+  }
+  if (ready) {
+    return (
+      <span
+        data-testid="hermes-status"
+        data-ready="true"
+        className="ml-1 inline-flex items-center gap-1 rounded-full border border-[var(--color-success)]/30 bg-[var(--color-success)]/10 px-1.5 py-px text-[9px] text-[var(--color-success)]"
+      >
+        <CircleCheck size={8} aria-hidden="true" />
+        <span>Hermes 在线</span>
+      </span>
+    );
+  }
+  return (
+    <span
+      data-testid="hermes-status"
+      data-ready="false"
+      className="ml-1 inline-flex items-center gap-1 rounded-full border border-[var(--color-error)]/30 bg-[var(--color-error)]/10 px-1.5 py-px text-[9px] text-[var(--color-error)]"
+    >
+      <CircleAlert size={8} aria-hidden="true" />
+      <span>Hermes 未启动</span>
+      <button
+        type="button"
+        onClick={onRetry}
+        aria-label="重试连接 Hermes"
+        data-testid="hermes-retry"
+        className="ml-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded hover:bg-[var(--color-error)]/15 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-error)]"
+      >
+        <RefreshCw size={8} aria-hidden="true" />
+      </button>
+    </span>
   );
 }
