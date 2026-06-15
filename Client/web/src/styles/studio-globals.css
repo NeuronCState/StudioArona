@@ -4,8 +4,8 @@
 
 /* ========== Page Enter ========== */
 @keyframes studio-page-enter {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; translate: 0 12px; }
+  to   { opacity: 1; translate: 0 0; }
 }
 .studio-page {
   position: relative; /* anchor for .focus-sidebar / .focus-toggle (absolute left:0 = StudioSidebar 右缘) */
@@ -370,7 +370,8 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%);
+  margin-left: -80px;
+  margin-top: -80px;
   width: 160px;
   height: 160px;
   border-radius: 50%;
@@ -414,7 +415,7 @@
 }
 
 .center-voice-btn:active {
-  transform: translate(-50%, -50%) scale(0.96);
+  transform: scale(0.96);
 }
 
 [data-mode='chat'] .center-voice-btn {
@@ -428,9 +429,9 @@
 }
 
 @keyframes center-btn-reappear {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2); border-color: transparent; }
-  60% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
-  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); border-color: rgba(217, 119, 6, 0.55); }
+  0% { opacity: 0; transform: scale(0.2); border-color: transparent; }
+  60% { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); border-color: rgba(217, 119, 6, 0.55); }
 }
 
 /* Voice mode: center button transforms into multi-color orb */
@@ -1060,8 +1061,8 @@
    FocusSidebar 的 absolute left:0 = StudioSidebar 右缘 = viewport x=208. */
 
 .focus-sidebar {
-  position: absolute;
-  left: 0; /* 相对 .studio-page (relative parent), 等于 StudioSidebar 右缘 */
+  position: fixed;
+  left: 0; /* viewport 最左 */
   top: 0;
   bottom: 0;
   width: 240px;
@@ -1146,7 +1147,7 @@
 }
 
 .focus-history {
-  flex: 0 0 60%;
+  flex: 0 0 40%;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1424,11 +1425,16 @@
 
 /* ========== Focus Toggle (收回指示条) ========== */
 
-.focus-toggle {
-  position: absolute;
-  left: 0; /* 紧贴 StudioSidebar 右缘 (相对 .studio-page) */
+.focus-toggle-wrapper {
+  position: fixed;
+  left: 240px; /* 侧边栏右面 */
   top: 50%;
   transform: translateY(-50%);
+  z-index: 13;
+}
+
+.focus-toggle {
+  position: relative;
   width: 8px;
   height: 30vh;
   min-height: 180px;
@@ -1441,7 +1447,6 @@
   background: var(--studio-surface, #FFFFFF);
   color: var(--studio-text-muted, #A8A29E);
   cursor: pointer;
-  z-index: 13; /* 高于 FocusSidebar (12), 低于 AgentPanel (40) */
   transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
   box-shadow: 2px 0 6px rgba(28, 25, 23, 0.06);
 }
@@ -1470,12 +1475,7 @@
   justify-content: center;
 }
 
-/* 当 FocusSidebar 打开, FocusToggle 应该贴在 FocusSidebar 右缘 (208 + 240 = 448).
-   使用 [data-focus-sidebar-open] 在父容器上. */
-[data-focus-sidebar-open="true"] .focus-toggle {
-  left: 240px; /* FocusSidebar 240px - 自身 8px = 232px, 但要凸出在外 (右缘),
-                  所以贴在 FocusSidebar 右缘 240px 上, 自身 8px 宽 */
-}
+/* FocusToggle 固定在页面最左边, 打开侧栏时不移动 */
 
 /* ========== 新对话按钮 (StudioSidebar 顶部) ========== */
 
@@ -1517,17 +1517,7 @@
 
 /* ========== Focus Mode — main area adjustments ========== */
 
-/* 焦点模式下, 主区域 grid 应该让出 FocusSidebar 空间.
-   由于 FocusSidebar 用 absolute 定位覆盖在 main 左 240px 上,
-   main 内容会被遮挡. 给 main 加 padding-left 让内容不重叠. */
-
-.studio-page[data-focus-mode="true"][data-focus-sidebar-open="true"] {
-  padding-left: 264px; /* FocusSidebar 240px + 24px 缓冲 */
-}
-
-.studio-page[data-focus-mode="true"][data-focus-sidebar-open="false"] {
-  padding-left: 32px; /* 默认 px-6 已经是 24px, 加 8px 给 FocusToggle 余地 */
-}
+/* FocusSidebar 已改为 position: fixed, 浮在内容上方, 不需要 padding 推移内容 */
 
 /* 焦点模式下, 中心按钮扩散时, 4 磁贴淡出.
    注意: 现有 .tile-shell 已被 [data-mode='voice'] 控制,

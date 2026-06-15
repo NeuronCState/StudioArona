@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '@/stores/auth';
@@ -250,6 +251,7 @@ export function StudioHomePage() {
   );
 
   return (
+    <>
     <div
       className="studio-page relative flex h-full flex-col px-6 pt-5 pb-4"
       data-focus-mode={focusMode ? 'true' : 'false'}
@@ -395,18 +397,26 @@ export function StudioHomePage() {
         />
       </div>
 
-      {/* FocusSidebar — 专注模式下拉出, 历史 + 3 区域 (240px 宽) */}
-      <FocusSidebar
-        open={focusMode && focusSidebarOpen}
-        onClose={() => toggleFocusSidebar()}
-      />
-
-      {/* FocusToggle — focus mode 才显示, 收回指示条 */}
-      <FocusToggle
-        visible={focusMode}
-        open={focusSidebarOpen}
-        onToggle={() => toggleFocusSidebar()}
-      />
     </div>
+
+      {/* FocusSidebar — portal 到 body 避免 transform 影响 fixed 定位 */}
+      {createPortal(
+        <FocusSidebar
+          open={focusMode && focusSidebarOpen}
+          onClose={() => toggleFocusSidebar()}
+        />,
+        document.body,
+      )}
+
+      {/* FocusToggle — portal 到 body 避免 transform 影响 fixed 定位 */}
+      {createPortal(
+        <FocusToggle
+          visible={focusMode}
+          open={focusSidebarOpen}
+          onToggle={() => toggleFocusSidebar()}
+        />,
+        document.body,
+      )}
+    </>
   );
 }
