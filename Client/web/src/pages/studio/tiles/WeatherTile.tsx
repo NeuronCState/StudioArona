@@ -2,14 +2,14 @@ import { CloudSun, CloudRain, Sun, Cloud, CloudSnow, CloudLightning } from 'luci
 import { useT } from '@/lib/i18n';
 
 interface WeatherTileProps {
-  city: string;
+  city?: string;
   temperature: number;
   condition: string;
   humidity: number;
-  windSpeed: string;
+  windSpeed?: string;
   windDirection?: string;
   feelsLike: number;
-  uvIndex: string;
+  uvIndex?: string;
 }
 
 const iconMap: Record<string, typeof Sun> = {
@@ -22,8 +22,7 @@ const iconMap: Record<string, typeof Sun> = {
 };
 
 export function WeatherTile({
-  city, temperature, condition, humidity, windSpeed, windDirection,
-  feelsLike, uvIndex,
+  temperature, condition, humidity, feelsLike,
 }: WeatherTileProps) {
   const t = useT();
   const key = condition.toLowerCase().includes('rain') ? 'rainy'
@@ -55,21 +54,18 @@ export function WeatherTile({
           <p className="text-[13px] text-stone-500">{condition}</p>
         </div>
 
-        <div className="mt-auto grid grid-cols-2 gap-x-3 gap-y-1 border-t border-stone-100 pt-2">
-          {[
-            [t('weather.humidity'), `${humidity}%`],
-            [t('weather.wind'), windDirection ? `${windSpeed} ${windDirection}` : windSpeed],
-            [t('weather.feelsLike'), `${feelsLike}°C`],
-            [t('weather.uvIndex'), uvIndex],
-          ].map(([label, value]) => (
-            <div key={label} className="flex items-center justify-between">
-              <span className="text-[11px] text-stone-400">{label}</span>
-              <span className="text-[11px] font-medium text-stone-600">{value}</span>
-            </div>
-          ))}
+        <div className="mt-auto flex items-center justify-center gap-8 border-t border-stone-100 pt-2">
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] text-stone-400">{t('weather.humidity')}</span>
+            <span className="text-[11px] font-medium text-stone-600">{humidity}%</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] text-stone-400">{t('weather.feelsLike')}</span>
+            <span className="text-[11px] font-medium text-stone-600">{feelsLike}°C</span>
+          </div>
         </div>
 
-        <p className="mt-1.5 text-center text-[11px] text-stone-400">{city}</p>
+        <p className="mt-1.5 text-center text-[11px] text-stone-400">沈阳</p>
       </div>
     </div>
   );

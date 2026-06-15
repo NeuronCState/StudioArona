@@ -2,9 +2,12 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Cloud } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth';
 import { api } from '@/lib/api/client';
-import type { VM, Schedule, Feed } from '@/types/contracts';
+import { useSchedules, useFeeds, useWeather } from '@/lib/db/hooks';
+import type { VM } from '@/types/contracts';
+import type { LocalSchedule } from '@/lib/db';
 import { CardSkeleton, CardError } from '@javis/ui-kit';
 import { ScheduleTile } from './tiles/ScheduleTile';
 import { WeatherTile } from './tiles/WeatherTile';
@@ -24,16 +27,6 @@ import { useFocusModeStore } from '@/stores/focus-mode';
 
 type StudioMode = 'dashboard' | 'chat';
 
-interface WeatherData {
-  city: string;
-  temperature: number;
-  condition: string;
-  humidity: number;
-  windSpeed: string;
-  windDirection?: string;
-  feelsLike: number;
-  uvIndex: string;
-}
 type TransitionPhase = 'idle' | 'dashboard-to-chat' | 'chat-to-dashboard';
 
 interface ChatMessage {
@@ -42,9 +35,9 @@ interface ChatMessage {
   content: string;
 }
 
-function adaptSchedule(apiSchedules: Schedule[]) {
-  return apiSchedules.slice(0, 6).map((s) => {
-    const due = new Date(s.starts_at);
+function adaptSchedule(schedules: LocalSchedule[]) {
+  return schedules.slice(0, 6).map((s) => {
+    const due = new Date(s.startAt);
     const now = Date.now();
     return {
       id: s.id,
@@ -56,9 +49,10 @@ function adaptSchedule(apiSchedules: Schedule[]) {
   });
 }
 
-function adaptRSS(feeds: Feed[]) {
+function adaptRSS(feeds: Array<{ id: string; title?: string; createdAt: number; created_at?: string }>) {
   return feeds.slice(0, 6).map((f) => {
-    const diff = Date.now() - new Date(f.created_at).getTime();
+    const created = f.createdAt ?? (f.created_at ? new Date(f.created_at).getTime() : Date.now());
+    const diff = Date.now() - created;
     const hours = Math.round(diff / 3_600_000);
     const timeAgo =
       hours < 1 ? '刚刚' : hours < 24 ? `${hours}h ago` : `${Math.round(hours / 24)}d ago`;
@@ -103,11 +97,8 @@ export function StudioHomePage() {
   // 中央文字 — 圆环涨到位后才出现, 用户发第一条消息后消失
   const showHint = focusMode && chat.messages.length === 0;
 
-  const { data: weather, isLoading: weatherLoading, error: weatherErr } = useQuery({
-    queryKey: ['weather'],
-    queryFn: () => api.get<WeatherData>('/weather'),
-    staleTime: 600_000,
-  });
+  // 4 磁贴: 本地优先 (IDB 缓存), 连接 server 时后台 sync
+  const { data: weather, isLoading: weatherLoading, error: weatherErr } = useWeather();
   const weatherError = weatherErr instanceof Error ? weatherErr.message : null;
 
   const queryClient = useQueryClient();
@@ -125,11 +116,7 @@ export function StudioHomePage() {
     isError: schedError,
     error: schedErr,
     refetch: refetchSched,
-  } = useQuery({
-    queryKey: ['schedules', 'upcoming'],
-    queryFn: () => api.get<Schedule[]>('/schedules?upcoming=true'),
-    staleTime: 60_000,
-  });
+  } = useSchedules();
 
   const {
     data: feedData,
@@ -137,12 +124,9 @@ export function StudioHomePage() {
     isError: feedsError,
     error: feedsErr,
     refetch: refetchFeeds,
-  } = useQuery({
-    queryKey: ['feeds'],
-    queryFn: () => api.get<Feed[]>('/feeds'),
-    staleTime: 60_000,
-  });
+  } = useFeeds();
 
+  // VM 仍走 server (工作室服务, 需连接)
   const {
     data: vms,
     isLoading: vmsLoading,
@@ -151,7 +135,7 @@ export function StudioHomePage() {
     refetch: refetchVms,
   } = useQuery({
     queryKey: ['vms'],
-    queryFn: () => api.get<VM[]>('/vms'),
+    queryFn: () => api.get<VM[]>('/api/vms'),
     staleTime: 30_000,
   });
 
@@ -333,7 +317,13 @@ export function StudioHomePage() {
                 feelsLike={weather.feelsLike}
                 uvIndex={weather.uvIndex}
               />
-            ) : null}
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
+                <Cloud size={32} className="text-stone-300" />
+                <p className="text-sm text-stone-500">暂无天气数据</p>
+                <p className="text-xs text-stone-400">连接 server 后获取</p>
+              </div>
+            )}
           </div>
           <div className="tile-shell tile-system" onClick={isChat ? backToDashboard : undefined}>
             {vmsLoading ? (
@@ -481,39 +471,41 @@ export function StudioHomePage() {
           document.body,
         )}
 
-        {/* Chat mode (非 focus) — conversation-stage 跟 QuickChatBar 旧版保留 */}
+        {/* Chat mode (非 focus) — conversation-stage */}
         {!focusMode && (
-          <>
-            <section className="conversation-stage" aria-hidden={!isChat}>
-              <div ref={chatRef} className="conversation-panel">
-                <div className="conversation-kicker">Today's conversation</div>
-                {messages.length === 0 && (
-                  <p className="conversation-empty">
-                    Start typing below and the surrounding tiles will stay available as compact context.
-                  </p>
-                )}
-                {messages.map((msg) => (
-                  <div key={msg.id} className={`chat-msg ${msg.role}`}>
-                    {msg.content}
-                  </div>
-                ))}
-                {isLoading && (
-                  <div className="chat-msg assistant">
-                    <span className="inline-flex gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </span>
-                  </div>
-                )}
-              </div>
-            </section>
-            <div className="mt-3 shrink-0">
-              <QuickChatBar onSend={handleSend} />
+          <section className="conversation-stage" aria-hidden={!isChat}>
+            <div ref={chatRef} className="conversation-panel">
+              <div className="conversation-kicker">Today's conversation</div>
+              {messages.length === 0 && (
+                <p className="conversation-empty">
+                  Start typing below and the surrounding tiles will stay available as compact context.
+                </p>
+              )}
+              {messages.map((msg) => (
+                <div key={msg.id} className={`chat-msg ${msg.role}`}>
+                  {msg.content}
+                </div>
+              ))}
+              {isLoading && (
+                <div className="chat-msg assistant">
+                  <span className="inline-flex gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </span>
+                </div>
+              )}
             </div>
-          </>
+          </section>
         )}
       </div>
+
+      {/* QuickChatBar — 固定在页面底部 */}
+      {!focusMode && (
+        <div className="quick-chat-fixed-bottom">
+          <QuickChatBar onSend={handleSend} />
+        </div>
+      )}
 
     </div>
 
