@@ -156,10 +156,12 @@ export function StudioHomePage() {
       new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
     [],
   );
-  const isDashboard = mode === 'dashboard' && !focusMode;
+  // focus mode 时, 4 磁贴/中心按钮 都不 unmount, 让 z:20 矩形盖过去 (不淡出)
+  // 视觉: focus 起来 0.55s 涨到位, 中间始终有底层在, 矩形盖住它们
+  const isDashboard = mode === 'dashboard';
   const isChat = mode === 'chat' || focusMode;
   // studio-stage 的 data-mode: dashboard / chat / focus
-  // focus 模式时 4 磁贴淡出, 中心按钮被 AgentPanel 接管
+  // focus 模式时 4 磁贴/中心按钮在 z:0 保持渲染, 被 z:20 矩形覆盖 (无淡出)
   const stageMode: StudioMode | 'focus' = focusMode ? 'focus' : mode;
 
   const scheduleEvents = useMemo(() => {
@@ -293,7 +295,7 @@ export function StudioHomePage() {
         data-mode={stageMode}
         data-phase={phase}
       >
-        <div className="tile-layer" aria-hidden={!isDashboard}>
+        <div className="tile-layer" aria-hidden={!isDashboard} style={{ pointerEvents: focusMode ? 'none' : 'auto' }}>
           <div className="tile-shell tile-schedule" onClick={isChat ? backToDashboard : undefined}>
             {schedLoading ? (
               <CardSkeleton variant="list" count={3} />
@@ -341,20 +343,21 @@ export function StudioHomePage() {
           </div>
         </div>
 
-        {/* Center action button — focus mode 起始点, 圆环涨满后被矩形盖住 */}
-        <AnimatePresence>
-          {!focusMode && (
-            <motion.button
-              key="center-btn"
-              className="center-voice-btn"
-              aria-label="打开阿洛娜专注面板"
-              type="button"
-              onClick={enterFocus}
-            >
-              <img src="/voice-btn.png" alt="阿洛娜专注" />
-            </motion.button>
-          )}
-        </AnimatePresence>
+        {/* Center action button — focus mode 起始点
+            focus 期间不 unmount, pointer-events 锁掉, 让 z:20 矩形盖住 (不淡出) */}
+        <button
+          className="center-voice-btn"
+          aria-label="打开阿洛娜专注面板"
+          type="button"
+          onClick={enterFocus}
+          aria-hidden={focusMode}
+          tabIndex={focusMode ? -1 : 0}
+          style={{
+            pointerEvents: focusMode ? 'none' : 'auto',
+          }}
+        >
+          <img src="/voice-btn.png" alt="阿洛娜专注" />
+        </button>
 
         {/* Focus mode — Phase 1: 圆环从中心 160×160 涨到右侧主区 (无圆角矩形)
             起点: 中心 160×160 (圆角 50%)
