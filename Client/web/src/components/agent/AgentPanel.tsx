@@ -103,7 +103,7 @@ export function AgentPanel({ open, onClose, agentName = DEFAULT_AGENT_NAME }: Ag
               mass: 0.9,
             }}
             style={{ transformOrigin: '50% 50%' }}
-            className="absolute inset-y-0 right-0 z-40 flex w-full max-w-[480px] flex-col overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-3)] max-md:max-w-full max-md:inset-x-0"
+            className="absolute inset-2 z-40 flex flex-col overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-3)] rounded-2xl"
           >
             <AgentPanelHeader
               agentName={agentName}
