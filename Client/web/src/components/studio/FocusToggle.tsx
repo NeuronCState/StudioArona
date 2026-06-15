@@ -41,6 +41,7 @@ export function FocusToggle({ visible, open, onToggle }: FocusToggleProps) {
         className="focus-toggle-icon"
         animate={{ x: open ? 1 : -1 }}
         transition={{ duration: 0.2 }}
+        aria-hidden="true"
       >
         {open ? <ChevronLeft size={10} /> : <ChevronRight size={10} />}
       </motion.span>
