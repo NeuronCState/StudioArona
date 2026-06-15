@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Rss, Calendar, Monitor, Brain, Sparkles, ShieldCheck, PanelLeftClose, ChevronDown, Server, Scan, HardDrive, MessageSquarePlus } from 'lucide-react';
+import { Home, Rss, Calendar, Monitor, Brain, Sparkles, ShieldCheck, PanelLeftClose, ChevronDown, Server, Scan, HardDrive } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useSessionStore } from '@/stores/session';
@@ -16,8 +16,6 @@ import { useT } from '@/lib/i18n';
 import { StaggerList, StaggerItem } from '@/components/motion';
 import { motion as m } from '@/lib/motion';
 import { api } from '@/lib/api/client';
-import { useFocusChatsStore } from '@/stores/focus-chats';
-import { useFocusModeStore } from '@/stores/focus-mode';
 
 const navItems = [
   { to: '/', icon: Home, i18nKey: 'sidebar.home' },
@@ -64,40 +62,9 @@ const routePrefetchMap: Record<string, Array<{ key: readonly unknown[]; fetcher:
 };
 
 /**
- * 新对话按钮 — 在 StudioSidebar 顶部, Logo 跟 ThemeToggle 之间.
- *
- * 行为:
- *  - 在 store 里创建一条 chat (auto-naming "新对话 N")
- *  - 设为 active
- *  - 进入 focus mode (打开 AgentPanel, 让中心按钮扩散)
- *
- * FocusSidebar 拉出时, 这个按钮仍在 StudioSidebar 上 — 不重复.
+ * 新对话按钮 — 现在在 FocusSidebar 内部 (header 下方), 不在 StudioSidebar.
+ * 这个函数保留 export 供其他文件 (eg. FocusSidebar) 用, 实际不渲染.
  */
-function NewChatButton() {
-  const createChat = useFocusChatsStore((s) => s.createChat);
-  const setFocusMode = useFocusModeStore((s) => s.setFocusMode);
-  const t = useT();
-
-  const handleClick = () => {
-    createChat();
-    setFocusMode(true);
-  };
-
-  return (
-    <motion.button
-      type="button"
-      onClick={handleClick}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.97 }}
-      transition={{ duration: m.duration.fast / 1000, ease: m.easing.out }}
-      className="sidebar-new-chat"
-      title={t('sidebar.newChat')}
-    >
-      <MessageSquarePlus size={14} />
-      <span>{t('sidebar.newChat')}</span>
-    </motion.button>
-  );
-}
 
 export function StudioSidebar() {
   const t = useT();
@@ -173,9 +140,6 @@ export function StudioSidebar() {
           <PanelLeftClose size={16} />
         </motion.button>
       </motion.div>
-
-      {/* 新对话 — 永远在 StudioSidebar 上, FocusSidebar 拉出时仍在 */}
-      <NewChatButton />
 
       {/* Day/night theme toggle */}
       <ThemeToggle />

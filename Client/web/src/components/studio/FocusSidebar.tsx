@@ -1,12 +1,14 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Pencil, Trash2, Calendar, Rss, Server, MessageSquare, X } from 'lucide-react';
+import { Pencil, Trash2, Calendar, Rss, Server, MessageSquare, MessageSquarePlus, X } from 'lucide-react';
 import { api } from '@/lib/api/client';
 import type { VM, Schedule, Feed } from '@/types/contracts';
 import { useFocusChatsStore, type FocusChat } from '@/stores/focus-chats';
+import { useFocusModeStore } from '@/stores/focus-mode';
 import { motion as m } from '@/lib/motion';
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/i18n';
 
 /**
  * FocusSidebar — 专注模式左侧拉出
@@ -51,6 +53,10 @@ export function FocusSidebar({ open, onClose }: FocusSidebarProps) {
 }
 
 function FocusSidebarContent({ onClose }: { onClose: () => void }) {
+  const createChat = useFocusChatsStore((s) => s.createChat);
+  const setFocusMode = useFocusModeStore((s) => s.setFocusMode);
+  const t = useT();
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
@@ -65,6 +71,20 @@ function FocusSidebarContent({ onClose }: { onClose: () => void }) {
           <X size={14} />
         </button>
       </div>
+
+      {/* 新对话按钮 — FocusSidebar 内部, 拉到时才显示 */}
+      <motion.button
+        type="button"
+        onClick={() => { createChat(); setFocusMode(true); }}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.97 }}
+        transition={{ duration: m.duration.fast / 1000, ease: m.easing.out }}
+        className="sidebar-new-chat"
+        title={t('sidebar.newChat')}
+      >
+        <MessageSquarePlus size={14} />
+        <span>{t('sidebar.newChat')}</span>
+      </motion.button>
 
       {/* History (60%) */}
       <HistoryPane />
