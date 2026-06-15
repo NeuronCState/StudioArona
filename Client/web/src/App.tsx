@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { StudioAppShell } from './components/studio/StudioAppShell';
@@ -69,7 +69,23 @@ export default function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const mode = useDesignModeStore((s) => s.mode);
 
-  if (!isAuthenticated) {
+  // Dev bypass: ?devbypass=1 直接进 home (puppeteer 截图用)
+  const devBypass =
+    import.meta.env.DEV &&
+    new URLSearchParams(window.location.search).get('devbypass') === '1';
+
+  // devbypass 模式强制设 authenticated (避免后续 401 自动 logout)
+  useEffect(() => {
+    if (devBypass && !isAuthenticated) {
+      useAuthStore.getState().login(
+        'dev-bypass-token',
+        'dev-bypass-refresh',
+        { id: 'admin', username: 'admin', display_name: 'Admin', role: 'admin', created_at: new Date().toISOString() } as any,
+      );
+    }
+  }, [devBypass, isAuthenticated]);
+
+  if (!isAuthenticated && !devBypass) {
     return <LoginPage />;
   }
 

@@ -5,10 +5,10 @@
 /* ========== Page Enter ========== */
 @keyframes studio-page-enter {
   from { opacity: 0; translate: 0 12px; }
-  to   { opacity: 1; translate: 0 0; }
+  to   { opacity: 1; translate: none; }  /* translate:none 不创建 containing block, position:fixed 仍相对于 viewport */
 }
 .studio-page {
-  position: relative; /* anchor for .focus-sidebar / .focus-toggle (absolute left:0 = StudioSidebar 右缘) */
+  position: relative;
   animation: studio-page-enter 300ms cubic-bezier(0,0,0.2,1) both;
 }
 
@@ -1431,7 +1431,7 @@
   left: 240px; /* 侧边栏右面 */
   top: 50%;
   transform: translateY(-50%);
-  z-index: 13;
+  z-index: 22; /* 高于 focus-stage (20), 低于 focus-input (25) */
 }
 
 .focus-toggle {
@@ -1554,7 +1554,7 @@
 .focus-hint {
   position: fixed;
   left: 50%;
-  top: 50%;
+  top: 36%; /* 居中偏上, 类似 GPT 风格 */
   transform: translate(-50%, -50%);
   text-align: center;
   font-size: 14px;
@@ -1591,6 +1591,12 @@
   background: color-mix(in srgb, var(--color-bg) 85%, transparent);
   backdrop-filter: blur(8px);
   border: 1px solid var(--color-border, #E7E5E4);
+}
+
+/* focus-messages 内层 AgentMessageList 不滚动, 由外层统一处理 */
+.focus-messages [role="log"] {
+  overflow: visible;
+  flex: none;
 }
 
 /* ========== Reduced Motion ========== */

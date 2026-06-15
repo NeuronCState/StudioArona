@@ -13,6 +13,8 @@ interface AgentMessageProps {
    *  the failed assistant bubble's "重试" button so the user can recover
    *  from a Hermes outage without retyping. */
   onRetry?: (assistantId: string) => void;
+  /** 隐藏助手头像 (专注模式使用) */
+  hideAvatar?: boolean;
 }
 
 function formatTime(ts: number): string {
@@ -34,6 +36,7 @@ export function AgentMessageItem({
   onRemoveAttachment,
   agentName,
   onRetry,
+  hideAvatar,
 }: AgentMessageProps) {
   const isUser = message.role === 'user';
   const hasError = Boolean(message.error);
@@ -47,7 +50,7 @@ export function AgentMessageItem({
       data-role={message.role}
       data-error={hasError ? 'true' : undefined}
     >
-      {!isUser && <Avatar size="sm" alt={agentName} />}
+      {!isUser && !hideAvatar && <Avatar size="sm" alt={agentName} />}
       <div className={`flex max-w-[80%] flex-col gap-1 ${isUser ? 'items-end' : 'items-start'}`}>
         {hasError ? (
           <div className="flex flex-col gap-1.5" data-testid="agent-message-error">

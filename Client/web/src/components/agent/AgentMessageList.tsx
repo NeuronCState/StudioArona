@@ -12,6 +12,8 @@ interface AgentMessageListProps {
   /** Re-trigger the previous user message. Wired by the panel to the
    *  inline retry button on failed assistant bubbles. */
   onRetry?: (assistantId: string) => void;
+  /** 隐藏助手头像 (专注模式使用) */
+  hideAvatar?: boolean;
 }
 
 export function AgentMessageList({
@@ -20,6 +22,7 @@ export function AgentMessageList({
   agentName,
   onRemoveAttachment,
   onRetry,
+  hideAvatar,
 }: AgentMessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -57,6 +60,7 @@ export function AgentMessageList({
               onRemoveAttachment={onRemoveAttachment}
               agentName={agentName}
               onRetry={onRetry}
+              hideAvatar={hideAvatar}
             />
           ))}
           <div ref={bottomRef} />

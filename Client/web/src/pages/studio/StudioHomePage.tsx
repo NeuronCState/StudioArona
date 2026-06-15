@@ -87,12 +87,17 @@ export function StudioHomePage() {
   const focusMode = useFocusModeStore((s) => s.focusMode);
   const setFocusMode = useFocusModeStore((s) => s.setFocusMode);
   const focusSidebarOpen = useFocusModeStore((s) => s.focusSidebarOpen);
+  const setFocusSidebarOpen = useFocusModeStore((s) => s.setFocusSidebarOpen);
   const toggleFocusSidebar = useFocusModeStore((s) => s.toggleFocusSidebar);
 
   // Focus mode 内部 chat — 复用 useAgentChat (wired to Hermes)
   const chat = useAgentChat();
-  // 中心按钮 → focusMode = true
-  const enterFocus = useCallback(() => setFocusMode(true), [setFocusMode]);
+  const focusMessagesRef = useRef<HTMLDivElement>(null);
+  // 中心按钮 → focusMode = true + 自动拉起 FocusSidebar
+  const enterFocus = useCallback(() => {
+    setFocusMode(true);
+    setFocusSidebarOpen(true);
+  }, [setFocusMode, setFocusSidebarOpen]);
   // Esc 退出 (同时清 messages 让中央提示在下次重新显示, 但保留 chat 内容供后续展示)
   const exitFocus = useCallback(() => setFocusMode(false), [setFocusMode]);
   // 中央文字 — 圆环涨到位后才出现, 用户发第一条消息后消失
@@ -160,9 +165,9 @@ export function StudioHomePage() {
   // 视觉: focus 起来 0.55s 涨到位, 中间始终有底层在, 矩形盖住它们
   const isDashboard = mode === 'dashboard';
   const isChat = mode === 'chat' || focusMode;
-  // studio-stage 的 data-mode: dashboard / chat / focus
-  // focus 模式时 4 磁贴/中心按钮在 z:0 保持渲染, 被 z:20 矩形覆盖 (无淡出)
-  const stageMode: StudioMode | 'focus' = focusMode ? 'focus' : mode;
+  // studio-stage 的 data-mode: 保持在 'dashboard' 即使 focusMode, 这样磁贴定位规则
+  // ([data-mode='dashboard'] .tile-*) 继续匹配, 磁贴留在原位被 z:20 的 focus-stage 盖住
+  const stageMode: StudioMode | 'focus' = focusMode ? 'dashboard' : mode;
 
   const scheduleEvents = useMemo(() => {
     if (!scheduleData) return [];
@@ -194,6 +199,13 @@ export function StudioHomePage() {
     },
     [],
   );
+
+  // focus-messages 自动滚动到底部
+  useEffect(() => {
+    if (focusMessagesRef.current) {
+      focusMessagesRef.current.scrollTop = focusMessagesRef.current.scrollHeight;
+    }
+  }, [chat.messages]);
 
   // Esc 退出 focus mode
   useEffect(() => {
@@ -364,97 +376,110 @@ export function StudioHomePage() {
             终点: x:240 y:0 width:calc(100vw-240) height:100vh (无圆角, 盖 4 磁贴)
             动画: width/height 同时变 (像水波纹扩散), 无 spring 回弹
             framer 技巧: 用 transform 写位移 (x/y), 不用 left/top, 避免插值冲突
-            240 = StudioSidebar 宽度 (跟 FocusSidebar 240 一致) */}
-        <AnimatePresence>
-          {focusMode && (
-            <motion.div
-              key="focus-stage"
-              className="focus-stage"
-              initial={{
-                width: 160,
-                height: 160,
-                x: 'calc(50vw - 80px - 120px)',  // viewport center, offset 120px = sidebar 240/2
-                y: 'calc(50vh - 80px)',
-                borderRadius: 9999,
-              }}
-              animate={{
-                width: 'calc(100vw - 240px)',
-                height: '100vh',
-                x: 240,  // 贴着 StudioSidebar 右缘 (240 = sidebar 宽)
-                y: 0,
-                borderRadius: 0,
-              }}
-              exit={{
-                width: 160,
-                height: 160,
-                x: 'calc(50vw - 80px - 120px)',
-                y: 'calc(50vh - 80px)',
-                borderRadius: 9999,
-              }}
-              transition={{
-                duration: 0.55,
-                ease: [0.16, 1, 0.3, 1],
-              }}
-              style={{ background: 'var(--color-bg)' }}
-            />
-          )}
-        </AnimatePresence>
+            240 = StudioSidebar 宽度 (跟 FocusSidebar 240 一致)
+            portal 到 body 避免 .studio-page 的 translate 动画创建 containing block */}
+        {createPortal(
+          <AnimatePresence>
+            {focusMode && (
+              <motion.div
+                key="focus-stage"
+                className="focus-stage"
+                initial={{
+                  width: 160,
+                  height: 160,
+                  x: 'calc(50vw + 40px)',  // 按钮中心(50vw+120) - 半宽(80) = 50vw+40
+                  y: 'calc(50vh - 80px)',
+                  borderRadius: 9999,
+                }}
+                animate={{
+                  width: 'calc(100vw - 240px)',
+                  height: '100vh',
+                  x: 240,  // 贴着 StudioSidebar 右缘 (240 = sidebar 宽)
+                  y: 0,
+                  borderRadius: 0,
+                }}
+                exit={{
+                  width: 160,
+                  height: 160,
+                  x: 'calc(50vw + 40px)',
+                  y: 'calc(50vh - 80px)',
+                  borderRadius: 9999,
+                }}
+                transition={{
+                  duration: 0.55,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
+                style={{ background: 'var(--color-bg)' }}
+              />
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
 
-        {/* Focus mode — Phase 2.1: 中央文字提示 (圆环涨到位才出现, 发第一条消息后消失) */}
-        <AnimatePresence>
-          {showHint && (
-            <motion.div
-              key="focus-hint"
-              className="focus-hint"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.4, delay: 0.6 }}
-            >
-              拖文件 / 文件夹进窗口，或者直接敲字。Esc 退出专注模式。
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Focus mode — Phase 2.1: 中央文字提示 (圆环涨到位才出现, 发第一条消息后消失)
+            portal 到 body 避免 .studio-page 的 translate 动画创建 containing block */}
+        {createPortal(
+          <AnimatePresence>
+            {showHint && (
+              <motion.div
+                key="focus-hint"
+                className="focus-hint"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4, delay: 0.6 }}
+              >
+                拖文件 / 文件夹进窗口，或者直接敲字。Esc 退出专注模式。
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
 
         {/* Focus mode — Phase 2.2: 底部 AgentInput (从下滑出)
-            复用 useAgentChat + AgentInput 组件 (带 paperclip/folder/textarea) */}
-        <AnimatePresence>
-          {focusMode && (
-            <motion.div
-              key="focus-input"
-              className="focus-input"
-              initial={{ y: '100%', opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: '100%', opacity: 0 }}
-              transition={{ duration: 0.35, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            >
-              {/* messages.length > 0 时: 上方展示 AgentMessageList, 下方 AgentInput */}
-              {chat.messages.length > 0 && (
-                <div className="focus-messages">
-                  <AgentMessageList
-                    messages={chat.messages}
-                    isStreaming={chat.isStreaming}
-                    agentName="阿洛娜"
-                    onRemoveAttachment={chat.removeAttachment}
-                    onRetry={chat.retry}
-                  />
-                  <AgentErrorToast
-                    message={chat.lastError}
-                    onDismiss={chat.dismissError}
-                  />
-                </div>
-              )}
-              <AgentInput
-                attachments={chat.attachments}
-                isStreaming={chat.isStreaming}
-                onSend={chat.send}
-                onCancel={chat.cancel}
-                onAddAttachments={chat.addAttachments}
-                onRemoveAttachment={chat.removeAttachment}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+            复用 useAgentChat + AgentInput 组件 (带 paperclip/folder/textarea)
+            portal 到 body 避免 .studio-page 的 translate 动画创建 containing block */}
+        {createPortal(
+          <AnimatePresence>
+            {focusMode && (
+              <motion.div
+                key="focus-input"
+                className="focus-input"
+                initial={{ y: '100%', opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: '100%', opacity: 0 }}
+                transition={{ duration: 0.35, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              >
+                {/* messages.length > 0 时: 上方展示 AgentMessageList, 下方 AgentInput */}
+                {chat.messages.length > 0 && (
+                  <div className="focus-messages" ref={focusMessagesRef}>
+                    <AgentMessageList
+                      messages={chat.messages}
+                      isStreaming={chat.isStreaming}
+                      agentName="阿洛娜"
+                      hideAvatar
+                      onRemoveAttachment={chat.removeAttachment}
+                      onRetry={chat.retry}
+                    />
+                    <AgentErrorToast
+                      message={chat.lastError}
+                      onDismiss={chat.dismissError}
+                    />
+                  </div>
+                )}
+                <AgentInput
+                  attachments={chat.attachments}
+                  isStreaming={chat.isStreaming}
+                  onSend={chat.send}
+                  onCancel={chat.cancel}
+                  onAddAttachments={chat.addAttachments}
+                  onRemoveAttachment={chat.removeAttachment}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
 
         {/* Chat mode (非 focus) — conversation-stage 跟 QuickChatBar 旧版保留 */}
         {!focusMode && (

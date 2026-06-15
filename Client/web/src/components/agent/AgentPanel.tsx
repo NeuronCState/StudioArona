@@ -75,34 +75,26 @@ export function AgentPanel({ open, onClose, agentName = DEFAULT_AGENT_NAME }: Ag
             aria-modal="true"
             aria-label={`${agentName} 专注面板`}
             initial={{
-              // Start as a small circle at the geometric center, mimicking
-              // the trigger button. Origin set to "center center" so scale
-              // grows from the middle.
               opacity: 0,
-              scale: 0.06,
-              borderRadius: 999,
+              y: 40,
             }}
             animate={{
               opacity: 1,
-              scale: 1,
-              borderRadius: 20,
+              y: 0,
             }}
             exit={{
               opacity: 0,
-              scale: 0.06,
-              borderRadius: 999,
+              y: 40,
               transition: {
                 duration: m.duration.base / 1000,
                 ease: m.easing.inout,
               },
             }}
             transition={{
-              type: 'spring',
-              stiffness: 220,
-              damping: 26,
-              mass: 0.9,
+              duration: 0.4,
+              delay: 2.4,
+              ease: [0.22, 1, 0.36, 1],
             }}
-            style={{ transformOrigin: '50% 50%' }}
             className="absolute inset-2 z-40 flex flex-col overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-3)] rounded-2xl"
           >
             <AgentPanelHeader
