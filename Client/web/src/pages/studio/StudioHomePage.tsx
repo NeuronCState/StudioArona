@@ -14,7 +14,10 @@ import { QuickChatBar } from './tiles/QuickChatBar';
 import { createSSEConnection, type SSEEvent } from '@/lib/sse-client';
 import { dispatchUIAction, onUIAction } from '@/lib/ui-actions';
 import type { UIAction } from '@/types/ui-actions';
-import { AgentPanel } from '@/components/agent/AgentPanel';
+import { AgentInput } from '@/components/agent/AgentInput';
+import { AgentMessageList } from '@/components/agent/AgentMessageList';
+import { AgentErrorToast } from '@/components/agent/AgentErrorToast';
+import { useAgentChat } from '@/components/agent/useAgentChat';
 import { FocusSidebar } from '@/components/studio/FocusSidebar';
 import { FocusToggle } from '@/components/studio/FocusToggle';
 import { useFocusModeStore } from '@/stores/focus-mode';
@@ -80,17 +83,20 @@ export function StudioHomePage() {
   const phaseTimerRef = useRef<number | null>(null);
   const replyTimerRef = useRef<number | null>(null);
 
-  // Focus mode — 中心按钮扩散 + FocusSidebar 拉出
+  // Focus mode — 中心圆环扩散 + FocusSidebar + AgentInput + 中央提示
   const focusMode = useFocusModeStore((s) => s.focusMode);
   const setFocusMode = useFocusModeStore((s) => s.setFocusMode);
   const focusSidebarOpen = useFocusModeStore((s) => s.focusSidebarOpen);
   const toggleFocusSidebar = useFocusModeStore((s) => s.toggleFocusSidebar);
 
-  // 单一来源: focusMode 同时驱动 AgentPanel 的 open prop.
-  // 中心按钮 → focusMode = true (AgentPanel 自动展开)
-  // AgentPanel 关闭 → focusMode = false
-  const agentOpen = focusMode;
-  const setAgentOpen = setFocusMode;
+  // Focus mode 内部 chat — 复用 useAgentChat (wired to Hermes)
+  const chat = useAgentChat();
+  // 中心按钮 → focusMode = true
+  const enterFocus = useCallback(() => setFocusMode(true), [setFocusMode]);
+  // Esc 退出 (同时清 messages 让中央提示在下次重新显示, 但保留 chat 内容供后续展示)
+  const exitFocus = useCallback(() => setFocusMode(false), [setFocusMode]);
+  // 中央文字 — 圆环涨到位后才出现, 用户发第一条消息后消失
+  const showHint = focusMode && chat.messages.length === 0;
 
   const { data: weather, isLoading: weatherLoading, error: weatherErr } = useQuery({
     queryKey: ['weather'],
@@ -186,6 +192,19 @@ export function StudioHomePage() {
     },
     [],
   );
+
+  // Esc 退出 focus mode
+  useEffect(() => {
+    if (!focusMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        exitFocus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [focusMode, exitFocus]);
 
   const enterChat = useCallback(() => {
     if (mode === 'chat') return;
@@ -322,79 +341,149 @@ export function StudioHomePage() {
           </div>
         </div>
 
-        {/* Center action button — opens the AgentPanel via layoutId shared element.
-            When focusMode, an expanded backdrop with the same layoutId takes over,
-            and framer-motion animates the morph (ring → full rectangle). */}
-        <AnimatePresence mode="popLayout">
+        {/* Center action button — focus mode 起始点, 圆环涨满后被矩形盖住 */}
+        <AnimatePresence>
           {!focusMode && (
             <motion.button
               key="center-btn"
-              layoutId="focus-ring"
               className="center-voice-btn"
               aria-label="打开阿洛娜专注面板"
-              aria-expanded={focusMode}
               type="button"
-              onClick={() => setAgentOpen(true)}
+              onClick={enterFocus}
             >
               <img src="/voice-btn.png" alt="阿洛娜专注" />
             </motion.button>
           )}
         </AnimatePresence>
 
+        {/* Focus mode — Phase 1: 圆环从中心 160×160 涨到右侧主区 (无圆角矩形)
+            起点: 中心 160×160 (圆角 50%)
+            终点: x:208 y:0 width:calc(100vw-208) height:100vh (无圆角, 盖 4 磁贴)
+            动画: width/height 同时变 (像水波纹扩散), 无 spring 回弹
+            framer 技巧: 用 transform 写位移 (x/y), 不用 left/top, 避免插值冲突 */}
         <AnimatePresence>
           {focusMode && (
             <motion.div
-              key="focus-ring-expanded"
-              layoutId="focus-ring"
-              className="focus-ring-expanded"
-              aria-hidden="true"
+              key="focus-stage"
+              className="focus-stage"
+              initial={{
+                width: 160,
+                height: 160,
+                x: 'calc(50vw - 80px - 104px)',  // viewport center, offset 104px for sidebar
+                y: 'calc(50vh - 80px)',
+                borderRadius: 9999,
+              }}
+              animate={{
+                width: 'calc(100vw - 208px)',
+                height: '100vh',
+                x: 208,  // 贴着 StudioSidebar 右缘
+                y: 0,
+                borderRadius: 0,
+              }}
+              exit={{
+                width: 160,
+                height: 160,
+                x: 'calc(50vw - 80px - 104px)',
+                y: 'calc(50vh - 80px)',
+                borderRadius: 9999,
+              }}
+              transition={{
+                duration: 0.55,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+              style={{ background: 'var(--color-bg)' }}
             />
           )}
         </AnimatePresence>
 
-        <section className="conversation-stage" aria-hidden={!isChat}>
-          <div ref={chatRef} className="conversation-panel">
-            <div className="conversation-kicker">Today's conversation</div>
-            {messages.length === 0 && (
-              <p className="conversation-empty">
-                Start typing below and the surrounding tiles will stay available as compact context.
-              </p>
-            )}
-            {messages.map((msg) => (
-              <div key={msg.id} className={`chat-msg ${msg.role}`}>
-                {msg.content}
-              </div>
-            ))}
-            {isLoading && (
-              <div className="chat-msg assistant">
-                <span className="inline-flex gap-1.5">
-                  <span
-                    className="h-2 w-2 rounded-full bg-amber-400 animate-bounce"
-                    style={{ animationDelay: '0ms' }}
-                  />
-                  <span
-                    className="h-2 w-2 rounded-full bg-amber-400 animate-bounce"
-                    style={{ animationDelay: '150ms' }}
-                  />
-                  <span
-                    className="h-2 w-2 rounded-full bg-amber-400 animate-bounce"
-                    style={{ animationDelay: '300ms' }}
-                  />
-                </span>
-              </div>
-            )}
-          </div>
-        </section>
+        {/* Focus mode — Phase 2.1: 中央文字提示 (圆环涨到位才出现, 发第一条消息后消失) */}
+        <AnimatePresence>
+          {showHint && (
+            <motion.div
+              key="focus-hint"
+              className="focus-hint"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4, delay: 0.6 }}
+            >
+              拖文件 / 文件夹进窗口，或者直接敲字。Esc 退出专注模式。
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Agent focus panel — diffuses out of the center button when opened.
-            UI-only; data hook is mock until task 4 wires Hermes. */}
-        <AgentPanel open={agentOpen} onClose={() => setAgentOpen(false)} />
-      </div>
+        {/* Focus mode — Phase 2.2: 底部 AgentInput (从下滑出)
+            复用 useAgentChat + AgentInput 组件 (带 paperclip/folder/textarea) */}
+        <AnimatePresence>
+          {focusMode && (
+            <motion.div
+              key="focus-input"
+              className="focus-input"
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ duration: 0.35, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            >
+              {/* messages.length > 0 时: 上方展示 AgentMessageList, 下方 AgentInput */}
+              {chat.messages.length > 0 && (
+                <div className="focus-messages">
+                  <AgentMessageList
+                    messages={chat.messages}
+                    isStreaming={chat.isStreaming}
+                    agentName="阿洛娜"
+                    onRemoveAttachment={chat.removeAttachment}
+                    onRetry={chat.retry}
+                  />
+                  <AgentErrorToast
+                    message={chat.lastError}
+                    onDismiss={chat.dismissError}
+                  />
+                </div>
+              )}
+              <AgentInput
+                attachments={chat.attachments}
+                isStreaming={chat.isStreaming}
+                onSend={chat.send}
+                onCancel={chat.cancel}
+                onAddAttachments={chat.addAttachments}
+                onRemoveAttachment={chat.removeAttachment}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      <div className="mt-3 shrink-0">
-        <QuickChatBar
-          onSend={handleSend}
-        />
+        {/* Chat mode (非 focus) — conversation-stage 跟 QuickChatBar 旧版保留 */}
+        {!focusMode && (
+          <>
+            <section className="conversation-stage" aria-hidden={!isChat}>
+              <div ref={chatRef} className="conversation-panel">
+                <div className="conversation-kicker">Today's conversation</div>
+                {messages.length === 0 && (
+                  <p className="conversation-empty">
+                    Start typing below and the surrounding tiles will stay available as compact context.
+                  </p>
+                )}
+                {messages.map((msg) => (
+                  <div key={msg.id} className={`chat-msg ${msg.role}`}>
+                    {msg.content}
+                  </div>
+                ))}
+                {isLoading && (
+                  <div className="chat-msg assistant">
+                    <span className="inline-flex gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </span>
+                  </div>
+                )}
+              </div>
+            </section>
+            <div className="mt-3 shrink-0">
+              <QuickChatBar onSend={handleSend} />
+            </div>
+          </>
+        )}
       </div>
 
     </div>

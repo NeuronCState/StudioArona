@@ -1538,21 +1538,87 @@
   transform: translateY(0) scale(1);
 }
 
-/* 中心按钮 — focus 模式下作为 "扩散源" 用 layoutId 配 AgentPanel.
-   framer-motion 在两个 layoutId 之间做共享元素动画, 这里不写 css 过渡,
-   由 framer 接管. */
+/* ========== Focus Mode — 圆环扩大动画 ========== */
 
-/* Focus ring 扩散目标 — 覆盖整个 studio-stage 的圆角矩形.
-   initial 从 160x160 圆环扩散而来 (layoutId 共享元素动画). */
-.focus-ring-expanded {
-  position: absolute;
-  inset: 0;
-  border-radius: 32px;
-  border: 1px solid rgba(217, 119, 6, 0.25);
-  background: rgba(250, 250, 249, 0.6);
-  backdrop-filter: blur(8px);
-  z-index: 5;
+/* 圆环扩大 — 从 button 中心 (160px 圆) 扩大到覆盖整个 stage 的圆角矩形.
+   关键: 高度先到达边界停下, 宽度继续扩大 (宽屏场景).
+   全程使用百分比 margin 居中, 避免 px↔% 混合插值导致偏移. */
+/* ========== Focus Stage (Phase 1: 圆环扩散到右半部分矩形) ==========
+   起点: 中心 160×160 圆 (圆角 50%)
+   终点: x:208 y:0 width:calc(100vw-208px) height:100vh (无圆角, 盖住 4 磁贴)
+   背景: var(--color-bg) (浅色 #F7F4EE / 深色 #1A1916, 跟主题默认背景同色)
+   动画: framer motion (not CSS keyframe), width/height 同时, cubic-bezier ease-out
+   位置用 transform (x/y) 不用 left/top, 避免 framer 插值冲突
+   z: 20 (盖 4 磁贴 z:0) */
+.focus-stage {
+  position: fixed;
+  top: 0;
+  left: 0;
+  background: var(--color-bg);
+  z-index: 20;
   pointer-events: none;
+}
+
+/* ========== Focus Hint (Phase 2.1: 中央文字) ========== */
+.focus-hint {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--studio-text-muted, #A8A29E);
+  z-index: 21;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .focus-hint {
+  color: #78716C;
+}
+
+/* ========== Focus Input (Phase 2.2: 底部 AgentInput) ========== */
+.focus-input {
+  position: fixed;
+  left: 208px;
+  right: 0;
+  bottom: 0;
+  z-index: 25;
+  padding: 0 24px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: calc(100vw - 208px);
+}
+
+.focus-messages {
+  flex: 0 0 auto;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-bg) 85%, transparent);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--color-border, #E7E5E4);
+}
+
+/* 提示文字 — 圆环扩大完成后居中显示 */
+.focus-hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--studio-text-muted, #A8A29E);
+  z-index: 6;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .focus-hint {
+  color: #78716C;
 }
 
 /* ========== Reduced Motion ========== */
@@ -1560,7 +1626,8 @@
   .studio-page, .tile-anim-1, .tile-anim-2, .tile-anim-3, .tile-anim-4, .tile-anim-5,
   .schedule-item, .rss-item, .system-bar-fill, .weather-icon-large,
   .tile-shell, .conversation-stage, .chat-msg, .voice-status-label,
-  .focus-sidebar, .focus-toggle, .focus-chat-item, .sidebar-new-chat {
+  .focus-sidebar, .focus-toggle, .focus-chat-item, .sidebar-new-chat,
+  .focus-ring-expanded {
     animation: none !important;
     transition: none !important;
   }
