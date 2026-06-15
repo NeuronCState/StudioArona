@@ -1,6 +1,0 @@
-{
-  "tts": {
-    "auto": "always",
-    "provider": "minimax"
-  }
-}
