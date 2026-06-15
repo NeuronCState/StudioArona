@@ -361,9 +361,10 @@ export function StudioHomePage() {
 
         {/* Focus mode — Phase 1: 圆环从中心 160×160 涨到右侧主区 (无圆角矩形)
             起点: 中心 160×160 (圆角 50%)
-            终点: x:208 y:0 width:calc(100vw-208) height:100vh (无圆角, 盖 4 磁贴)
+            终点: x:240 y:0 width:calc(100vw-240) height:100vh (无圆角, 盖 4 磁贴)
             动画: width/height 同时变 (像水波纹扩散), 无 spring 回弹
-            framer 技巧: 用 transform 写位移 (x/y), 不用 left/top, 避免插值冲突 */}
+            framer 技巧: 用 transform 写位移 (x/y), 不用 left/top, 避免插值冲突
+            240 = StudioSidebar 宽度 (跟 FocusSidebar 240 一致) */}
         <AnimatePresence>
           {focusMode && (
             <motion.div
@@ -372,21 +373,21 @@ export function StudioHomePage() {
               initial={{
                 width: 160,
                 height: 160,
-                x: 'calc(50vw - 80px - 104px)',  // viewport center, offset 104px for sidebar
+                x: 'calc(50vw - 80px - 120px)',  // viewport center, offset 120px = sidebar 240/2
                 y: 'calc(50vh - 80px)',
                 borderRadius: 9999,
               }}
               animate={{
-                width: 'calc(100vw - 208px)',
+                width: 'calc(100vw - 240px)',
                 height: '100vh',
-                x: 208,  // 贴着 StudioSidebar 右缘
+                x: 240,  // 贴着 StudioSidebar 右缘 (240 = sidebar 宽)
                 y: 0,
                 borderRadius: 0,
               }}
               exit={{
                 width: 160,
                 height: 160,
-                x: 'calc(50vw - 80px - 104px)',
+                x: 'calc(50vw - 80px - 120px)',
                 y: 'calc(50vh - 80px)',
                 borderRadius: 9999,
               }}

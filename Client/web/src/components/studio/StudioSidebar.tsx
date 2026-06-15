@@ -98,7 +98,7 @@ export function StudioSidebar() {
 
   return (
     <aside
-      className="flex h-screen w-[208px] shrink-0 flex-col border-r"
+      className="flex h-screen w-[240px] shrink-0 flex-col border-r"
       style={{
         backgroundColor: 'var(--studio-bg)',
         borderColor: 'var(--studio-border)',

@@ -1056,9 +1056,10 @@
 
 /* ========== Focus Sidebar (新对话 + 历史 + 3 区域) ========== */
 
-/* 层级: <div flex h-screen> > StudioSidebar (0..208) + <main flex-1>
+/* 层级: <div flex h-screen> > StudioSidebar (0..240) + <main flex-1>
    .studio-page 是 <main> 的子元素, 设置 position:relative 后,
-   FocusSidebar 的 absolute left:0 = StudioSidebar 右缘 = viewport x=208. */
+   FocusSidebar 的 absolute left:0 = StudioSidebar 右缘 = viewport x=240.
+   240 = StudioSidebar 宽度 (跟 FocusSidebar 240 一致) */
 
 .focus-sidebar {
   position: fixed;
@@ -1519,19 +1520,8 @@
 
 /* FocusSidebar 已改为 position: fixed, 浮在内容上方, 不需要 padding 推移内容 */
 
-/* 焦点模式下, 中心按钮扩散时, 4 磁贴淡出.
-   注意: 现有 .tile-shell 已被 [data-mode='voice'] 控制,
-   这里新增 [data-mode='focus'] 共享相同的淡出效果. */
-
-[data-mode='focus'] .tile-shell {
-  opacity: 0;
-  pointer-events: none;
-}
-
-[data-mode='focus'] .center-voice-btn {
-  opacity: 0;
-  pointer-events: none;
-}
+/* 焦点模式下, 4 磁贴/中心按钮 不淡出, 直接被 z:20 矩形盖住
+   pointer-events: none 避免误点, 但保持 opacity: 1 */
 
 [data-mode='focus'] .conversation-stage {
   opacity: 1;
@@ -1545,11 +1535,12 @@
    全程使用百分比 margin 居中, 避免 px↔% 混合插值导致偏移. */
 /* ========== Focus Stage (Phase 1: 圆环扩散到右半部分矩形) ==========
    起点: 中心 160×160 圆 (圆角 50%)
-   终点: x:208 y:0 width:calc(100vw-208px) height:100vh (无圆角, 盖住 4 磁贴)
+   终点: x:240 y:0 width:calc(100vw-240px) height:100vh (无圆角, 盖住 4 磁贴)
    背景: var(--color-bg) (浅色 #F7F4EE / 深色 #1A1916, 跟主题默认背景同色)
    动画: framer motion (not CSS keyframe), width/height 同时, cubic-bezier ease-out
    位置用 transform (x/y) 不用 left/top, 避免 framer 插值冲突
-   z: 20 (盖 4 磁贴 z:0) */
+   z: 20 (盖 4 磁贴 z:1)
+   240 = StudioSidebar 宽度 (跟 FocusSidebar 240 一致) */
 .focus-stage {
   position: fixed;
   top: 0;
@@ -1581,7 +1572,7 @@
 /* ========== Focus Input (Phase 2.2: 底部 AgentInput) ========== */
 .focus-input {
   position: fixed;
-  left: 208px;
+  left: 240px; /* 跟 StudioSidebar 宽度一致, 贴着 sidebar 右缘 */
   right: 0;
   bottom: 0;
   z-index: 25;
@@ -1589,7 +1580,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-width: calc(100vw - 208px);
+  max-width: calc(100vw - 240px);
 }
 
 .focus-messages {
@@ -1602,32 +1593,12 @@
   border: 1px solid var(--color-border, #E7E5E4);
 }
 
-/* 提示文字 — 圆环扩大完成后居中显示 */
-.focus-hint {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--studio-text-muted, #A8A29E);
-  z-index: 6;
-  pointer-events: none;
-  white-space: nowrap;
-}
-
-[data-theme="dark"] .focus-hint {
-  color: #78716C;
-}
-
 /* ========== Reduced Motion ========== */
 @media (prefers-reduced-motion: reduce) {
   .studio-page, .tile-anim-1, .tile-anim-2, .tile-anim-3, .tile-anim-4, .tile-anim-5,
   .schedule-item, .rss-item, .system-bar-fill, .weather-icon-large,
   .tile-shell, .conversation-stage, .chat-msg, .voice-status-label,
-  .focus-sidebar, .focus-toggle, .focus-chat-item, .sidebar-new-chat,
-  .focus-ring-expanded {
+  .focus-sidebar, .focus-toggle, .focus-chat-item, .sidebar-new-chat {
     animation: none !important;
     transition: none !important;
   }
