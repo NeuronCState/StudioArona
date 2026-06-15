@@ -2,8 +2,9 @@ import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Cloud } from 'lucide-react';
+import { Cloud, ServerOff } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth';
+import { useConnectionStore } from '@/stores/connection';
 import { api } from '@/lib/api/client';
 import { useSchedules, useFeeds, useWeather } from '@/lib/db/hooks';
 import type { VM } from '@/types/contracts';
@@ -100,6 +101,10 @@ export function StudioHomePage() {
   // 4 磁贴: 本地优先 (IDB 缓存), 连接 server 时后台 sync
   const { data: weather, isLoading: weatherLoading, error: weatherErr } = useWeather();
   const weatherError = weatherErr instanceof Error ? weatherErr.message : null;
+
+  // VM 走 server, 离线时显示"未连接" (工作室服务需要 server)
+  const effectiveMode = useConnectionStore(s => s.effectiveMode());
+  const vmsOnline = effectiveMode === 'online';
 
   const queryClient = useQueryClient();
   // Real-time data sync: backend broadcasts data.changed → invalidate queries
@@ -328,6 +333,13 @@ export function StudioHomePage() {
           <div className="tile-shell tile-system" onClick={isChat ? backToDashboard : undefined}>
             {vmsLoading ? (
               <CardSkeleton variant="list" count={3} />
+            ) : !vmsOnline ? (
+              // 离线: 工作室服务 (VMS/NAS/HA) 明确提示未连接, 不让用户重试
+              <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
+                <ServerOff size={32} className="text-stone-300" />
+                <p className="text-sm text-stone-500">未连接 server</p>
+                <p className="text-xs text-stone-400">工作室服务需连接后查看</p>
+              </div>
             ) : vmsError ? (
               <CardError message={vmsErr?.message} onRetry={() => refetchVms()} />
             ) : (
