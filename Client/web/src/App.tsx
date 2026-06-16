@@ -17,7 +17,7 @@ import { SystemPage } from './pages/system/SystemPage';
 import { VmsPage } from './pages/vms/VmsPage';
 import { OCRPage } from './pages/ocr/OCRPage';
 import { useAuthStore } from './stores/auth';
-import { useHermesConfigStore } from './stores/hermes-config';
+import { useSonettoConfigStore } from './stores/sonetto-config';
 import { useDesignModeStore } from './stores/design-mode';
 import { useTheme } from './hooks/useTheme';
 import { motion as m } from './lib/motion';
@@ -74,7 +74,7 @@ export default function App() {
   // 双向同步 coordinator — schedules 表 dirty doc → server, 409 入 ConflictStore
   useSync();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const setupComplete = useHermesConfigStore((s) => s.setupComplete);
+  const setupComplete = useSonettoConfigStore((s) => s.setupComplete);
   const mode = useDesignModeStore((s) => s.mode);
 
   // Dev bypass: ?devbypass=1 直接进 home (puppeteer 截图用)

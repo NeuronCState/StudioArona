@@ -60,7 +60,9 @@ export function AgentInput({
       items.push({
         id: nextAttachmentId(),
         name: f.name,
+        uri: '',
         size: f.size,
+        mimeType: f.type || 'application/octet-stream',
         kind,
         file: f,
       });
@@ -82,7 +84,9 @@ export function AgentInput({
       const items: AgentAttachment[] = Array.from(files).map((f) => ({
         id: nextAttachmentId(),
         name: f.name,
+        uri: '',
         size: f.size,
+        mimeType: f.type || 'application/octet-stream',
         kind: 'folder' as const,
         file: f,
       }));

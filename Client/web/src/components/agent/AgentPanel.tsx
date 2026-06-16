@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { motion as m } from '@/lib/motion';
-import { useAgentChat } from './useAgentChat';
+import { useAgentChat, type AgentAttachment } from './useAgentChat';
 import { AgentPanelHeader } from './AgentPanelHeader';
 import { AgentMessageList } from './AgentMessageList';
 import { AgentInput } from './AgentInput';
@@ -28,6 +28,10 @@ const DEFAULT_AGENT_NAME = '阿洛娜';
 export function AgentPanel({ open, onClose, agentName = DEFAULT_AGENT_NAME }: AgentPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const chat = useAgentChat();
+  const [attachments, setAttachments] = useState<AgentAttachment[]>([]);
+  const handleRemoveAttachment = useCallback((id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  }, []);
 
   // Esc closes the panel.
   useEffect(() => {
@@ -100,15 +104,15 @@ export function AgentPanel({ open, onClose, agentName = DEFAULT_AGENT_NAME }: Ag
             <AgentPanelHeader
               agentName={agentName}
               onClose={onClose}
-              hermesReady={chat.hermesReady}
-              onRetryConnection={chat.probeHermes}
+              hermesReady={chat.sonettoReady}
+              onRetryConnection={() => window.location.reload()}
             />
             <div className="relative flex-1 overflow-hidden">
               <AgentMessageList
                 messages={chat.messages}
                 isStreaming={chat.isStreaming}
                 agentName={agentName}
-                onRemoveAttachment={chat.removeAttachment}
+                onRemoveAttachment={handleRemoveAttachment}
                 onRetry={chat.retry}
               />
               {/* Floating toast for the latest send failure. Sits at the top
@@ -116,16 +120,16 @@ export function AgentPanel({ open, onClose, agentName = DEFAULT_AGENT_NAME }: Ag
                   layout when it appears / disappears. */}
               <AgentErrorToast
                 message={chat.lastError}
-                onDismiss={chat.dismissError}
+                onDismiss={() => chat.clear()}
               />
             </div>
             <AgentInput
-              attachments={chat.attachments}
+              attachments={attachments}
               isStreaming={chat.isStreaming}
               onSend={chat.send}
               onCancel={chat.cancel}
-              onAddAttachments={chat.addAttachments}
-              onRemoveAttachment={chat.removeAttachment}
+              onAddAttachments={setAttachments}
+              onRemoveAttachment={handleRemoveAttachment}
             />
           </motion.div>
         </>

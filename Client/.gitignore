@@ -1,0 +1,4 @@
+
+# SonettoHere 集成 (本地 Python venv + 数据)
+.sonetto-run/
+.venv-sonetto/
