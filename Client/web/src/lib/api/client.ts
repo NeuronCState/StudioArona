@@ -104,7 +104,7 @@ class ApiClient {
   private async handleResponse<T>(res: Response): Promise<T> {
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new ApiError(body.code ?? 'UNKNOWN', body.message ?? res.statusText);
+      throw new ApiError(body.code ?? 'UNKNOWN', body.message ?? res.statusText, res.status, body);
     }
     if (res.status === 204) return undefined as T;
     return res.json();
@@ -131,6 +131,10 @@ class ApiError extends Error {
   constructor(
     public code: string,
     message: string,
+    /** HTTP status code (4xx / 5xx). 用于 useSync 识别 409 Conflict */
+    public status?: number,
+    /** 完整响应 body — useSync 拿 server / client / field_diff */
+    public body?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';

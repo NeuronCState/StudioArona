@@ -6,6 +6,8 @@ import { FeedsPage } from './pages/feeds/FeedsPage';
 import { LoginPage } from './pages/login/LoginPage';
 import { SetupPage } from './pages/setup/SetupPage';
 import { StorageMigrationBanner } from './components/studio/StorageMigrationBanner';
+import { ConflictMergeDialog } from './components/studio/ConflictMergeDialog';
+import { useSync } from './lib/sync/useSync';
 import { MemoryPage } from './pages/memory/MemoryPage';
 import { SkillsPage } from './pages/skills/SkillsPage';
 import { SchedulePage } from './pages/schedule/SchedulePage';
@@ -69,6 +71,8 @@ function HomePage() {
 
 export default function App() {
   useTheme();
+  // 双向同步 coordinator — schedules 表 dirty doc → server, 409 入 ConflictStore
+  useSync();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const setupComplete = useHermesConfigStore((s) => s.setupComplete);
   const mode = useDesignModeStore((s) => s.mode);
@@ -127,6 +131,8 @@ export default function App() {
             <AppRoutes />
             {/* Tauri 桌面首次启动: IDB 旧数据 → 提示迁 fs (~/Documents/studioarona/) */}
             <StorageMigrationBanner />
+            {/* useSync 收到 409 时弹, 让用户手动合并 server/client 字段 */}
+            <ConflictMergeDialog />
           </StudioAppShell>
         </motion.div>
       )}
