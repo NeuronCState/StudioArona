@@ -3,7 +3,7 @@ use axum::{
     extract::State,
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post},
+    routing::{delete, get, post},
     Json, Router,
 };
 use serde_json::{json, Value};
@@ -16,6 +16,8 @@ mod auth;
 mod config;
 mod schedule;
 mod rss;
+mod memory;
+mod skills;
 mod vms;
 mod weather;
 
@@ -24,11 +26,13 @@ use auth::{
     TokenPair, User,
 };
 use config::Config;
+use weather::MetricsCache;
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
     pub config: Config,
+    pub metrics_cache: MetricsCache,
 }
 
 async fn health() -> impl IntoResponse {
@@ -57,7 +61,7 @@ async fn register(
     let display_name = req.display_name.clone().unwrap_or_else(|| req.username.clone());
 
     sqlx::query(
-        "INSERT INTO users (id, username, display_name, password_hash, role) VALUES ($1, $2, $3, $4, 'member')"
+        "INSERT INTO users (id, username, display_name, password_hash, role) VALUES ($1::uuid, $2, $3, $4, 'member')"
     )
     .bind(&id)
     .bind(&req.username)
@@ -179,7 +183,16 @@ async fn main() -> Result<()> {
         tracing::info!("seeded default admin/admin123 (admin role)");
     }
 
-    let state = AppState { db, config: config.clone() };
+    let state = AppState {
+        db,
+        config: config.clone(),
+        metrics_cache: MetricsCache::new(),
+    };
+
+    // S1c — initialize the in-process weather cache (5min TTL) and spawn the
+    // RSS fetch cron (5min interval). Both run for the life of the process.
+    weather::init_weather_cache();
+    rss::start_cron(state.db.clone());
 
     let app = Router::new()
         .route("/health", get(health))
@@ -187,12 +200,23 @@ async fn main() -> Result<()> {
         .route("/api/auth/login", post(login))
         .route("/api/auth/refresh", post(refresh))
         .route("/api/me", get(me))
-        .route("/api/feeds", get(rss::list_feeds))
+.route("/api/feeds", get(rss::list_feeds).post(rss::create_feed))
+        .route("/api/feeds/:id", axum::routing::patch(rss::update_feed).delete(rss::delete_feed))
+        .route("/api/feeds/:id/items", get(rss::list_feed_items))
+        .route("/api/memory/entries", get(memory::list_memory_entries).post(memory::create_memory_entry))
+        .route("/api/memory/entries/:id", axum::routing::patch(memory::update_memory_entry).delete(memory::delete_memory_entry))
         .route("/api/schedules", get(schedule::list_schedules).post(schedule::create_schedule))
-        .route("/api/schedules/:id", axum::routing::patch(schedule::update_schedule).delete(schedule::delete_schedule))
+        .route("/api/schedules/:id", get(schedule::get_schedule).patch(schedule::update_schedule).delete(schedule::delete_schedule))
         .route("/api/vms", get(vms::list_vms))
+        .route("/api/vms/:id/start", post(vms::start_vm))
+        .route("/api/vms/:id/stop", post(vms::stop_vm))
+        .route("/api/vms/:id/restart", post(vms::restart_vm))
         .route("/api/weather", get(weather::get_weather))
         .route("/api/system/metrics", get(weather::get_system_metrics))
+        // S1c — skills install backend
+        .route("/api/skills/marketplace/install", post(skills::install_skill))
+        .route("/api/skills/installed", get(skills::list_installed_skills))
+        .route("/api/skills/:slug", delete(skills::uninstall_skill))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
