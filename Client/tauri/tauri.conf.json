@@ -2,12 +2,12 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Studio Arona",
   "version": "0.1.0",
-  "identifier": "com.studioarona.app",
+  "identifier": "com.studioarona.desktop",
   "build": {
-    "frontendDist": "../../apps/web/dist",
+    "frontendDist": "../web/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "pnpm --filter web dev",
-    "beforeBuildCommand": "pnpm --filter web build"
+    "beforeDevCommand": "cd /Users/zhangxuanning/StudioArona/Client/web && pnpm dev",
+    "beforeBuildCommand": "cd /Users/zhangxuanning/StudioArona/Client/web && pnpm build"
   },
   "app": {
     "windows": [
@@ -46,6 +46,10 @@
   "plugins": {
     "shell": {
       "open": true
+    },
+    "updater": {
+      "pubkey": "",
+      "endpoints": []
     }
   }
 }
