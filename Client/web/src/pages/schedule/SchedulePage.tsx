@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar as CalendarIcon, Clock, MapPin, Plus, Pencil, X, Trash2, CalendarClock, CalendarRange, Save } from 'lucide-react';
 import { api } from '@/lib/api/client';
+import { useLocalResource } from '@/lib/storage/useLocalResource';
 import { EmptyState, Button, Badge, Skeleton, CardError } from '@javis/ui-kit';
 import { cn } from '@/lib/utils';
 import { motion as m } from '@/lib/motion';
@@ -16,6 +17,9 @@ interface ScheduleEvent {
   starts_at: string;
   location?: string;
   source: string;
+  serverId?: string | null;
+  dirty?: boolean;
+  updatedAt?: number;
 }
 
 function toISOLocal(datetimeLocal: string): string {
@@ -226,7 +230,6 @@ function ScheduleEventForm({
 }
 
 export function SchedulePage() {
-  const queryClient = useQueryClient();
   const [view, setView] = useState<'upcoming' | 'all'>('upcoming');
   const [showAdd, setShowAdd] = useState(false);
   const [addInitialDate, setAddInitialDate] = useState<string | undefined>(undefined);
@@ -246,29 +249,54 @@ export function SchedulePage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editInitialEvent, setEditInitialEvent] = useState<ScheduleEvent | null>(null);
 
+  // 本地优先 — ScheduleEvent 写 storage (Tauri fs / IDB), online 时 push server
+  // (FeedsPage / MemoryPage / Skills 同 pattern — 1-7 收官后陆续 follow)
+  const localSchedules = useLocalResource<ScheduleEvent>({
+    table: 'schedules',
+    queryKey: ['schedules', view, 'local'],
+    serverList: () =>
+      api.get<ScheduleEvent[]>(`/schedules${view === 'upcoming' ? '?upcoming=true' : ''}`),
+    serverPush: (doc) => api.post<ScheduleEvent>('/schedules', {
+      title: doc.title,
+      body: doc.body,
+      starts_at: doc.starts_at,
+      location: doc.location,
+    }),
+    serverRemove: (id) => api.delete(`/schedules/${id}`),
+  });
+
   const addMutation = useMutation({
-    mutationFn: (data: { title: string; body: string; starts_at: string; location: string }) =>
-      api.post('/schedules', data),
+    mutationFn: async (data: { title: string; body: string; starts_at: string; location: string }) => {
+      const id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      return localSchedules.save({
+        id,
+        title: data.title,
+        body: data.body,
+        starts_at: data.starts_at,
+        location: data.location,
+        source: 'local',
+      });
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
       setShowAdd(false);
       setAddInitialDate(undefined);
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...data }: { id: string; title: string; body?: string; starts_at: string; location?: string }) =>
-      api.patch(`/schedules/${id}`, data),
+    mutationFn: async ({ id, ...data }: { id: string; title: string; body?: string; starts_at: string; location?: string }) => {
+      const existing = (localSchedules.data ?? []).find((e) => e.id === id);
+      if (!existing) return;
+      return localSchedules.save({ ...existing, ...data });
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
       setEditingId(null);
       setEditInitialEvent(null);
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/schedules/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['schedules'] }),
+    mutationFn: (id: string) => localSchedules.remove(id),
   });
 
   function startEdit(e: ScheduleEvent) {

@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -14,14 +14,9 @@ import { ScheduleTile } from './tiles/ScheduleTile';
 import { WeatherTile } from './tiles/WeatherTile';
 import { SystemTile } from './tiles/SystemTile';
 import { RSSTile } from './tiles/RSSTile';
-import { QuickChatBar } from './tiles/QuickChatBar';
-import { createSSEConnection, type SSEEvent } from '@/lib/sse-client';
-import { dispatchUIAction, onUIAction } from '@/lib/ui-actions';
+
+import { onUIAction } from '@/lib/ui-actions';
 import type { UIAction } from '@/types/ui-actions';
-import { AgentInput } from '@/components/agent/AgentInput';
-import { AgentMessageList } from '@/components/agent/AgentMessageList';
-import { AgentErrorToast } from '@/components/agent/AgentErrorToast';
-import { useAgentChat } from '@/components/agent/useAgentChat';
 import { FocusSidebar } from '@/components/studio/FocusSidebar';
 import { FocusToggle } from '@/components/studio/FocusToggle';
 import { useFocusModeStore } from '@/stores/focus-mode';
@@ -29,12 +24,6 @@ import { useFocusModeStore } from '@/stores/focus-mode';
 type StudioMode = 'dashboard' | 'chat';
 
 type TransitionPhase = 'idle' | 'dashboard-to-chat' | 'chat-to-dashboard';
-
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-}
 
 function adaptSchedule(schedules: LocalSchedule[]) {
   return schedules.slice(0, 6).map((s) => {
@@ -70,24 +59,13 @@ function getGreeting(): string {
 
 export function StudioHomePage() {
   const user = useAuthStore((s) => s.user);
-  const [mode, setMode] = useState<StudioMode>('dashboard');
-  const [phase, setPhase] = useState<TransitionPhase>('idle');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const chatRef = useRef<HTMLDivElement>(null);
-  const phaseTimerRef = useRef<number | null>(null);
-  const replyTimerRef = useRef<number | null>(null);
-
-  // Focus mode — 中心圆环扩散 + FocusSidebar + AgentInput + 中央提示
   const focusMode = useFocusModeStore((s) => s.focusMode);
-  const setFocusMode = useFocusModeStore((s) => s.setFocusMode);
   const focusSidebarOpen = useFocusModeStore((s) => s.focusSidebarOpen);
+  const setFocusMode = useFocusModeStore((s) => s.setFocusMode);
   const setFocusSidebarOpen = useFocusModeStore((s) => s.setFocusSidebarOpen);
   const toggleFocusSidebar = useFocusModeStore((s) => s.toggleFocusSidebar);
-
-  // Focus mode 内部 chat — 复用 useAgentChat (wired to Hermes)
-  const chat = useAgentChat();
-  const focusMessagesRef = useRef<HTMLDivElement>(null);
+  const [mode] = useState<StudioMode>('dashboard');
+  const [phase] = useState<TransitionPhase>('idle');
   // 中心按钮 → focusMode = true + 自动拉起 FocusSidebar
   const enterFocus = useCallback(() => {
     setFocusMode(true);
@@ -95,8 +73,6 @@ export function StudioHomePage() {
   }, [setFocusMode, setFocusSidebarOpen]);
   // Esc 退出 (同时清 messages 让中央提示在下次重新显示, 但保留 chat 内容供后续展示)
   const exitFocus = useCallback(() => setFocusMode(false), [setFocusMode]);
-  // 中央文字 — 圆环涨到位后才出现, 用户发第一条消息后消失
-  const showHint = focusMode && chat.messages.length === 0;
 
   // 4 磁贴: 本地优先 (IDB 缓存), 连接 server 时后台 sync
   const { data: weather, isLoading: weatherLoading, error: weatherErr } = useWeather();
@@ -153,7 +129,6 @@ export function StudioHomePage() {
   // focus mode 时, 4 磁贴/中心按钮 都不 unmount, 让 z:20 矩形盖过去 (不淡出)
   // 视觉: focus 起来 0.55s 涨到位, 中间始终有底层在, 矩形盖住它们
   const isDashboard = mode === 'dashboard';
-  const isChat = mode === 'chat' || focusMode;
   // studio-stage 的 data-mode: 保持在 'dashboard' 即使 focusMode, 这样磁贴定位规则
   // ([data-mode='dashboard'] .tile-*) 继续匹配, 磁贴留在原位被 z:20 的 focus-stage 盖住
   const stageMode: StudioMode | 'focus' = focusMode ? 'dashboard' : mode;
@@ -168,34 +143,6 @@ export function StudioHomePage() {
     return adaptRSS(feedData);
   }, [feedData]);
 
-  const setTimedPhase = useCallback((nextPhase: TransitionPhase, duration: number) => {
-    if (phaseTimerRef.current) window.clearTimeout(phaseTimerRef.current);
-    setPhase(nextPhase);
-    phaseTimerRef.current = window.setTimeout(() => {
-      setPhase('idle');
-      phaseTimerRef.current = null;
-    }, duration);
-  }, []);
-
-  useEffect(() => {
-    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [messages, isLoading]);
-
-  useEffect(
-    () => () => {
-      if (phaseTimerRef.current) window.clearTimeout(phaseTimerRef.current);
-      if (replyTimerRef.current) window.clearTimeout(replyTimerRef.current);
-    },
-    [],
-  );
-
-  // focus-messages 自动滚动到底部
-  useEffect(() => {
-    if (focusMessagesRef.current) {
-      focusMessagesRef.current.scrollTop = focusMessagesRef.current.scrollHeight;
-    }
-  }, [chat.messages]);
-
   // Esc 退出 focus mode
   useEffect(() => {
     if (!focusMode) return;
@@ -208,69 +155,6 @@ export function StudioHomePage() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [focusMode, exitFocus]);
-
-  const enterChat = useCallback(() => {
-    if (mode === 'chat') return;
-    setTimedPhase('dashboard-to-chat', 900);
-    setMode('chat');
-  }, [mode, setTimedPhase]);
-
-  const backToDashboard = useCallback(() => {
-    if (mode === 'chat') {
-      setTimedPhase('chat-to-dashboard', 750);
-      setMode('dashboard');
-    }
-  }, [mode, setTimedPhase]);
-
-  const handleSend = useCallback(
-    async (content: string) => {
-      enterChat();
-      // Create session
-      let sid: string;
-      try {
-        const s = await api.post<{ id: string }>('/chat/sessions');
-        sid = s.id;
-      } catch {
-        setMessages((prev) => [...prev, { id: `e-${Date.now()}`, role: 'assistant', content: '无法连接阿洛娜' }]);
-        return;
-      }
-      // User message
-      setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: 'user', content }]);
-      setIsLoading(true);
-      // Assistant bubble
-      let fullText = '';
-      setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: 'assistant', content: '' }]);
-
-      createSSEConnection(
-        sid,
-        content,
-        (event: SSEEvent) => {
-          if (event.type === 'token') {
-            fullText += event.text;
-            setMessages((prev) => {
-              const next = [...prev];
-              next[next.length - 1] = { ...next[next.length - 1], content: fullText };
-              return next;
-            });
-          } else if (event.type === 'done') {
-            setIsLoading(false);
-          } else if (event.type === 'error') {
-            fullText += `\n\n${event.message}`;
-            setIsLoading(false);
-            setMessages((prev) => {
-              const next = [...prev];
-              next[next.length - 1] = { ...next[next.length - 1], content: fullText };
-              return next;
-            });
-          } else if (event.type === 'ui_action') {
-            dispatchUIAction(event.action);
-          }
-        },
-        () => setIsLoading(false),
-      );
-    },
-    [enterChat],
-  );
 
   return (
     <>
@@ -297,7 +181,7 @@ export function StudioHomePage() {
         data-phase={phase}
       >
         <div className="tile-layer" aria-hidden={!isDashboard} style={{ pointerEvents: focusMode ? 'none' : 'auto' }}>
-          <div className="tile-shell tile-schedule" onClick={isChat ? backToDashboard : undefined}>
+          <div className="tile-shell tile-schedule">
             {schedLoading ? (
               <CardSkeleton variant="list" count={3} />
             ) : schedError ? (
@@ -306,7 +190,7 @@ export function StudioHomePage() {
               <ScheduleTile events={scheduleEvents} />
             )}
           </div>
-          <div className="tile-shell tile-weather" onClick={isChat ? backToDashboard : undefined}>
+          <div className="tile-shell tile-weather">
             {weatherLoading ? (
               <CardSkeleton variant="list" count={4} />
             ) : weatherError ? (
@@ -330,7 +214,7 @@ export function StudioHomePage() {
               </div>
             )}
           </div>
-          <div className="tile-shell tile-system" onClick={isChat ? backToDashboard : undefined}>
+          <div className="tile-shell tile-system">
             {vmsLoading ? (
               <CardSkeleton variant="list" count={3} />
             ) : !vmsOnline ? (
@@ -346,7 +230,7 @@ export function StudioHomePage() {
               <SystemTile vms={vms ?? []} />
             )}
           </div>
-          <div className="tile-shell tile-rss" onClick={isChat ? backToDashboard : undefined}>
+          <div className="tile-shell tile-rss">
             {feedsLoading ? (
               <CardSkeleton variant="list" count={3} />
             ) : feedsError ? (
@@ -420,105 +304,8 @@ export function StudioHomePage() {
 
         {/* Focus mode — Phase 2.1: 中央文字提示 (圆环涨到位才出现, 发第一条消息后消失)
             portal 到 body 避免 .studio-page 的 translate 动画创建 containing block */}
-        {createPortal(
-          <AnimatePresence>
-            {showHint && (
-              <motion.div
-                key="focus-hint"
-                className="focus-hint"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.4, delay: 0.6 }}
-              >
-                拖文件 / 文件夹进窗口，或者直接敲字。Esc 退出专注模式。
-              </motion.div>
-            )}
-          </AnimatePresence>,
-          document.body,
-        )}
-
-        {/* Focus mode — Phase 2.2: 底部 AgentInput (从下滑出)
-            复用 useAgentChat + AgentInput 组件 (带 paperclip/folder/textarea)
-            portal 到 body 避免 .studio-page 的 translate 动画创建 containing block */}
-        {createPortal(
-          <AnimatePresence>
-            {focusMode && (
-              <motion.div
-                key="focus-input"
-                className="focus-input"
-                initial={{ y: '100%', opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: '100%', opacity: 0 }}
-                transition={{ duration: 0.35, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
-              >
-                {/* messages.length > 0 时: 上方展示 AgentMessageList, 下方 AgentInput */}
-                {chat.messages.length > 0 && (
-                  <div className="focus-messages" ref={focusMessagesRef}>
-                    <AgentMessageList
-                      messages={chat.messages}
-                      isStreaming={chat.isStreaming}
-                      agentName="阿洛娜"
-                      hideAvatar
-                      onRemoveAttachment={chat.removeAttachment}
-                      onRetry={chat.retry}
-                    />
-                    <AgentErrorToast
-                      message={chat.lastError}
-                      onDismiss={chat.dismissError}
-                    />
-                  </div>
-                )}
-                <AgentInput
-                  attachments={chat.attachments}
-                  isStreaming={chat.isStreaming}
-                  onSend={chat.send}
-                  onCancel={chat.cancel}
-                  onAddAttachments={chat.addAttachments}
-                  onRemoveAttachment={chat.removeAttachment}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>,
-          document.body,
-        )}
-
-        {/* Chat mode (非 focus) — conversation-stage */}
-        {!focusMode && (
-          <section className="conversation-stage" aria-hidden={!isChat}>
-            <div ref={chatRef} className="conversation-panel">
-              <div className="conversation-kicker">Today's conversation</div>
-              {messages.length === 0 && (
-                <p className="conversation-empty">
-                  Start typing below and the surrounding tiles will stay available as compact context.
-                </p>
-              )}
-              {messages.map((msg) => (
-                <div key={msg.id} className={`chat-msg ${msg.role}`}>
-                  {msg.content}
-                </div>
-              ))}
-              {isLoading && (
-                <div className="chat-msg assistant">
-                  <span className="inline-flex gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </span>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
+        {/* Focus mode — 中央提示已迁到 FocusSidebar 内部 (新对话按钮附近) */}
       </div>
-
-      {/* QuickChatBar — 固定在页面底部 */}
-      {!focusMode && (
-        <div className="quick-chat-fixed-bottom">
-          <QuickChatBar onSend={handleSend} />
-        </div>
-      )}
-
     </div>
 
       {/* FocusSidebar — portal 到 body 避免 transform 影响 fixed 定位 */}

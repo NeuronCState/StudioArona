@@ -90,17 +90,29 @@ export const DEFAULT_HERMES_CONFIG: HermesConfig = {
   apiKey: 'local-hermes',
 };
 
-let _runtimeConfig: HermesConfig = {
-  baseUrl:
-    (import.meta.env.VITE_HERMES_BASE_URL as string | undefined) ??
-    DEFAULT_HERMES_CONFIG.baseUrl,
-  model:
-    (import.meta.env.VITE_HERMES_MODEL as string | undefined) ??
-    DEFAULT_HERMES_CONFIG.model,
-  apiKey:
-    (import.meta.env.VITE_HERMES_API_KEY as string | undefined) ??
-    DEFAULT_HERMES_CONFIG.apiKey,
-};
+/** Get config from store or env vars */
+function getHermesConfigFromStore(): HermesConfig {
+  try {
+    const stored = localStorage.getItem('studio-arona-hermes-config');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      const providers = parsed?.state?.providers;
+      const activeIndex = parsed?.state?.activeProviderIndex ?? 0;
+      if (providers && providers[activeIndex]) {
+        return providers[activeIndex];
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return {
+    baseUrl: (import.meta.env.VITE_HERMES_BASE_URL as string | undefined) ?? DEFAULT_HERMES_CONFIG.baseUrl,
+    model: (import.meta.env.VITE_HERMES_MODEL as string | undefined) ?? DEFAULT_HERMES_CONFIG.model,
+    apiKey: (import.meta.env.VITE_HERMES_API_KEY as string | undefined) ?? DEFAULT_HERMES_CONFIG.apiKey,
+  };
+}
+
+let _runtimeConfig: HermesConfig = getHermesConfigFromStore();
 
 /** Test-only override; production code should set env vars instead. */
 export function __setHermesConfigForTests(partial: Partial<HermesConfig>): void {

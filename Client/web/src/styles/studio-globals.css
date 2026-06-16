@@ -168,6 +168,13 @@
 .rss-item:hover { background: var(--studio-bg, #FAFAF9); transform: translateX(4px); }
 
 /* ========== Quick Chat ========== */
+.quick-chat-fixed-bottom {
+  position: sticky;
+  bottom: 0;
+  padding: 0 6px 24px 6px;
+  z-index: 10;
+  pointer-events: auto;
+}
 .quick-chat-wrapper {
   background: var(--studio-surface, #FFFFFF);
   border: 1px solid var(--studio-border-subtle, #F5F5F4);

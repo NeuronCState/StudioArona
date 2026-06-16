@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,7 +19,7 @@ const registerSchema = z.object({
   username: z.string().min(2, '用户名至少 2 个字符'),
   displayName: z.string().min(1, '请输入显示名'),
   password: z.string().min(6, '密码至少 6 位'),
-  invitationCode: z.string().min(1, '请输入识别码'),
+
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -60,7 +61,6 @@ export function LoginPage() {
           username: data.username,
           display_name: data.displayName,
           password: data.password,
-          invitation_code: data.invitationCode,
           avatar: selectedAvatar || undefined,
         },
       ),
@@ -128,23 +128,35 @@ export function LoginPage() {
           </div>
 
           {/* Error banner */}
-          {isError && (
-            <div
-              key={shakeKey}
-              className="mb-4 animate-shake rounded-lg border border-[var(--color-error)] bg-[var(--color-error)]/5 px-4 py-2.5 text-sm text-[var(--color-error)]"
-            >
-              {mode === 'login'
-                ? '登录失败，请检查用户名和密码'
-                : '注册失败，请检查识别码或稍后重试'}
-            </div>
-          )}
+          <AnimatePresence mode="wait">
+            {isError && (
+              <motion.div
+                key={shakeKey}
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+                className="mb-4 animate-shake rounded-lg border border-[var(--color-error)] bg-[var(--color-error)]/5 px-4 py-2.5 text-sm text-[var(--color-error)]"
+              >
+                {mode === 'login'
+                  ? '登录失败，请检查用户名和密码'
+                  : '注册失败，请检查信息或稍后重试'}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* Login form */}
-          {mode === 'login' && (
-            <form
-              onSubmit={loginForm.handleSubmit((data) => loginMutation.mutate(data))}
-              className="space-y-4"
-            >
+          {/* Forms with transition */}
+          <AnimatePresence mode="wait">
+            {mode === 'login' ? (
+              <motion.form
+                key="login"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                onSubmit={loginForm.handleSubmit((data) => loginMutation.mutate(data))}
+                className="space-y-4"
+              >
               <div>
                 <label
                   htmlFor="login-username"
@@ -195,15 +207,17 @@ export function LoginPage() {
               >
                 {isPending ? <Spinner size="sm" /> : '登录'}
               </button>
-            </form>
-          )}
-
-          {/* Register form */}
-          {mode === 'register' && (
-            <form
-              onSubmit={registerForm.handleSubmit((data) => registerMutation.mutate(data))}
-              className="space-y-4"
-            >
+            </motion.form>
+            ) : (
+              <motion.form
+                key="register"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+                onSubmit={registerForm.handleSubmit((data) => registerMutation.mutate(data))}
+                className="space-y-4"
+              >
               <div>
                 <label
                   htmlFor="reg-username"
@@ -268,28 +282,6 @@ export function LoginPage() {
                 )}
               </div>
 
-              {/* Invitation code */}
-              <div>
-                <label
-                  htmlFor="reg-code"
-                  className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]"
-                >
-                  识别码
-                </label>
-                <input
-                  id="reg-code"
-                  {...registerForm.register('invitationCode')}
-                  className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors"
-                  autoComplete="off"
-                  placeholder="输入识别码"
-                />
-                {registerForm.formState.errors.invitationCode && (
-                  <p className="mt-1 text-xs text-[var(--color-error)]">
-                    {registerForm.formState.errors.invitationCode.message}
-                  </p>
-                )}
-              </div>
-
               {/* Avatar picker */}
               <div>
                 <p className="mb-2 text-xs font-medium text-[var(--color-text-secondary)]">
@@ -321,8 +313,9 @@ export function LoginPage() {
               >
                 {isPending ? <Spinner size="sm" /> : '注册'}
               </button>
-            </form>
-          )}
+            </motion.form>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>

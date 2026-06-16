@@ -62,6 +62,11 @@ export const useHermesConfigStore = create<HermesConfigState>()(
     }),
     {
       name: 'studio-arona-hermes-config',
+      partialize: (state) => ({
+        providers: state.providers,
+        activeProviderIndex: state.activeProviderIndex,
+        setupComplete: state.setupComplete, // 显式持久化 setupComplete, 避免 markSetupComplete 改 zustand persist 版本
+      }),
     },
   ),
 );

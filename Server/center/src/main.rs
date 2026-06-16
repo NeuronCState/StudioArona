@@ -17,6 +17,7 @@ mod config;
 mod schedule;
 mod rss;
 mod vms;
+mod weather;
 
 use auth::{
     hash_password, verify_password, Claims, LoginRequest, RefreshRequest, RegisterRequest,
@@ -189,6 +190,8 @@ async fn main() -> Result<()> {
         .route("/api/feeds", get(rss::list_feeds))
         .route("/api/schedules", get(schedule::list_schedules))
         .route("/api/vms", get(vms::list_vms))
+        .route("/api/weather", get(weather::get_weather))
+        .route("/api/system/metrics", get(weather::get_system_metrics))
         .layer(CorsLayer::permissive())
         .with_state(state);
 

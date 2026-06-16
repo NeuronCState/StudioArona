@@ -4,6 +4,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { StudioAppShell } from './components/studio/StudioAppShell';
 import { FeedsPage } from './pages/feeds/FeedsPage';
 import { LoginPage } from './pages/login/LoginPage';
+import { SetupPage } from './pages/setup/SetupPage';
+import { StorageMigrationBanner } from './components/studio/StorageMigrationBanner';
 import { MemoryPage } from './pages/memory/MemoryPage';
 import { SkillsPage } from './pages/skills/SkillsPage';
 import { SchedulePage } from './pages/schedule/SchedulePage';
@@ -13,6 +15,7 @@ import { SystemPage } from './pages/system/SystemPage';
 import { VmsPage } from './pages/vms/VmsPage';
 import { OCRPage } from './pages/ocr/OCRPage';
 import { useAuthStore } from './stores/auth';
+import { useHermesConfigStore } from './stores/hermes-config';
 import { useDesignModeStore } from './stores/design-mode';
 import { useTheme } from './hooks/useTheme';
 import { motion as m } from './lib/motion';
@@ -67,6 +70,7 @@ function HomePage() {
 export default function App() {
   useTheme();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const setupComplete = useHermesConfigStore((s) => s.setupComplete);
   const mode = useDesignModeStore((s) => s.mode);
 
   // Dev bypass: ?devbypass=1 直接进 home (puppeteer 截图用)
@@ -87,6 +91,11 @@ export default function App() {
 
   if (!isAuthenticated && !devBypass) {
     return <LoginPage />;
+  }
+
+  // 注册后首次进入，显示配置引导页
+  if (!setupComplete && !devBypass) {
+    return <SetupPage />;
   }
 
   return (
@@ -116,6 +125,8 @@ export default function App() {
           <StudioAppShell>
             {/* AppRoutes 内层已包 AnimatePresence */}
             <AppRoutes />
+            {/* Tauri 桌面首次启动: IDB 旧数据 → 提示迁 fs (~/Documents/studioarona/) */}
+            <StorageMigrationBanner />
           </StudioAppShell>
         </motion.div>
       )}
