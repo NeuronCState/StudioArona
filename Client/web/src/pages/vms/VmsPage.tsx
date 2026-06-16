@@ -9,6 +9,8 @@ import { VmDetail } from './VmDetail';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { Drawer } from '@/components/ui/Drawer';
+import { StudioServiceOffline } from '@/components/studio/StudioServiceOffline';
+import { useConnectionStore } from '@/stores/connection';
 
 function VmListSkeleton() {
   return (
@@ -40,6 +42,7 @@ export function VmsPage() {
   } = useQuery({
     queryKey: ['vms'],
     queryFn: () => api.get<VM[]>('/vms'),
+    enabled: useConnectionStore.getState().effectiveMode() === 'online', // 离线不发请求
   });
 
   const destroyMutation = useMutation({
@@ -67,6 +70,11 @@ export function VmsPage() {
     error: '异常',
     destroyed: '已销毁',
   };
+
+  // 离线先于 loading/error 判: 工作室服务需 server, 没连接时不打 server
+  if (useConnectionStore.getState().effectiveMode() !== 'online') {
+    return <StudioServiceOffline service="vms" onRetry={() => refetch()} />;
+  }
 
   if (isLoading) {
     return <VmListSkeleton />;

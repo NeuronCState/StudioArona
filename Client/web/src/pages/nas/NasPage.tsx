@@ -1,12 +1,19 @@
 import { useState } from 'react';
 import { ExternalLink, Copy, Check, HardDrive } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth';
+import { useConnectionStore } from '@/stores/connection';
+import { StudioServiceOffline } from '@/components/studio/StudioServiceOffline';
 
 const NAS_URL = 'http://192.168.198.129:5666';
 
 export function NasPage() {
   const user = useAuthStore((s) => s.user);
   const [copied, setCopied] = useState(false);
+
+  // 离线时显示占位, 不让用户对 NAS 跳转链接困惑
+  if (useConnectionStore.getState().effectiveMode() !== 'online') {
+    return <StudioServiceOffline service="nas" />;
+  }
 
   const handleOpenNas = () => {
     // Use the auto-login endpoint — opens NAS with credential injection
