@@ -14,6 +14,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { api } from '@/lib/api/client';
+import { useLocalResource } from '@/lib/storage/useLocalResource';
 import { Tabs, Badge, Skeleton, EmptyState, Button, CardError } from '@javis/ui-kit';
 import { cn } from '@/lib/utils';
 import { StaggerList, StaggerItem } from '@/components/motion';
@@ -69,20 +70,42 @@ export function MemoryPage() {
     queryFn: () => api.get<MemoryEntry[]>('/memory/entries'),
   });
 
+  // 本地优先 — Memory 写 storage (Tauri fs / IDB), online 时 push server (S1a endpoint)
+  const localMemories = useLocalResource<MemoryEntry>({
+    table: 'memories',
+    queryKey: ['memory-entries', 'local'],
+    serverList: () => api.get<MemoryEntry[]>('/memory/entries'),
+    serverPush: (doc) => api.post<MemoryEntry>('/memory/entries', {
+      type: doc.type,
+      summary: doc.summary,
+      detail: doc.detail,
+      hit_count: doc.hit_count,
+      enabled: doc.enabled,
+      decaying: doc.decaying,
+    }),
+    serverRemove: (id) => api.delete(`/memory/entries/${id}`),
+  });
+
   const updateMutation = useMutation({
-    mutationFn: ({ id, summary }: { id: string; summary: string }) =>
-      api.patch(`/memory/entries/${id}`, { summary }),
+    mutationFn: async ({ id, summary }: { id: string; summary: string }) => {
+      const existing = (localMemories.data ?? []).find((e) => e.id === id);
+      if (!existing) return;
+      return localMemories.save({ ...existing, summary });
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['memory-entries'] }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/memory/entries/${id}`),
+    mutationFn: (id: string) => localMemories.remove(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['memory-entries'] }),
   });
 
   const disableMutation = useMutation({
-    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
-      api.patch(`/memory/entries/${id}`, { enabled }),
+    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
+      const existing = (localMemories.data ?? []).find((e) => e.id === id);
+      if (!existing) return;
+      return localMemories.save({ ...existing, enabled });
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['memory-entries'] }),
   });
 

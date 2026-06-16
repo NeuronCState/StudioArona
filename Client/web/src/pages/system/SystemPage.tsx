@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api/client';
+import { useLocalResource } from '@/lib/storage/useLocalResource';
 import type { SystemMetrics, NetworkDevice } from '@/types/contracts';
 import { CpuGrid } from './CpuGrid';
 import { GpuCard } from './GpuCard';
@@ -58,11 +59,22 @@ function SystemSkeleton() {
 export function SystemPage() {
   const pageVisible = usePageVisible();
 
-  const { data: metrics, isLoading, isError, error, refetch } = useQuery({
+  // 本地优先 — SystemMetrics 写 storage (Tauri fs / IDB), online 时 sync server (S1b endpoint)
+  // TODO: write 路径不存在 (system metrics 是只读 sensor), 标 TODO 暂不接 save/remove
+  const localMetrics = useLocalResource<SystemMetrics & { id: string }>({
+    table: 'system',
+    queryKey: ['system-metrics', 'local'],
+    serverList: () => api.get<SystemMetrics>('/system/metrics').then((m) => [{ ...m, id: 'singleton' }]),
+  });
+
+  const { data: serverMetrics, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['system-metrics'],
     queryFn: () => api.get<SystemMetrics>('/system/metrics'),
     refetchInterval: pageVisible ? 5000 : false,
   });
+
+  // 用 local (IDB 优先) → server fallback
+  const metrics = localMetrics.data?.[0] ?? serverMetrics;
 
   const { data: devices } = useQuery({
     queryKey: ['network-devices'],

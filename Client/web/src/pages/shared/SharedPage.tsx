@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api/client';
+import { useLocalResource } from '@/lib/storage/useLocalResource';
 import { useAuthStore } from '@/stores/auth';
 import type { Feed, Schedule } from '@/types/contracts';
 import { formatRelativeTime, formatCountdown } from '@/lib/utils';
@@ -99,8 +100,17 @@ export function SharedPage() {
     );
   }
 
+  // 本地优先 — Shared feed delete 写 storage (Tauri fs / IDB), online 时 push server (S1a endpoint)
+  // TODO: Shared 端的高可用(HA) 还没接, mutation 暂保留 useLocalResource.feeds.remove, 后续 HA 接入后这里再 review
+  const localSharedFeeds = useLocalResource<Feed>({
+    table: 'feeds',
+    queryKey: ['feeds', 'shared', 'local'],
+    serverList: () => api.get<Feed[]>('/feeds?scope=shared'),
+    serverRemove: (id) => api.delete(`/feeds/${id}`),
+  });
+
   const deleteFeedMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/feeds/${id}`),
+    mutationFn: (id: string) => localSharedFeeds.remove(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['feeds'] }),
   });
 

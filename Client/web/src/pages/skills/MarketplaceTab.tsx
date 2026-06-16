@@ -5,6 +5,7 @@ import {
   Search, Sparkles, RefreshCw, Flame, FolderTree, Trophy, CalendarDays,
 } from 'lucide-react';
 import { api } from '@/lib/api/client';
+import { useLocalResource } from '@/lib/storage/useLocalResource';
 import { Skeleton, EmptyState } from '@javis/ui-kit';
 import { useAuthStore } from '@/stores/auth';
 import { CategoryTabs } from './CategoryTabs';
@@ -27,6 +28,11 @@ interface MarketSkill {
   category: string;
   installed?: boolean;
   updated_at?: number;
+}
+
+/** LocalMarketSkill — install 后存到 IDB 的形态, 加 id (useLocalResource 泛型约束要) */
+interface LocalMarketSkill extends MarketSkill {
+  id: string;
 }
 
 interface SearchResponse {
@@ -246,15 +252,35 @@ export function MarketplaceTab() {
     return undefined;
   }, [viewMode, trendingData, rawData, category, categoriesData, installedSlugs]);
 
+  // 本地优先 — Skill install 写 storage (Tauri fs / IDB), online 时 push server (S1c endpoint)
+  // TODO: uninstall 暂时没有 client 入口 (uninstall 走 SkillsPage), 后续补 serverRemove
+  const localSkills = useLocalResource<LocalMarketSkill>({
+    table: 'skills',
+    queryKey: ['skills', 'marketplace', 'local'],
+    serverList: () =>
+      api.get<{ skills: MarketSkill[] }>('/skills/installed')
+        .then((r) => (r.skills ?? []).map((s) => ({ ...s, id: s.slug }))),
+    serverPush: async (doc) => {
+      const r = await api.post<MarketSkill>('/skills/marketplace/install', {
+        slug: doc.slug,
+        source: doc.source,
+        source_url: doc.source_url,
+        detail_url: doc.detail_url || '',
+        name: doc.name,
+      });
+      return { ...r, id: doc.slug };
+    },
+  });
+
   const installMutation = useMutation({
-    mutationFn: (skill: MarketSkill) =>
-      api.post('/skills/marketplace/install', {
-        slug: skill.slug,
-        source: skill.source,
-        source_url: skill.source_url,
-        detail_url: (skill as MarketSkill).detail_url || '',
-        name: skill.name,
-      }),
+    mutationFn: (skill: MarketSkill) => {
+      const id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      return localSkills.save({
+        ...skill,
+        id,
+        installed: true,
+      });
+    },
     onSuccess: (_data, skill) => {
       // 乐观更新: 立即把 installed 加进 set, 避免 refetch 闪烁
       queryClient.setQueryData<{ skills: MarketSkill[]; slugs: string[]; total: number } | undefined>(

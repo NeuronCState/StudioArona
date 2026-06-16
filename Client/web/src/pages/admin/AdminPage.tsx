@@ -232,17 +232,21 @@ function UsersTab() {
   });
   const loading = useDelayedPending(isPending);
 
+  // TODO: Admin mutation 走 server-only (管理操作无 IDB 优先语义), 暂时保留 api.* 直连
+  // 后续: 1-7 收官后, admin 写操作可能走「先 IDB cache + 后台 push」pattern, 但本期不阻塞
   const updateMutation = useMutation({
     mutationFn: ({ id, body }: { id: string; body: { display_name?: string; role?: 'admin' | 'member' } }) =>
       api.patch(`/users/${id}`, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
   });
 
+  // TODO: Admin mutation 走 server-only, 暂时保留 api.* 直连
   const killSessionMutation = useMutation({
     mutationFn: (id: string) => api.post(`/admin/users/${id}/kill-session`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
   });
 
+  // TODO: Admin mutation 走 server-only, 暂时保留 api.* 直连
   const notifyUserMutation = useMutation({
     mutationFn: ({ id, subject, body }: { id: string; subject: string; body: string }) =>
       api.post(`/admin/notify/user/${id}`, { subject, body }),
@@ -493,6 +497,7 @@ function NotificationsTab() {
     refetchInterval: 15000,
   });
 
+  // TODO: Admin mutation 走 server-only (通知 / DLQ 是 server-side 资源), 暂时保留 api.* 直连
   const testMutation = useMutation({
     mutationFn: () => api.post('/admin/notify/test', { to: testTo, subject: testSubject, body: testBody }),
     onSuccess: (res: any) => {
@@ -502,6 +507,7 @@ function NotificationsTab() {
     },
   });
 
+  // TODO: Admin mutation 走 server-only, 暂时保留 api.* 直连
   const broadcastMutation = useMutation({
     mutationFn: () => api.post('/admin/notify/broadcast', { subject: bcSubject, body: bcBody }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-notify-dlq'] }),

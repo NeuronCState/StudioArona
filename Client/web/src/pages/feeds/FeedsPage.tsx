@@ -4,6 +4,7 @@ import { Plus, Trash2, ExternalLink, Rss, Globe, Eye, Clock } from 'lucide-react
 import { useDelayedPending } from '@/hooks/useDelayedPending';
 import { motion } from 'framer-motion';
 import { api } from '@/lib/api/client';
+import { useLocalResource } from '@/lib/storage/useLocalResource';
 import type { Feed } from '@/types/contracts';
 import { formatRelativeTime } from '@/lib/utils';
 import { Skeleton, CardError } from '@javis/ui-kit';
@@ -71,11 +72,33 @@ export function FeedsPage() {
     return items;
   }, [feeds, monitors]);
 
+  // 本地优先 — Feed 写 storage (Tauri fs / IDB), online 时 push server (S1a endpoint)
+  // page-monitors 没有 server endpoint, 标 TODO 仍走 server (1-7 收官后 server 端补)
+  const localFeeds = useLocalResource<Feed>({
+    table: 'feeds',
+    queryKey: ['feeds', 'local'],
+    serverList: () => api.get<Feed[]>('/feeds'),
+    serverPush: (doc) => api.post<Feed>('/feeds', {
+      url: doc.url,
+      title: doc.title,
+    }),
+    serverRemove: (id) => api.delete(`/feeds/${id}`),
+  });
+
   const addFeedMutation = useMutation({
-    mutationFn: (data: { url: string; title?: string }) => api.post<Feed>('/feeds', data),
+    mutationFn: async (data: { url: string; title?: string }) => {
+      const id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      return localFeeds.save({
+        id,
+        url: data.url,
+        title: data.title,
+        created_at: new Date().toISOString(),
+      } as Feed);
+    },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['feeds'] }); setNewUrl(''); setNewTitle(''); },
   });
 
+  // TODO: page-monitors 没有 server endpoint, mutation 仍走 server, 后续 server 端补 CRUD 后接 useLocalResource
   const addMonitorMutation = useMutation({
     mutationFn: (data: { url: string; label: string; css_selector: string }) =>
       api.post<PageMonitor>('/page-monitors', data),
@@ -83,10 +106,11 @@ export function FeedsPage() {
   });
 
   const deleteFeedMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/feeds/${id}`),
+    mutationFn: (id: string) => localFeeds.remove(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['feeds'] }),
   });
 
+  // TODO: page-monitors 没有 server endpoint, 后续 server 端补 DELETE endpoint 后接 useLocalResource.remove
   const deleteMonitorMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/page-monitors/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['page-monitors'] }),
