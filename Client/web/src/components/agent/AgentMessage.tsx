@@ -4,6 +4,8 @@ import { motion as m, listItem as itemVariant } from '@/lib/motion';
 import { Avatar } from '@javis/ui-kit';
 import type { AgentMessage as ChatMessage } from './useAgentChat';
 import { AgentAttachmentChip } from './AgentAttachment';
+import { ThinkingBlock } from './ThinkingBlock';
+import { ToolCallCard } from './ToolCallCard';
 
 interface AgentMessageProps {
   message: ChatMessage;
@@ -79,8 +81,34 @@ export function AgentMessageItem({
             )}
           </div>
         ) : (
-          <div className={isUser ? userBubble : assistantBubble}>
-            {message.pending && message.content === '' ? <TypingDots /> : message.content}
+          <div className={`flex flex-col gap-1 ${isUser ? 'items-end' : 'items-start'}`}>
+            {isUser ? (
+              <div className={userBubble}>
+                {message.content}
+              </div>
+            ) : (
+              <>
+                {/* AI 思考过程折叠面板 */}
+                {message.thinking !== undefined && (
+                  <ThinkingBlock
+                    content={message.thinking}
+                    done={!message.pending && message.content.length > 0}
+                  />
+                )}
+                {/* 工具调用列表 (每个 tool 一个折叠卡片) */}
+                {message.toolCalls && message.toolCalls.length > 0 && (
+                  <div className="w-full">
+                    {message.toolCalls.map((tool) => (
+                      <ToolCallCard key={tool.id} tool={tool} />
+                    ))}
+                  </div>
+                )}
+                {/* 主回复 (token 流) */}
+                <div className={assistantBubble}>
+                  {message.pending && message.content === '' ? <TypingDots /> : message.content}
+                </div>
+              </>
+            )}
           </div>
         )}
         {message.attachments && message.attachments.length > 0 && (

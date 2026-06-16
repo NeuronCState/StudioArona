@@ -4,6 +4,7 @@ import { motion as m } from '@/lib/motion';
 import { useAgentChat, type AgentAttachment } from './useAgentChat';
 import { AgentPanelHeader } from './AgentPanelHeader';
 import { AgentMessageList } from './AgentMessageList';
+import { TaskTrackerBar } from './TaskTrackerBar';
 import { AgentInput } from './AgentInput';
 import { AgentErrorToast } from './AgentErrorToast';
 
@@ -108,6 +109,12 @@ export function AgentPanel({ open, onClose, agentName = DEFAULT_AGENT_NAME }: Ag
               onRetryConnection={() => window.location.reload()}
             />
             <div className="relative flex-1 overflow-hidden">
+              {/* 顶部任务进度条: 当前 assistant message 的 tool calls */}
+              {(() => {
+                const last = chat.messages.filter((m) => m.role === 'assistant').slice(-1)[0];
+                if (!last?.toolCalls?.length) return null;
+                return <TaskTrackerBar toolCalls={last.toolCalls} />;
+              })()}
               <AgentMessageList
                 messages={chat.messages}
                 isStreaming={chat.isStreaming}

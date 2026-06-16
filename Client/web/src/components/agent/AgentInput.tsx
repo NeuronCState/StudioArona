@@ -15,6 +15,8 @@ import { Spinner } from '@javis/ui-kit';
 import { motion as m } from '@/lib/motion';
 import type { AgentAttachment } from './useAgentChat';
 import { AgentAttachmentChip } from './AgentAttachment';
+import { AutocompletePanel, type AutocompleteItem } from './AutocompletePanel';
+import { useAutocomplete } from './useAutocomplete';
 
 interface AgentInputProps {
   attachments: AgentAttachment[];
@@ -45,6 +47,30 @@ export function AgentInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+
+  // AutocompletePanel 候选列表 (SonettoHere LangGraph 内置 tool 名字)
+  // 阶段 1 还没接 tool 真实列表, 写一批最常用的占位
+  const autocompleteItems: AutocompleteItem[] = [
+    { id: 'search', name: 'search', description: '网络搜索 (Tavily)', icon: 'search', insertText: '/search ' },
+    { id: 'weather', name: 'weather', description: '查询天气', icon: 'sparkles', insertText: '/weather ' },
+    { id: 'map', name: 'map', description: '地图搜索 (高德)', icon: 'search', insertText: '/map ' },
+    { id: 'todo', name: 'todo', description: 'Todoist 任务', icon: 'command', insertText: '/todo ' },
+    { id: 'tarot', name: 'tarot', description: '塔罗牌占卜', icon: 'sparkles', insertText: '/tarot ' },
+    { id: 'subagent', name: 'subagent', description: '启动 SubAgent 独立会话', icon: 'command', insertText: '/subagent ' },
+    { id: 'file', name: 'file', description: '文件读写', icon: 'search', insertText: '/file ' },
+    { id: 'debug', name: 'debug', description: '代码调试', icon: 'command', insertText: '/debug ' },
+    { id: 'test', name: 'test', description: '运行测试', icon: 'command', insertText: '/test ' },
+    { id: 'image', name: 'image', description: '图像生成', icon: 'sparkles', insertText: '/image ' },
+  ];
+  const handleAutocompleteInsert = useCallback((insertText: string) => {
+    setValue((v) => {
+      // 替换当前 `/filterText` 段
+      return v.replace(/\/[^\s\/]*$/, '') + insertText;
+    });
+    // 重新 focus textarea
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  }, []);
+  const ac = useAutocomplete(value, autocompleteItems, handleAutocompleteInsert);
 
   // Reset textarea height whenever content changes.
   useEffect(() => {
@@ -109,12 +135,15 @@ export function AgentInput({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      // 1. AutocompletePanel 优先拦截 Arrow/Enter/Tab/Escape
+      if (ac.handleKey(e)) return;
+      // 2. 普通 Enter → submit
       if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         void handleSubmit();
       }
     },
-    [handleSubmit],
+    [handleSubmit, ac],
   );
 
   // Drag & drop on the whole input region.
@@ -173,6 +202,19 @@ export function AgentInput({
           ))}
         </div>
       )}
+
+      <AutocompletePanel
+        items={ac.filtered}
+        visible={ac.open}
+        position={ac.position}
+        filterText={ac.filtered.length ? '' : ''}
+        activeIndex={ac.activeIndex}
+        onSelect={(item) => {
+          handleAutocompleteInsert(item.insertText ?? `/${item.name} `);
+        }}
+        onActiveIndexChange={ac.setActiveIndex}
+        onClose={ac.close}
+      />
 
       <textarea
         ref={textareaRef}
