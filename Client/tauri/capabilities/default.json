@@ -1,11 +1,30 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "enables the default permissions",
+  "description": "Studio Arona 默认权限 — 文件系统 (~/Documents/studioarona) + 对话框 + 通知 + 打开外部链接",
   "windows": [
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "dialog:default",
+    "notification:default",
+    "shell:allow-open",
+    "fs:default",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
+    "fs:allow-read-dir",
+    "fs:allow-mkdir",
+    "fs:allow-remove",
+    "fs:allow-rename",
+    "fs:allow-exists",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        { "path": "$HOME/Documents/studioarona/**" },
+        { "path": "$HOME/Documents/studioarona" },
+        { "path": "$HOME/Documents/studioarona/*" }
+      ]
+    }
   ]
 }

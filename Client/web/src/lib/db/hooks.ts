@@ -10,7 +10,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
-import { db, type LocalSchedule, type LocalFeed, type LocalMemory, type LocalWeather, type LocalSystemMetrics, uuid, markDirty } from './index';
+import { uuid, markDirty } from './index';
+import type { LocalSchedule, LocalFeed, LocalFeedItem, LocalMemory, LocalSkill, LocalWeather, LocalSystemMetrics } from './index';
+import { put as storagePut, get as storageGet, listAll as storageListAll, type Table } from '@/lib/storage';
 import { api } from '@/lib/api/client';
 import { useConnectionStore } from '@/stores/connection';
 
@@ -22,10 +24,8 @@ export function useSchedules() {
   const q = useQuery({
     queryKey: ['schedules', 'local'],
     queryFn: async () => {
-      const local = await db.schedules
-        .filter(s => !s.deleted)
-        .sortBy('startAt');
-      return local;
+      const all = await storageListAll<LocalSchedule>('schedules');
+      return all.filter(s => !s.deleted).sort((a, b) => a.startAt - b.startAt);
     },
   });
   useEffect(() => {
@@ -64,7 +64,8 @@ export function useFeeds() {
   const q = useQuery({
     queryKey: ['feeds', 'local'],
     queryFn: async () => {
-      return await db.feeds.filter(f => !f.deleted).sortBy('createdAt');
+      const all = await storageListAll<LocalFeed>('feeds');
+      return all.filter(f => !f.deleted).sort((a, b) => a.createdAt - b.createdAt);
     },
   });
   useEffect(() => {
@@ -95,11 +96,10 @@ export function useFeedItems(feedId: string | undefined) {
     queryKey: ['feedItems', feedId, 'local'],
     queryFn: async () => {
       if (!feedId) return [];
-      return await db.feedItems
-        .where('feedId').equals(feedId)
-        .filter(i => !i.deleted)
-        .reverse()
-        .sortBy('publishedAt');
+      const all = await storageListAll<LocalFeedItem>('feedItems');
+      return all
+        .filter(i => i.feedId === feedId && !i.deleted)
+        .sort((a, b) => (b.publishedAt ?? 0) - (a.publishedAt ?? 0));
     },
     enabled: !!feedId,
   });
@@ -111,10 +111,8 @@ export function useMemories() {
   const q = useQuery({
     queryKey: ['memories', 'local'],
     queryFn: async () => {
-      return await db.memories
-        .filter(m => !m.deleted)
-        .reverse()
-        .sortBy('createdAt');
+      const all = await storageListAll<LocalMemory>('memories');
+      return all.filter(m => !m.deleted).sort((a, b) => b.createdAt - a.createdAt);
     },
   });
   useEffect(() => {
@@ -132,9 +130,8 @@ export function useSkills() {
   const q = useQuery({
     queryKey: ['skills', 'local'],
     queryFn: async () => {
-      return await db.skills
-        .filter(s => !s.deleted)
-        .toArray();
+      const all = await storageListAll<LocalSkill>('skills');
+      return all.filter(s => !s.deleted);
     },
   });
   useEffect(() => {
@@ -149,8 +146,9 @@ export function useWeather() {
   const q = useQuery({
     queryKey: ['weather', 'local'],
     queryFn: async () => {
-      const cached = await db.weather.toArray();
-      const fresh = cached.filter(w => Date.now() - w.updatedAt < 24 * 3600_000);
+      // weather 走 IDB 单独表 (key 为 'current', 24h 缓存)
+      const all = await storageListAll<LocalWeather>('weather');
+      const fresh = all.filter(w => Date.now() - w.updatedAt < 24 * 3600_000);
       return fresh[0] ?? null;
     },
   });
@@ -181,8 +179,8 @@ export function useSystemMetrics() {
   const q = useQuery({
     queryKey: ['system', 'local'],
     queryFn: async () => {
-      const cached = await db.systemMetrics.toArray();
-      return cached[0] ?? null;
+      const all = await storageListAll<LocalSystemMetrics>('system');
+      return all[0] ?? null;
     },
   });
   useEffect(() => {
@@ -232,17 +230,14 @@ function useSync() {
 
       try {
         const serverItems = await fetcher();
-        // 写 IDB (按 serverId 匹配)
+        // 写 storage (按 serverId 匹配, IDB 或 Tauri fs 自动 dispatch)
         if (Array.isArray(serverItems)) {
-          if (key === 'weather' && serverItems[0]) {
-            await db.weather.put(serverItems[0] as LocalWeather);
-          } else if (key === 'system' && serverItems[0]) {
-            await db.systemMetrics.put(serverItems[0] as LocalSystemMetrics);
+          if ((key === 'weather' || key === 'system') && serverItems[0]) {
+            await storagePut(key as 'weather' | 'system', serverItems[0] as Record<string, unknown>);
           } else {
-            // schedules/feeds/memories/skills
             for (const item of serverItems as Array<{ id: string; serverId?: string; updatedAt: number }>) {
               if (item.serverId) {
-                await db.table(key).put(item);
+                await storagePut(key as Table, item as Record<string, unknown>);
               }
             }
           }
@@ -274,22 +269,22 @@ export async function addSchedule(input: Omit<LocalSchedule, 'id' | 'createdAt' 
     deleted: false,
     ...input,
   };
-  await db.schedules.add(item);
+  await storagePut('schedules', item as unknown as Record<string, unknown>);
   // TODO: 触发 push sync
   return item;
 }
 
 export async function updateSchedule(id: string, patch: Partial<LocalSchedule>): Promise<void> {
-  const cur = await db.schedules.get(id);
+  const cur = await storageGet<LocalSchedule>('schedules', id);
   if (!cur) return;
   const next = markDirty({ ...cur, ...patch });
-  await db.schedules.put(next);
+  await storagePut('schedules', next as unknown as Record<string, unknown>);
 }
 
 export async function deleteSchedule(id: string): Promise<void> {
-  const cur = await db.schedules.get(id);
+  const cur = await storageGet<LocalSchedule>('schedules', id);
   if (!cur) return;
-  await db.schedules.put({ ...cur, deleted: true, dirty: true, updatedAt: Date.now() });
+  await storagePut('schedules', { ...cur, deleted: true, dirty: true, updatedAt: Date.now() } as unknown as Record<string, unknown>);
 }
 
 export async function addFeed(url: string, options?: Partial<LocalFeed>): Promise<LocalFeed> {
@@ -307,7 +302,7 @@ export async function addFeed(url: string, options?: Partial<LocalFeed>): Promis
     syncedAt: undefined,
     deleted: false,
   };
-  await db.feeds.add(item);
+  await storagePut('feeds', item as unknown as Record<string, unknown>);
   return item;
 }
 
@@ -326,6 +321,6 @@ export async function addMemory(input: { category: string; content: string; impo
     syncedAt: undefined,
     deleted: false,
   };
-  await db.memories.add(item);
+  await storagePut('memories', item as unknown as Record<string, unknown>);
   return item;
 }

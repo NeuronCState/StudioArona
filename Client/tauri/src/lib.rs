@@ -17,6 +17,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_log::Builder::default().build())
+        .plugin(tauri_plugin_fs::init())
         .manage(BackendState { base_url: backend_url })
         .setup(|app| {
             // 设置窗口大小
