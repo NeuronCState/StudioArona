@@ -65,16 +65,25 @@ fn shared_cache() -> WeatherCache {
     WEATHER_CACHE.get().cloned().unwrap_or_else(WeatherCache::new)
 }
 
-/// One-shot flag for the "WEATHER_API_KEY not set" warning. The mock path
-/// runs on every request when no key is configured, so we only want to log
-/// the warning once per process to keep logs readable.
-static KEY_MISSING_LOGGED: OnceLock<Mutex<bool>> = OnceLock::new();
+/// One-shot flag for "no upstream available" warnings. We log a warning at most
+/// once per process so a flapping upstream doesn't spam the log.
+static WTTR_FAIL_LOGGED: OnceLock<Mutex<bool>> = OnceLock::new();
+static OWM_FAIL_LOGGED: OnceLock<Mutex<bool>> = OnceLock::new();
 
-fn log_key_missing_once() {
-    let lock = KEY_MISSING_LOGGED.get_or_init(|| Mutex::new(false));
+fn log_wttr_fail_once(err: &str) {
+    let lock = WTTR_FAIL_LOGGED.get_or_init(|| Mutex::new(false));
     let mut fired = lock.lock().unwrap();
     if !*fired {
-        tracing::warn!("weather API key not set, using mock (set WEATHER_API_KEY for live data)");
+        tracing::warn!(error = %err, "weather: wttr.in call failed, will return null-ish payload");
+        *fired = true;
+    }
+}
+
+fn log_owm_fail_once(err: &str) {
+    let lock = OWM_FAIL_LOGGED.get_or_init(|| Mutex::new(false));
+    let mut fired = lock.lock().unwrap();
+    if !*fired {
+        tracing::warn!(error = %err, "weather: openweathermap call failed (continuing with wttr.in)");
         *fired = true;
     }
 }
@@ -96,9 +105,10 @@ const SHENYANG_LON: f64 = 123.4315;
 /// GET /api/weather — 给 Studio HomePage weather 磁贴用
 ///
 /// 固定城市: 沈阳 (lat 41.8057, lon 123.4315).
-/// Reads `WEATHER_API_KEY` env var. If unset, returns the static mock and
-/// logs a warning once per process. If set, calls openweathermap
-/// (`/data/2.5/weather`) with lat/lon and caches for 5 minutes.
+/// 上游优先级:
+///   1. openweathermap (如果 `WEATHER_API_KEY` 配了) — 失败继续
+///   2. wttr.in (no key, free, public) — 失败 → 返 stale cache 或空 payload
+/// 5 分钟 in-process 缓存.
 pub async fn get_weather(
     State(_state): State<AppState>,
     Query(q): Query<WeatherQuery>,
@@ -117,46 +127,145 @@ pub async fn get_weather(
         return Ok(Json(cached));
     }
 
+    // 1) OpenWeatherMap (optional, only if key set)
     let key = std::env::var("WEATHER_API_KEY").ok().filter(|s| !s.is_empty());
-    let payload = match key {
-        Some(k) => match fetch_openweather(&k, &city).await {
+    if let Some(k) = &key {
+        match fetch_openweather(k, &city).await {
             Ok(v) => {
                 tracing::debug!(city = %city, "weather: served from openweathermap");
-                v
+                cache.put(&cache_key, v.clone());
+                return Ok(Json(v));
             }
-            Err(e) => {
-                tracing::warn!(city = %city, error = %e, "weather: openweathermap call failed, falling back to mock");
-                mock_for_city(&city)
-            }
-        },
-        None => {
-            // Rate-limited warn so we don't spam the log on every request.
-            log_key_missing_once();
-            mock_for_city(&city)
+            Err(e) => log_owm_fail_once(&e.to_string()),
         }
-    };
+    }
 
-    cache.put(&cache_key, payload.clone());
-    Ok(Json(payload))
+    // 2) wttr.in (no key, free)
+    match fetch_wttr(&city).await {
+        Ok(v) => {
+            tracing::debug!(city = %city, "weather: served from wttr.in");
+            cache.put(&cache_key, v.clone());
+            Ok(Json(v))
+        }
+        Err(e) => {
+            log_wttr_fail_once(&e.to_string());
+            // 3) Real fallback: stale cache (any age) if we have it from a prior call.
+            //    Don't fabricate — just return the last good reading we have.
+            if let Some(stale) = cache.get_any(&cache_key) {
+                tracing::warn!(city = %city, "weather: serving stale cache (upstream failed)");
+                return Ok(Json(stale));
+            }
+            // 4) No cache, no upstream — return error so client can fall back to direct wttr.in fetch
+            Err((
+                StatusCode::BAD_GATEWAY,
+                Json(json!({
+                    "error": "weather upstream unavailable",
+                    "city": city,
+                })),
+            ))
+        }
+    }
 }
 
-fn mock_for_city(city: &str) -> Value {
-    // 默认给沈阳天气; 其他城市 fallback 一组通用值
-    let is_shenyang = city == "沈阳";
-    json!({
-        "city": "沈阳",
-        "temperature": if is_shenyang { -3 } else { 24 },
-        "condition": if is_shenyang { "晴" } else { "多云" },
-        "humidity": if is_shenyang { 55 } else { 65 },
-        "windSpeed": if is_shenyang { 12 } else { 17 },
-        "windDirection": "S",
-        "feelsLike": if is_shenyang { -6 } else { 23 },
-        "uvIndex": if is_shenyang { 2 } else { 5 },
-        "lat": SHENYANG_LAT,
-        "lon": SHENYANG_LON,
+impl WeatherCache {
+    fn get_any(&self, city: &str) -> Option<Value> {
+        let map = self.inner.lock().unwrap();
+        map.get(city).map(|(_, val)| val.clone())
+    }
+}
+
+async fn fetch_wttr(city: &str) -> anyhow::Result<Value> {
+    // wttr.in 接受城市名或 lat,lon. 沈阳固定走 lat,lon 准.
+    let query = if city == "沈阳" {
+        format!("{},{}", SHENYANG_LAT, SHENYANG_LON)
+    } else {
+        city.to_string()
+    };
+    let url = format!("https://wttr.in/{}?format=j1", urlencoding_simple(&query));
+
+    let body: serde_json::Value = reqwest::Client::builder()
+        .timeout(Duration::from_secs(8))
+        .user_agent("curl/8.0")
+        .build()?
+        .get(&url)
+        .header("Accept", "application/json")
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+
+    // wttr.in `?format=j1` response shape:
+    //   current_condition: [{ temp_C, FeelsLikeC, humidity, winddir16Point,
+    //                         windspeedKmph, uvIndex, weatherDesc: [{value}] }]
+    //   nearest_area:      [{ areaName: [{value}], latitude, longitude, ... }]
+    let cur = body
+        .get("current_condition")
+        .and_then(|c| c.get(0))
+        .ok_or_else(|| anyhow::anyhow!("wttr.in: missing current_condition[0]"))?;
+
+    let parse_f64 = |k: &str| -> f64 {
+        cur.get(k)
+            .and_then(|v| v.as_str())
+            .and_then(|s| s.parse::<f64>().ok())
+            .unwrap_or(0.0)
+    };
+    let temp_c = parse_f64("temp_C");
+    let feels_like_c = if cur.get("FeelsLikeC").is_some() {
+        parse_f64("FeelsLikeC")
+    } else {
+        temp_c
+    };
+    let humidity = parse_f64("humidity");
+    let wind_kph = parse_f64("windspeedKmph");
+    let uv = parse_f64("uvIndex");
+
+    let wind_dir = cur
+        .get("winddir16Point")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let condition = cur
+        .get("weatherDesc")
+        .and_then(|w| w.get(0))
+        .and_then(|w| w.get("value"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("Unknown")
+        .to_string();
+
+    let area = body.get("nearest_area").and_then(|a| a.get(0));
+    let resolved_city = area
+        .and_then(|a| a.get("areaName"))
+        .and_then(|a| a.get(0))
+        .and_then(|a| a.get("value"))
+        .and_then(|v| v.as_str())
+        .unwrap_or(city)
+        .to_string();
+    let lat = area
+        .and_then(|a| a.get("latitude"))
+        .and_then(|v| v.as_str())
+        .and_then(|s| s.parse::<f64>().ok())
+        .unwrap_or(SHENYANG_LAT);
+    let lon = area
+        .and_then(|a| a.get("longitude"))
+        .and_then(|v| v.as_str())
+        .and_then(|s| s.parse::<f64>().ok())
+        .unwrap_or(SHENYANG_LON);
+
+    Ok(json!({
+        "city": resolved_city,
+        "temperature": temp_c,
+        "condition": condition,
+        "humidity": humidity,
+        "windSpeed": wind_kph,
+        "windDirection": wind_dir,
+        "feelsLike": feels_like_c,
+        "uvIndex": uv,
+        "lat": lat,
+        "lon": lon,
         "updatedAt": chrono::Utc::now().to_rfc3339(),
-        "source": "mock",
-    })
+        "source": "wttr.in",
+    }))
 }
 
 async fn fetch_openweather(api_key: &str, city: &str) -> anyhow::Result<Value> {

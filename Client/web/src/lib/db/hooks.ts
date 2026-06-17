@@ -142,52 +142,110 @@ export function useSkills() {
 
 /* ===== Weather (24h cache) ===== */
 
-/** 沈阳固定 fallback (没 IDB 数据 + offline 时返) — 保证首页 weather 磁贴永远有值. */
-const SHENYANG_MOCK: LocalWeather = {
-  id: 'shenyang',
-  city: '沈阳',
-  temperature: -3,
-  condition: '晴',
-  humidity: 55,
-  windSpeed: '12 km/h S',
-  windDirection: 'S',
-  feelsLike: -6,
-  uvIndex: '2 (Low)',
-  updatedAt: Date.now(),
-};
+/**
+ * 把 server / wttr.in 返的统一 payload 规整成 LocalWeather 格式.
+ * 字段格式跟 WeatherTile 兼容: windSpeed 形如 "17 km/h S", uvIndex 形如 "5 (Moderate)".
+ */
+function wttrPayloadToLocal(w: Record<string, unknown>): LocalWeather {
+  const city = (w.city as string) ?? '沈阳';
+  const windKph = Number(w.windSpeed ?? 0);
+  const windDir = (w.windDirection as string) ?? '';
+  const uv = Number(w.uvIndex ?? 0);
+  return {
+    id: city,
+    city,
+    temperature: Number(w.temperature ?? 0),
+    condition: (w.condition as string) ?? 'Unknown',
+    humidity: Number(w.humidity ?? 0),
+    windSpeed: `${windKph} km/h ${windDir}`.trim(),
+    windDirection: windDir,
+    feelsLike: Number(w.feelsLike ?? w.temperature ?? 0),
+    uvIndex: formatUvIndex(uv),
+    updatedAt: Date.now(),
+  };
+}
+
+/** uvIndex 0-11+ → 文字 + (等级) 跟 WeatherTile 兼容. */
+function formatUvIndex(uv: number): string {
+  if (!uv || uv <= 0) return '0 (Low)';
+  let label = 'Low';
+  if (uv >= 3 && uv < 6) label = 'Moderate';
+  else if (uv >= 6 && uv < 8) label = 'High';
+  else if (uv >= 8 && uv < 11) label = 'Very High';
+  else if (uv >= 11) label = 'Extreme';
+  return `${uv} (${label})`;
+}
+
+/**
+ * 客户端直接打 wttr.in 拿真实天气 — server 挂了 / 启动没 server / 离线时兜底.
+ * wttr.in CORS 通 (`access-control-allow-origin: *`), 浏览器 fetch 即可.
+ * 失败返 null (UI 显示 "暂无天气数据", 绝不 mock 假值).
+ */
+async function fetchWttrDirect(city: string): Promise<Record<string, unknown> | null> {
+  try {
+    const url = `https://wttr.in/${encodeURIComponent(city)}?format=j1`;
+    const r = await fetch(url, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(6000),
+      headers: { Accept: 'application/json' },
+    });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const cur = d?.current_condition?.[0];
+    if (!cur) return null;
+    const area = d?.nearest_area?.[0];
+    const cityName = area?.areaName?.[0]?.value ?? city;
+    const parseF = (k: string) => parseFloat(cur[k]) || 0;
+    return {
+      city: cityName,
+      temperature: parseF('temp_C'),
+      condition: cur.weatherDesc?.[0]?.value ?? 'Unknown',
+      humidity: parseF('humidity'),
+      windSpeed: parseF('windspeedKmph'),
+      windDirection: cur.winddir16Point ?? '',
+      feelsLike: parseF('FeelsLikeC') || parseF('temp_C'),
+      uvIndex: parseF('uvIndex'),
+      updatedAt: new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
 
 export function useWeather() {
   const sync = useSync();
   const q = useQuery({
     queryKey: ['weather', 'local'],
     queryFn: async () => {
-      // weather 走 IDB 单独表 (key 为 'current', 24h 缓存)
+      // 1) IDB 24h 内有就用 (instant render)
       const all = await storageListAll<LocalWeather>('weather');
       const fresh = all.filter(w => Date.now() - w.updatedAt < 24 * 3600_000);
-      // 没 IDB 缓存 (首次启动 + 没 server) → 返沈阳 mock (永远是沈阳)
-      return fresh[0] ?? SHENYANG_MOCK;
+      if (fresh[0]) return fresh[0];
+
+      // 2) 没 IDB → 试 server (server 优先, 因为 server 可能用 openweathermap 准一点)
+      try {
+        const w = await api.get<Record<string, unknown>>('/api/weather?city=沈阳');
+        return wttrPayloadToLocal(w);
+      } catch {
+        // 3) server 挂 → 直连 wttr.in (no key, free, CORS 通)
+        const direct = await fetchWttrDirect('沈阳');
+        if (direct) return wttrPayloadToLocal(direct);
+        // 4) 都拿不到 → 返 null (UI 显示 "暂无天气数据", 不假数据)
+        return null;
+      }
     },
-    staleTime: 24 * 3600_000, // 24h, 跟 IDB 缓存期一致
+    staleTime: 24 * 3600_000,
   });
   useEffect(() => {
+    // 还在线时, 静默 sync server 拿最新值, 写 IDB (下次 queryFn 命中)
     sync('weather', '/api/weather?city=沈阳', async () => {
       try {
         const w = await api.get<Record<string, unknown>>('/api/weather?city=沈阳');
-        const local: LocalWeather = {
-          id: (w.city as string) ?? 'shenyang',
-          city: (w.city as string) ?? '沈阳',
-          temperature: (w.temperature as number) ?? 0,
-          condition: (w.condition as string) ?? '',
-          humidity: (w.humidity as number) ?? 0,
-          windSpeed: `${w.windSpeed ?? 0} ${w.windDirection ?? ''}`.trim(),
-          windDirection: (w.windDirection as string) ?? '',
-          feelsLike: (w.feelsLike as number) ?? 0,
-          uvIndex: `${w.uvIndex ?? 0}`,
-          updatedAt: Date.now(),
-        };
-        return [local];
+        return [wttrPayloadToLocal(w)];
       } catch {
-        // offline 时 fetch 失败, 不写 IDB (保留 SHENYANG_MOCK 一直用)
+        // server 不可达 → 直接 wttr.in 兜底, 同样写 IDB
+        const direct = await fetchWttrDirect('沈阳');
+        if (direct) return [wttrPayloadToLocal(direct)];
         return [];
       }
     });
