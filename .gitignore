@@ -90,3 +90,12 @@ services/agent/openclaw.json.last-good
 # - PaddleOCR-VL-1.6 GGUF 模型 (892M + 841M)
 # - llama.cpp 三平台 runtime (darwin-arm64 / linux-x64 / windows-x64)
 Client/vendor/
+
+# OCR vendor 在 Server/vendor/ (1.85G, 用 Server/run.py --download-ocr 拉)
+Server/vendor/
+
+# Server OCR 独立 venv (跟 .venv-runner 分开)
+Server/.venv-ocr/
+
+# Server runner venv (跟 Client 完全独立)
+Server/.venv-runner/
