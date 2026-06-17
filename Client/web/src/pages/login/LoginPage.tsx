@@ -9,7 +9,30 @@ import { useAuthStore } from '@/stores/auth';
 import { useSonettoConfigStore } from '@/stores/sonetto-config';
 import { Spinner } from '@javis/ui-kit';
 import { LoginBackdrop } from '@/components/effects/LoginBackdrop';
+import { db } from '@/lib/db';
 import type { UserProfile } from '@/types/contracts';
+
+/**
+ * 清空所有用户数据表 — admin/admin123 本地注册时调用, 当作全新账号.
+ * 返回 { hadData } — 之前是否有数据, 用于 UI 提示.
+ */
+async function clearAllUserData(): Promise<{ hadData: boolean }> {
+  const tables = [
+    'schedules',
+    'feeds',
+    'feedItems',
+    'memories',
+    'skills',
+    'weather',
+    'systemMetrics',
+  ] as const;
+  let hadData = false;
+  for (const t of tables) {
+    if ((await db.table(t).count()) > 0) hadData = true;
+    await db.table(t).clear();
+  }
+  return { hadData };
+}
 
 const loginSchema = z.object({
   username: z.string().min(1, '请输入用户名'),
@@ -55,8 +78,28 @@ export function LoginPage() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: (data: RegisterForm) =>
-      api.post<{ access_token: string; refresh_token: string; user: UserProfile }>(
+    mutationFn: async (data: RegisterForm) => {
+      // admin/admin123 特殊路径: 不连 server, 直接本地注册, 已有数据全部清空当新账号
+      if (data.username === 'admin' && data.password === 'admin123') {
+        const { hadData } = await clearAllUserData();
+        return {
+          access_token: `admin-local-token-${Date.now()}`,
+          refresh_token: `admin-local-refresh-${Date.now()}`,
+          user: {
+            id: 'admin',
+            username: 'admin',
+            display_name: data.displayName || 'Admin',
+            role: 'admin',
+            created_at: new Date().toISOString(),
+            preferences: {},
+            face_enrolled: false,
+          } as UserProfile,
+          __isAdmin: true as const,
+          __hadData: hadData,
+        };
+      }
+      // 正常路径: 打 server 注册
+      return api.post<{ access_token: string; refresh_token: string; user: UserProfile }>(
         '/auth/register',
         {
           username: data.username,
@@ -64,8 +107,16 @@ export function LoginPage() {
           password: data.password,
           avatar: selectedAvatar || undefined,
         },
-      ),
-    onSuccess: (data) => login(data.access_token, data.refresh_token, data.user),
+      );
+    },
+    onSuccess: (data) => {
+      login(data.access_token, data.refresh_token, data.user);
+      // admin 路径: 跳过 SetupPage, 直接跳首页 (跟 dev bypass button 一致)
+      if ('__isAdmin' in data && data.__isAdmin) {
+        useSonettoConfigStore.getState().markSetupComplete();
+        window.location.href = '/';
+      }
+    },
     onError: () => setShakeKey((k) => k + 1),
   });
 
