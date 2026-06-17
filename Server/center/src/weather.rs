@@ -86,14 +86,19 @@ pub struct WeatherQuery {
 }
 
 fn default_city() -> String {
-    "上海".to_string()
+    "沈阳".to_string()
 }
+
+/// 沈阳固定坐标 (lat/lon) — openweathermap 用坐标查询更准
+const SHENYANG_LAT: f64 = 41.8057;
+const SHENYANG_LON: f64 = 123.4315;
 
 /// GET /api/weather — 给 Studio HomePage weather 磁贴用
 ///
+/// 固定城市: 沈阳 (lat 41.8057, lon 123.4315).
 /// Reads `WEATHER_API_KEY` env var. If unset, returns the static mock and
 /// logs a warning once per process. If set, calls openweathermap
-/// (`/data/2.5/weather`) and caches per-city for 5 minutes.
+/// (`/data/2.5/weather`) with lat/lon and caches for 5 minutes.
 pub async fn get_weather(
     State(_state): State<AppState>,
     Query(q): Query<WeatherQuery>,
@@ -107,7 +112,8 @@ pub async fn get_weather(
     }
 
     let cache = shared_cache();
-    if let Some(cached) = cache.get_fresh(&city) {
+    let cache_key = if city == "沈阳" { "shenyang".to_string() } else { city.clone() };
+    if let Some(cached) = cache.get_fresh(&cache_key) {
         return Ok(Json(cached));
     }
 
@@ -130,31 +136,43 @@ pub async fn get_weather(
         }
     };
 
-    cache.put(&city, payload.clone());
+    cache.put(&cache_key, payload.clone());
     Ok(Json(payload))
 }
 
 fn mock_for_city(city: &str) -> Value {
+    // 默认给沈阳天气; 其他城市 fallback 一组通用值
+    let is_shenyang = city == "沈阳";
     json!({
-        "city": city,
-        "temperature": 24,
-        "condition": "多云",
-        "humidity": 65,
-        "windSpeed": 17,
+        "city": "沈阳",
+        "temperature": if is_shenyang { -3 } else { 24 },
+        "condition": if is_shenyang { "晴" } else { "多云" },
+        "humidity": if is_shenyang { 55 } else { 65 },
+        "windSpeed": if is_shenyang { 12 } else { 17 },
         "windDirection": "S",
-        "feelsLike": 23,
-        "uvIndex": 5,
+        "feelsLike": if is_shenyang { -6 } else { 23 },
+        "uvIndex": if is_shenyang { 2 } else { 5 },
+        "lat": SHENYANG_LAT,
+        "lon": SHENYANG_LON,
         "updatedAt": chrono::Utc::now().to_rfc3339(),
         "source": "mock",
     })
 }
 
 async fn fetch_openweather(api_key: &str, city: &str) -> anyhow::Result<Value> {
-    let url = format!(
-        "https://api.openweathermap.org/data/2.5/weather?q={}&appid={}&units=metric",
-        urlencoding_simple(city),
-        api_key,
-    );
+    // 沈阳固定走 lat/lon, 其他城市保持 ?q= 兼容
+    let url = if city == "沈阳" {
+        format!(
+            "https://api.openweathermap.org/data/2.5/weather?lat={}&lon={}&appid={}&units=metric",
+            SHENYANG_LAT, SHENYANG_LON, api_key
+        )
+    } else {
+        format!(
+            "https://api.openweathermap.org/data/2.5/weather?q={}&appid={}&units=metric",
+            urlencoding_simple(city),
+            api_key,
+        )
+    };
 
     let body: serde_json::Value = reqwest::Client::builder()
         .timeout(Duration::from_secs(10))
@@ -168,7 +186,7 @@ async fn fetch_openweather(api_key: &str, city: &str) -> anyhow::Result<Value> {
 
     // openweathermap response shape:
     //   { main: {temp, feels_like, humidity}, weather: [{main, description}],
-    //     wind: {speed, deg}, name: "..." }
+    //     wind: {speed, deg}, name: "...", coord: {lat, lon} }
     let main = body.get("main").cloned().unwrap_or(json!({}));
     let temp = main.get("temp").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let feels_like = main.get("feels_like").and_then(|v| v.as_f64()).unwrap_or(temp);
@@ -193,8 +211,18 @@ async fn fetch_openweather(api_key: &str, city: &str) -> anyhow::Result<Value> {
     let resolved_city = body
         .get("name")
         .and_then(|v| v.as_str())
-        .unwrap_or(city)
+        .unwrap_or("沈阳")
         .to_string();
+    let lat = body
+        .get("coord")
+        .and_then(|c| c.get("lat"))
+        .and_then(|v| v.as_f64())
+        .unwrap_or(SHENYANG_LAT);
+    let lon = body
+        .get("coord")
+        .and_then(|c| c.get("lon"))
+        .and_then(|v| v.as_f64())
+        .unwrap_or(SHENYANG_LON);
 
     Ok(json!({
         "city": resolved_city,
@@ -205,6 +233,8 @@ async fn fetch_openweather(api_key: &str, city: &str) -> anyhow::Result<Value> {
         "windDirection": deg_to_compass(wind_deg),
         "feelsLike": feels_like,
         "uvIndex": 0,    // requires separate One Call API endpoint
+        "lat": lat,
+        "lon": lon,
         "updatedAt": chrono::Utc::now().to_rfc3339(),
         "source": "openweathermap",
     }))

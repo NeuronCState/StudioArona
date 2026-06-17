@@ -153,11 +153,11 @@ export function useWeather() {
     },
   });
   useEffect(() => {
-    sync('weather', '/api/weather', async () => {
-      const w = await api.get<Record<string, unknown>>('/api/weather');
+    sync('weather', '/api/weather?city=沈阳', async () => {
+      const w = await api.get<Record<string, unknown>>('/api/weather?city=沈阳');
       const local: LocalWeather = {
-        id: (w.city as string) ?? 'default',
-        city: (w.city as string) ?? '上海',
+        id: (w.city as string) ?? 'shenyang',
+        city: (w.city as string) ?? '沈阳',
         temperature: (w.temperature as number) ?? 0,
         condition: (w.condition as string) ?? '',
         humidity: (w.humidity as number) ?? 0,
