@@ -28,6 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # ---------- 路径 (Client/ 为 cwd) ----------
+# main.py 在 Client/services/ocr/main.py → parent.parent.parent = Client/
 VENDOR_DIR = Path(__file__).resolve().parent.parent.parent / "vendor" / "paddle-ocr"
 LLAMA_CPP_DIR = Path(__file__).resolve().parent.parent.parent / "vendor" / "llama.cpp"
 

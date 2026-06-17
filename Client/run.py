@@ -38,8 +38,8 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-REPO_ROOT = ROOT.parent
 WEB_DIR = ROOT / "web"
+OCR_DIR = ROOT / "services" / "ocr"
 SONETTO_SRC_PARENT = ROOT / ".sonetto-run"
 SONETTO_SRC_LINK = SONETTO_SRC_PARENT / "src"
 SONETTO_REQUIREMENTS = Path("/Users/zhangxuanning/Downloads/SonettoHere-main/requirements.txt")
@@ -51,8 +51,8 @@ UV_BIN = Path.home() / ".local" / "bin" / "uv"
 PY_BIN = Path.home() / ".local" / "bin" / "python3.12"
 PY_VERSION = "3.12"  # 统一项目 Python 版本 (SonettoHere requires-python >= 3.11)
 
-OCR_VENDOR_DIR = REPO_ROOT / "vendor" / "paddle-ocr"
-OCR_LLAMA_DIR = REPO_ROOT / "vendor" / "llama.cpp"
+OCR_VENDOR_DIR = ROOT / "vendor" / "paddle-ocr"
+OCR_LLAMA_DIR = ROOT / "vendor" / "llama.cpp"
 
 
 def log(msg: str) -> None:
@@ -130,7 +130,7 @@ def ensure_ocr_vendor() -> None:
         return
 
     log("OCR vendor missing, running scripts/download_ocr.sh (1.85G, 5-30 min) ...")
-    download_script = REPO_ROOT / "scripts" / "download_ocr.sh"
+    download_script = ROOT / "scripts" / "download_ocr.sh"
     if not download_script.exists():
         log(f"ERROR: {download_script} not found")
         sys.exit(1)
@@ -162,7 +162,7 @@ def spawn_ocr() -> tuple[subprocess.Popen, Path]:
     p = subprocess.Popen(
         [str(VENV_DIR / "bin" / "python"), "-m", "uvicorn", "main:app",
          "--host", "127.0.0.1", "--port", "8083"],
-        cwd=REPO_ROOT / "services" / "client_ocr",
+        cwd=OCR_DIR,
         env={**os.environ, "OCR_PORT": "8083", "OCR_LLAMA_PORT": "8082", "PYTHONUNBUFFERED": "1"},
         stdout=open(log_path, "ab"),
         stderr=subprocess.STDOUT,

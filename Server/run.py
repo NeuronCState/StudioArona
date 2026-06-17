@@ -14,7 +14,7 @@
 依赖:
     - docker (启 PG/Redis)
     - rust/cargo (启 center)
-    - python3.12 (脚本本身, 跟 Client 统一版本)
+    - python3.12 (脚本本身, 跟 Client 统一版本, 装在 Server/.venv-runner)
 """
 from __future__ import annotations
 
@@ -30,7 +30,40 @@ ROOT = Path(__file__).resolve().parent
 CENTER_DIR = ROOT / "center"
 COMPOSE_FILE = ROOT / "infra" / "compose" / "docker-compose.yml"
 LOG_DIR = ROOT / ".run-logs"
+VENV_DIR = ROOT / ".venv-runner"
+PY_VERSION = "3.12"
 LOG_DIR.mkdir(exist_ok=True)
+
+
+def ensure_runner_venv() -> Path:
+    """确保 Server/.venv-runner 存在 (首次自动建 + 装基础 deps).
+    跟 Client/.venv-sonetto 独立 — Server 没有 SonettoHere/OCR, 不依赖那些大包.
+    """
+    if VENV_DIR.exists() and (VENV_DIR / "bin" / "python3").exists():
+        return VENV_DIR / "bin" / "python3"
+
+    log("creating Server runner venv (Python 3.12) ...")
+    uv = Path.home() / ".local" / "bin" / "uv"
+    py_bin = Path.home() / ".local" / "bin" / "python3.12"
+    py_arg = str(py_bin) if py_bin.exists() else PY_VERSION
+
+    if not uv.exists():
+        log(f"ERROR: uv not at {uv}, install: curl -LsSf https://astral.sh/uv/install.sh | sh")
+        sys.exit(1)
+
+    subprocess.run([str(uv), "venv", "--python", py_arg, str(VENV_DIR)], check=True)
+
+    # 装基础 deps (Server 端可能用到的工具)
+    log("installing runner deps ...")
+    subprocess.run([
+        str(uv), "pip", "install", "--python", str(VENV_DIR / "bin" / "python3"),
+        "-i", "https://pypi.tuna.tsinghua.edu.cn/simple/",
+        "httpx",  # 给未来 SSRF / DB query 用
+        "pyyaml",
+        "rich",  # 给未来漂亮输出用
+    ], check=True)
+    log("runner venv ready")
+    return VENV_DIR / "bin" / "python3"
 
 
 def log(msg: str) -> None:
@@ -73,10 +106,15 @@ def docker_down() -> None:
 
 
 def cargo_build() -> None:
-    log("cargo build (release) ...")
+    """Build Rust center daemon (dev profile for fast iteration).
+
+    --release 因 macOS Apple Silicon 链接器 bug (mis-aligned LINKEDIT string pool) 在 sqlx 上挂,
+    改用 dev profile + 强 LTO 优化 (Cargo.toml profile.dev 已配 opt-level=3).
+    """
+    log("cargo build (dev) ...")
     log_path = LOG_DIR / "cargo-build.log"
     p = subprocess.Popen(
-        ["cargo", "build", "--release"],
+        ["cargo", "build"],
         cwd=CENTER_DIR,
         stdout=open(log_path, "wb"),
         stderr=subprocess.STDOUT,

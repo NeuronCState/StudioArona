@@ -1,3 +1,0 @@
-[submodule "services/rssany"]
-	path = services/rssany
-	url = https://github.com/joohw/rssany.git

@@ -86,6 +86,7 @@ tmp/
 services/agent/.device-identity.json
 services/agent/openclaw.json.last-good
 
-# OCR vendor — 模型 1.7G + llama.cpp runtime 154M
-# 用 ./scripts/download_ocr.sh 拉 (国内 hf-mirror.com 镜像)
-vendor/
+# OCR vendor 在 Client/vendor/ (1.85G, 用 Client/run.py --download-ocr 拉)
+# - PaddleOCR-VL-1.6 GGUF 模型 (892M + 841M)
+# - llama.cpp 三平台 runtime (darwin-arm64 / linux-x64 / windows-x64)
+Client/vendor/

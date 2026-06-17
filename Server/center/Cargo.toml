@@ -45,3 +45,14 @@ thiserror = "1"
 
 # System metrics (real CPU / mem / disk / net)
 sysinfo = "0.30"
+
+[profile.dev]
+# 接近 release 性能, 避开 macOS Apple Silicon release build 链接器 bug
+opt-level = 3
+lto = false  # release 才有 LTO, dev 关闭省时
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
