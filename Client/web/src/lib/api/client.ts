@@ -87,6 +87,19 @@ class ApiClient {
   }
 
   private async rawFetch(path: string, options: RequestInit): Promise<Response> {
+    // 本地 fake token (admin / dev bypass): 不打 server, 抛 OFFLINE 走 useApiQuery silent fail
+    // 避免 server 401 → refresh → 401 → 自动 logout 链 (用户没连 server 期望)
+    const auth = useAuthStore.getState();
+    if (auth.tokenMode === 'local') {
+      throw new ApiError('OFFLINE', 'local token, no server access', 0);
+    }
+
+    // 当前不是 online (启动默认 offline / server 真不可达): 也不打 server
+    // 让 prefetch 静默, 不触发 401 chain
+    if (useConnectionStore.getState().effectiveMode() !== 'online') {
+      throw new ApiError('OFFLINE', 'server not in online mode', 0);
+    }
+
     const token = useAuthStore.getState().accessToken;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',

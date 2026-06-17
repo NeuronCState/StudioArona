@@ -110,9 +110,12 @@ export function LoginPage() {
       );
     },
     onSuccess: (data) => {
-      login(data.access_token, data.refresh_token, data.user);
+      // admin 路径: 本地 fake token, 标记 local 模式, client.ts 跳过 server
+      // 避免 prefetch 触发 401 → refresh → 401 → 自动 logout
+      const isAdmin = '__isAdmin' in data && data.__isAdmin;
+      login(data.access_token, data.refresh_token, data.user, { local: isAdmin });
       // admin 路径: 跳过 SetupPage, 直接跳首页 (跟 dev bypass button 一致)
-      if ('__isAdmin' in data && data.__isAdmin) {
+      if (isAdmin) {
         useSonettoConfigStore.getState().markSetupComplete();
         window.location.href = '/';
       }
@@ -380,6 +383,7 @@ export function LoginPage() {
               'dev-bypass-token',
               'dev-bypass-refresh',
               { id: 'dev', username: 'dev', display_name: 'Dev User', role: 'admin', created_at: new Date().toISOString() } as any,
+              { local: true },
             );
             useSonettoConfigStore.getState().markSetupComplete();
             window.location.href = '/';

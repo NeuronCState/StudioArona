@@ -93,6 +93,7 @@ export default function App() {
         'dev-bypass-token',
         'dev-bypass-refresh',
         { id: 'dev', username: 'dev', display_name: 'Dev User', role: 'admin', created_at: new Date().toISOString() } as any,
+        { local: true },
       );
     }
     if (setupBypass && !useSonettoConfigStore.getState().setupComplete) {
