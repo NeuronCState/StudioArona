@@ -141,6 +141,21 @@ export function useSkills() {
 }
 
 /* ===== Weather (24h cache) ===== */
+
+/** 沈阳固定 fallback (没 IDB 数据 + offline 时返) — 保证首页 weather 磁贴永远有值. */
+const SHENYANG_MOCK: LocalWeather = {
+  id: 'shenyang',
+  city: '沈阳',
+  temperature: -3,
+  condition: '晴',
+  humidity: 55,
+  windSpeed: '12 km/h S',
+  windDirection: 'S',
+  feelsLike: -6,
+  uvIndex: '2 (Low)',
+  updatedAt: Date.now(),
+};
+
 export function useWeather() {
   const sync = useSync();
   const q = useQuery({
@@ -149,25 +164,32 @@ export function useWeather() {
       // weather 走 IDB 单独表 (key 为 'current', 24h 缓存)
       const all = await storageListAll<LocalWeather>('weather');
       const fresh = all.filter(w => Date.now() - w.updatedAt < 24 * 3600_000);
-      return fresh[0] ?? null;
+      // 没 IDB 缓存 (首次启动 + 没 server) → 返沈阳 mock (永远是沈阳)
+      return fresh[0] ?? SHENYANG_MOCK;
     },
+    staleTime: 24 * 3600_000, // 24h, 跟 IDB 缓存期一致
   });
   useEffect(() => {
     sync('weather', '/api/weather?city=沈阳', async () => {
-      const w = await api.get<Record<string, unknown>>('/api/weather?city=沈阳');
-      const local: LocalWeather = {
-        id: (w.city as string) ?? 'shenyang',
-        city: (w.city as string) ?? '沈阳',
-        temperature: (w.temperature as number) ?? 0,
-        condition: (w.condition as string) ?? '',
-        humidity: (w.humidity as number) ?? 0,
-        windSpeed: `${w.windSpeed ?? 0} ${w.windDirection ?? ''}`.trim(),
-        windDirection: (w.windDirection as string) ?? '',
-        feelsLike: (w.feelsLike as number) ?? 0,
-        uvIndex: `${w.uvIndex ?? 0}`,
-        updatedAt: Date.now(),
-      };
-      return [local];
+      try {
+        const w = await api.get<Record<string, unknown>>('/api/weather?city=沈阳');
+        const local: LocalWeather = {
+          id: (w.city as string) ?? 'shenyang',
+          city: (w.city as string) ?? '沈阳',
+          temperature: (w.temperature as number) ?? 0,
+          condition: (w.condition as string) ?? '',
+          humidity: (w.humidity as number) ?? 0,
+          windSpeed: `${w.windSpeed ?? 0} ${w.windDirection ?? ''}`.trim(),
+          windDirection: (w.windDirection as string) ?? '',
+          feelsLike: (w.feelsLike as number) ?? 0,
+          uvIndex: `${w.uvIndex ?? 0}`,
+          updatedAt: Date.now(),
+        };
+        return [local];
+      } catch {
+        // offline 时 fetch 失败, 不写 IDB (保留 SHENYANG_MOCK 一直用)
+        return [];
+      }
     });
   }, [sync]);
   return q;
