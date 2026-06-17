@@ -19,7 +19,8 @@
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build",
     "lint:style": "stylelint 'src/**/*.css'",
-    "chromatic": "chromatic --exit-zero-on-changes"
+    "chromatic": "chromatic --exit-zero-on-changes",
+    "dev:ocr": "cd ../../services/client_ocr && ../../Client/.venv-sonetto/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8083 --reload"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -18,6 +18,16 @@ storybook-static/
 .env.local
 .env.*.local
 
+# Mavis session workspace (本机临时, 不进 repo)
+.mavis/
+
+# Run.py runtime logs (Client/.run-logs, Server/.run-logs)
+.run-logs/
+
+# SonettoHere venv + symlink (Client/.venv-sonetto, Client/.sonetto-run)
+.venv-sonetto/
+.sonetto-run/
+
 # IDE
 .vscode/
 .idea/
@@ -75,3 +85,7 @@ infra/scripts/tmp/
 tmp/
 services/agent/.device-identity.json
 services/agent/openclaw.json.last-good
+
+# OCR vendor — 模型 1.7G + llama.cpp runtime 154M
+# 用 ./scripts/download_ocr.sh 拉 (国内 hf-mirror.com 镜像)
+vendor/

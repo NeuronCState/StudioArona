@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Upload, FileText, Download, Copy, Check, Loader2, X, File } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { api } from '@/lib/api/client';
+import { ocrParsePdf, ocrRecognizeImage, ensureOcrReady } from '@/lib/api/ocr';
 
 interface ParseResult {
   markdown: string;
@@ -16,20 +16,26 @@ export function OCRPage() {
   const [results, setResults] = useState<ParseResult[]>([]);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [selectedResultIndex, setSelectedResultIndex] = useState<number | null>(null);
+  const [loadingMsg, setLoadingMsg] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
   const parseMutation = useMutation({
     mutationFn: async (file: File) => {
-      const formData = new FormData();
       const isImage = file.type.startsWith('image/');
-      formData.append(isImage ? 'image' : 'file', file);
-      const endpoint = isImage ? '/ocr/recognize' : '/ocr/parse';
-      const response = await api.post<{ markdown: string; page_count?: number }>(
-        endpoint,
-        formData,
-      );
-      return response;
+
+      // 懒启动 OCR 引擎 (首次加载 ~30s)
+      setLoadingMsg('启动 OCR 引擎 ...');
+      await ensureOcrReady((p) => {
+        setLoadingMsg(p.message);
+      });
+
+      setLoadingMsg('OCR 处理中 ...');
+      const result = isImage
+        ? await ocrRecognizeImage(file)
+        : await ocrParsePdf(file);
+
+      return result;
     },
     onSuccess: (data, variables) => {
       const result: ParseResult = {
@@ -40,6 +46,12 @@ export function OCRPage() {
       };
       setResults((prev) => [result, ...prev]);
       setSelectedResultIndex(0);
+      setLoadingMsg('');
+    },
+    onError: (err) => {
+      setLoadingMsg('');
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`OCR 失败: ${msg}`);
     },
   });
 
@@ -93,17 +105,27 @@ export function OCRPage() {
     URL.revokeObjectURL(url);
   }, []);
 
-  const handleExportPDF = useCallback(async (result: ParseResult) => {
-    const response = await api.post<{ pdf_url: string }>(
-      '/ocr/export-pdf',
-      { markdown: result.markdown, fileName: result.fileName },
-    );
-    if (response.pdf_url) {
-      const a = document.createElement('a');
-      a.href = response.pdf_url;
-      a.download = `${result.fileName.replace('.pdf', '')}_parsed.pdf`;
-      a.click();
-    }
+  const handleExportPDF = useCallback((result: ParseResult) => {
+    // 客户端 markdown → PDF (浏览器 print API, 不依赖后端)
+    const win = window.open('', '_blank', 'width=900,height=1200');
+    if (!win) return;
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${result.fileName}</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #222; }
+  h1, h2, h3 { color: #111; margin-top: 1.5em; }
+  code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 90%; }
+  pre { background: #f5f5f5; padding: 12px; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  blockquote { border-left: 4px solid #ddd; margin: 1em 0; padding: 0 1em; color: #666; }
+  hr { border: none; border-top: 1px solid #eee; margin: 2em 0; }
+</style></head><body>
+<pre>${result.markdown.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]!)}</pre>
+</body></html>`;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 500);
   }, []);
 
   const handleClear = useCallback(() => {
@@ -205,7 +227,7 @@ export function OCRPage() {
             {parseMutation.isPending ? (
               <>
                 <Loader2 size={16} className="animate-spin" />
-                解析中...
+                {loadingMsg || '解析中...'}
               </>
             ) : (
               <>

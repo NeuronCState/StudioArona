@@ -105,6 +105,31 @@ cargo tauri build --target x86_64-unknown-linux-gnu # Linux
 - Windows: `.msi`
 - Linux: `.AppImage` + `.deb`
 
+## OCR 服务 (本地 PaddleOCR-VL)
+
+桌面应用按需启动 OCR 引擎, 不进 boot:
+
+```bash
+# Web 模式 (浏览器开发):
+cd Client/web
+pnpm dev          # Vite (前端)
+pnpm dev:ocr      # OCR FastAPI (端口 8083, 假设已下载模型到 vendor/)
+
+# 桌面模式 (Tauri):
+cargo tauri dev   # 自动 spawn SonettoHere + OCR (按需)
+```
+
+资源位置:
+- `vendor/paddle-ocr/` — PaddleOCR-VL-1.6 GGUF 模型 (1.7G)
+- `vendor/llama.cpp/{plat}/` — llama.cpp 推理 runtime (三平台: darwin-arm64 / linux-x64 / windows-x64)
+
+OCR 工作流:
+1. 用户点 `/ocr` 页 → 拖入 PDF/图片 → 点"开始解析"
+2. 前端调 Tauri command `ocr_ensure` → Rust spawn llama-server (端口 8082) + FastAPI (端口 8083)
+3. llama-server 5 秒加载模型 (macOS Metal GPU)
+4. FastAPI 把 PDF 转图片 (macOS Quartz / Linux pdftoppm), 逐页调 PaddleOCR-VL, 返 markdown
+5. **5 分钟空闲自动 kill** (释放 GPU 显存/内存, 模型 1.7G 不常驻)
+
 ## 开发命令
 
 ```bash
