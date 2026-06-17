@@ -1,4 +1,5 @@
 import { useAuthStore } from '@/stores/auth';
+import { useConnectionStore } from '@/stores/connection';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -98,14 +99,30 @@ class ApiClient {
     if (csrf && options.method && options.method !== 'GET') {
       headers['X-CSRF-Token'] = csrf;
     }
-    return fetch(`${BASE_URL}${path}`, { ...options, headers });
+
+    try {
+      return await fetch(`${BASE_URL}${path}`, { ...options, headers });
+    } catch (e) {
+      // Network error: server not reachable. Mark offline + throw ApiError('OFFLINE').
+      // 业务 page 会 catch (or useQuery 进 error state) 走本地数据; StudioServiceOffline 显示占位.
+      useConnectionStore.getState().setServerStatus('offline');
+      throw new ApiError('OFFLINE', e instanceof Error ? e.message : 'server unreachable', 0);
+    }
   }
 
   private async handleResponse<T>(res: Response): Promise<T> {
     if (!res.ok) {
+      // 5xx (server 错误 / Vite proxy 502) → 静默当 offline. 不把 HTML body 抛给上层 (避免 "Internal Server Error" 字符串).
+      if (res.status >= 500) {
+        useConnectionStore.getState().setServerStatus('offline');
+        throw new ApiError('OFFLINE', 'server unavailable', res.status);
+      }
+      // 4xx: 业务错误 (401/403/404/409). 保留 body.
       const body = await res.json().catch(() => ({}));
       throw new ApiError(body.code ?? 'UNKNOWN', body.message ?? res.statusText, res.status, body);
     }
+    // 200-299: server 在线, 标记
+    useConnectionStore.getState().setServerStatus('online');
     if (res.status === 204) return undefined as T;
     return res.json();
   }

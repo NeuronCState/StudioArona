@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { isOfflineError } from "@/lib/api/error-helpers";
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -185,7 +186,7 @@ export function StudioHomePage() {
             {schedLoading ? (
               <CardSkeleton variant="list" count={3} />
             ) : schedError ? (
-              <CardError message={schedErr?.message} onRetry={() => refetchSched()} />
+              <CardError offline={isOfflineError(schedErr)} message={schedErr?.message} onRetry={() => refetchSched()} />
             ) : (
               <ScheduleTile events={scheduleEvents} />
             )}
@@ -194,7 +195,7 @@ export function StudioHomePage() {
             {weatherLoading ? (
               <CardSkeleton variant="list" count={4} />
             ) : weatherError ? (
-              <CardError message={weatherError} onRetry={() => window.location.reload()} />
+              <CardError offline={isOfflineError(weatherError)} message={weatherError} onRetry={() => window.location.reload()} />
             ) : weather ? (
               <WeatherTile
                 city={weather.city}
@@ -225,7 +226,7 @@ export function StudioHomePage() {
                 <p className="text-xs text-stone-400">工作室服务需连接后查看</p>
               </div>
             ) : vmsError ? (
-              <CardError message={vmsErr?.message} onRetry={() => refetchVms()} />
+              <CardError offline={isOfflineError(vmsErr)} message={vmsErr?.message} onRetry={() => refetchVms()} />
             ) : (
               <SystemTile vms={vms ?? []} />
             )}
@@ -234,7 +235,7 @@ export function StudioHomePage() {
             {feedsLoading ? (
               <CardSkeleton variant="list" count={3} />
             ) : feedsError ? (
-              <CardError message={feedsErr?.message} onRetry={() => refetchFeeds()} />
+              <CardError offline={isOfflineError(feedsErr)} message={feedsErr?.message} onRetry={() => refetchFeeds()} />
             ) : (
               <RSSTile items={rssItems} />
             )}

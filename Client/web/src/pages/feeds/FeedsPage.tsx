@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { isOfflineError } from "@/lib/api/error-helpers";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, ExternalLink, Rss, Globe, Eye, Clock } from 'lucide-react';
 import { useDelayedPending } from '@/hooks/useDelayedPending';
@@ -180,7 +181,7 @@ export function FeedsPage() {
   if (isError) {
     return (
       <div className="mx-auto max-w-5xl p-6">
-        <CardError message={error?.message} onRetry={() => { refetchFeeds(); refetchMonitors(); }} />
+        <CardError offline={isOfflineError(error)} message={error?.message} onRetry={() => { refetchFeeds(); refetchMonitors(); }} />
       </div>
     );
   }

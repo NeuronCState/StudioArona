@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api/client';
 import { useAuthStore } from '@/stores/auth';
+import { useSonettoConfigStore } from '@/stores/sonetto-config';
 import { Spinner } from '@javis/ui-kit';
 import { LoginBackdrop } from '@/components/effects/LoginBackdrop';
 import type { UserProfile } from '@/types/contracts';
@@ -318,6 +319,26 @@ export function LoginPage() {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Dev mode: 离线登录 (不连 server), 仅 dev 构建显示. 写 fake token 进 localStorage 直接进首页. */}
+      {import.meta.env.DEV ? (
+        <button
+          type="button"
+          onClick={() => {
+            useAuthStore.getState().login(
+              'dev-bypass-token',
+              'dev-bypass-refresh',
+              { id: 'dev', username: 'dev', display_name: 'Dev User', role: 'admin', created_at: new Date().toISOString() } as any,
+            );
+            useSonettoConfigStore.getState().markSetupComplete();
+            window.location.href = '/';
+          }}
+          className="fixed bottom-4 right-4 z-50 rounded-full border border-stone-300 bg-white/90 px-4 py-2 text-xs font-medium text-stone-600 shadow-sm backdrop-blur-sm transition-colors hover:bg-stone-50 dark:border-stone-600 dark:bg-stone-800/90 dark:text-stone-300 dark:hover:bg-stone-700"
+          title="不需要 server, 直接进首页 (dev only)"
+        >
+          🔓 离线登录 (dev)
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isOfflineError } from "@/lib/api/error-helpers";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useDelayedPending } from '@/hooks/useDelayedPending';
@@ -79,7 +80,7 @@ function SystemTab() {
   const loading = useDelayedPending(isPending);
 
   if (loading && !data) return <div className="space-y-3">{[1, 2, 3, 4].map((i) => <Skeleton key={i} variant="rect" height={64} />)}</div>;
-  if (isError) return <CardError message={error?.message} onRetry={() => refetch()} />;
+  if (isError) return <CardError offline={isOfflineError(error)} message={error?.message} onRetry={() => refetch()} />;
   if (!data) return null;
 
   return (
@@ -263,7 +264,7 @@ function UsersTab() {
   };
 
   if (loading && !data) return <div className="space-y-2">{[1, 2, 3].map((i) => <Skeleton key={i} variant="rect" height={56} />)}</div>;
-  if (isError) return <CardError message={error?.message} onRetry={() => refetch()} />;
+  if (isError) return <CardError offline={isOfflineError(error)} message={error?.message} onRetry={() => refetch()} />;
   if (!data) return null;
 
   const onlineCount = data.filter((u) => u.online).length;

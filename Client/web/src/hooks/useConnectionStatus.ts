@@ -1,51 +1,53 @@
 import { useEffect, useRef } from 'react';
 import { useConnectionStore } from '@/stores/connection';
 
-const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL || 'http://localhost:18790';
+const CENTER_URL = import.meta.env.VITE_CENTER_URL || 'http://127.0.0.1:8080';
+const PING_INTERVAL_MS = 30_000;
+const PING_TIMEOUT_MS = 3_000;
 
 /**
- * Subscribe to connection status via SSE and initial REST fetch.
- * Place once at app root.
+ * Subscribe to server connection status via /health ping.
+ *
+ * Place once at app root. Polls every 30s, marks server 'offline' if 2 consecutive misses.
+ * Replaces the v2 EventSource-based version (which pointed at port 18790, removed in v3).
  */
 export function useConnectionStatus() {
   const setServerStatus = useConnectionStore((s) => s.setServerStatus);
-  const reconnectRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const stopRef = useRef(false);
+  const failCountRef = useRef(0);
 
   useEffect(() => {
-    let es: EventSource | null = null;
-    let stopped = false;
+    stopRef.current = false;
+    failCountRef.current = 0;
 
-    function connect() {
-      if (stopped) return;
-      es = new EventSource(`${BRIDGE_URL}/api/ui/stream`);
-
-      // Initial status fetch
-      fetch(`${BRIDGE_URL}/api/connection/status`)
-        .then((r) => r.json())
-        .then((d) => setServerStatus(d.status))
-        .catch(() => {});
-
-      es.addEventListener('connection_status', (e) => {
-        try {
-          const { status } = JSON.parse(e.data);
-          setServerStatus(status);
-        } catch {}
-      });
-
-      es.onerror = () => {
-        es?.close();
-        if (!stopped) {
-          reconnectRef.current = setTimeout(connect, 5000);
+    async function ping(): Promise<void> {
+      if (stopRef.current) return;
+      try {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), PING_TIMEOUT_MS);
+        const r = await fetch(`${CENTER_URL}/health`, { signal: ctrl.signal });
+        clearTimeout(tid);
+        if (r.ok) {
+          failCountRef.current = 0;
+          setServerStatus('online');
+        } else {
+          failCountRef.current += 1;
+          if (failCountRef.current >= 2) setServerStatus('offline');
         }
-      };
+      } catch {
+        // Network error: server not reachable
+        failCountRef.current += 1;
+        if (failCountRef.current >= 2) setServerStatus('offline');
+      }
     }
 
-    connect();
+    // initial ping, then poll
+    ping();
+    const id = setInterval(ping, PING_INTERVAL_MS);
 
     return () => {
-      stopped = true;
-      es?.close();
-      clearTimeout(reconnectRef.current);
+      stopRef.current = true;
+      clearInterval(id);
     };
   }, [setServerStatus]);
 }

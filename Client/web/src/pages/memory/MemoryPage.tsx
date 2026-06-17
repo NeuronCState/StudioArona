@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { isOfflineError } from "@/lib/api/error-helpers";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDelayedPending } from '@/hooks/useDelayedPending';
 import {
@@ -152,7 +153,7 @@ export function MemoryPage() {
   if (isError) {
     return (
       <div className="mx-auto max-w-4xl p-6">
-        <CardError message={error?.message} onRetry={() => refetch()} />
+        <CardError offline={isOfflineError(error)} message={error?.message} onRetry={() => refetch()} />
       </div>
     );
   }

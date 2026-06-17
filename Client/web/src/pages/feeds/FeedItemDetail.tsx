@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isOfflineError } from "@/lib/api/error-helpers";
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ExternalLink, Clock, FileText, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth';
@@ -121,7 +122,7 @@ export function FeedItemDetail({ feedId, onBack: _onBack }: FeedItemDetailProps)
   }
 
   if (isError) {
-    return <CardError message={error?.message ?? '加载失败'} onRetry={() => refetch()} />;
+    return <CardError offline={isOfflineError(error)} message={error?.message ?? '加载失败'} onRetry={() => refetch()} />;
   }
 
   const isMonitor = feedId.startsWith('monitor:');

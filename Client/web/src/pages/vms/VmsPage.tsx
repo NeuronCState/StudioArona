@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isOfflineError } from "@/lib/api/error-helpers";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Terminal, Server } from 'lucide-react';
 import { api } from '@/lib/api/client';
@@ -83,7 +84,7 @@ export function VmsPage() {
   if (isError) {
     return (
       <div className="mx-auto max-w-5xl p-6">
-        <CardError message={error?.message} onRetry={() => refetch()} />
+        <CardError offline={isOfflineError(error)} message={error?.message} onRetry={() => refetch()} />
       </div>
     );
   }

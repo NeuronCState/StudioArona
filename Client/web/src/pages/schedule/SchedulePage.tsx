@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isOfflineError } from "@/lib/api/error-helpers";
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar as CalendarIcon, Clock, MapPin, Plus, Pencil, X, Trash2, CalendarClock, CalendarRange, Save } from 'lucide-react';
@@ -309,7 +310,7 @@ export function SchedulePage() {
   if (isError) {
     return (
       <div className="mx-auto max-w-4xl p-6">
-        <CardError message={error?.message} onRetry={() => refetch()} />
+        <CardError offline={isOfflineError(error)} message={error?.message} onRetry={() => refetch()} />
       </div>
     );
   }

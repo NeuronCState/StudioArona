@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { isOfflineError } from "@/lib/api/error-helpers";
 import { api } from '@/lib/api/client';
 import { useLocalResource } from '@/lib/storage/useLocalResource';
 import { useAuthStore } from '@/stores/auth';
@@ -93,6 +94,7 @@ export function SharedPage() {
     return (
       <div className="mx-auto max-w-4xl p-6">
         <CardError
+          offline={isOfflineError(firstError)}
           message={firstError?.message}
           onRetry={() => { refetchFeeds(); refetchSched(); }}
         />

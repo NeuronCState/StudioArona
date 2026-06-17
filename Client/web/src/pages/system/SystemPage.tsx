@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { isOfflineError } from "@/lib/api/error-helpers";
 import { api } from '@/lib/api/client';
 import { useLocalResource } from '@/lib/storage/useLocalResource';
 import type { SystemMetrics, NetworkDevice } from '@/types/contracts';
@@ -89,6 +90,7 @@ export function SystemPage() {
     return (
       <div className="mx-auto max-w-5xl p-6">
         <CardError
+          offline={isOfflineError(error)}
           message={error?.message ?? '无法加载系统指标'}
           onRetry={() => refetch()}
         />

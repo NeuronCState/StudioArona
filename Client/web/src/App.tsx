@@ -77,10 +77,14 @@ export default function App() {
   const setupComplete = useSonettoConfigStore((s) => s.setupComplete);
   const mode = useDesignModeStore((s) => s.mode);
 
-  // Dev bypass: ?devbypass=1 直接进 home (puppeteer 截图用)
+  // Dev bypass: ?devbypass=1 直接进 home (puppeteer 截图 + 离线浏览用)
+  // ?setupbypass=1 跳过 SetupPage (SonettoHere 没配也能进)
   const devBypass =
     import.meta.env.DEV &&
     new URLSearchParams(window.location.search).get('devbypass') === '1';
+  const setupBypass =
+    devBypass ||
+    new URLSearchParams(window.location.search).get('setupbypass') === '1';
 
   // devbypass 模式强制设 authenticated (避免后续 401 自动 logout)
   useEffect(() => {
@@ -88,17 +92,20 @@ export default function App() {
       useAuthStore.getState().login(
         'dev-bypass-token',
         'dev-bypass-refresh',
-        { id: 'admin', username: 'admin', display_name: 'Admin', role: 'admin', created_at: new Date().toISOString() } as any,
+        { id: 'dev', username: 'dev', display_name: 'Dev User', role: 'admin', created_at: new Date().toISOString() } as any,
       );
     }
-  }, [devBypass, isAuthenticated]);
+    if (setupBypass && !useSonettoConfigStore.getState().setupComplete) {
+      useSonettoConfigStore.getState().markSetupComplete();
+    }
+  }, [devBypass, setupBypass, isAuthenticated]);
 
   if (!isAuthenticated && !devBypass) {
     return <LoginPage />;
   }
 
   // 注册后首次进入，显示配置引导页
-  if (!setupComplete && !devBypass) {
+  if (!setupComplete && !setupBypass) {
     return <SetupPage />;
   }
 

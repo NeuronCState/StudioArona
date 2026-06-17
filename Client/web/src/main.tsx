@@ -3,6 +3,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { useConnectionStatus } from './hooks/useConnectionStatus';
 import { createQueryClient } from './lib/query-client';
 import './styles/globals.css';
 import './styles/studio-globals.css';
@@ -19,9 +21,14 @@ async function enableMocking() {
 
 const queryClient = createQueryClient();
 
-function renderApp() {
-  ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
+/**
+ * Root wrapper — 装 useConnectionStatus 单例, 让全 App 知道 server 状态.
+ * ping 8080/health 通了才 setServerStatus('online'), 各 page 才能决定 fetch / 走本地.
+ */
+function RootWithConnection() {
+  useConnectionStatus();
+  return (
+    <ErrorBoundary scope="app">
       <QueryClientProvider client={queryClient}>
         <BrowserRouter
           future={{
@@ -32,6 +39,14 @@ function renderApp() {
           <App />
         </BrowserRouter>
       </QueryClientProvider>
+    </ErrorBoundary>
+  );
+}
+
+function renderApp() {
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <RootWithConnection />
     </React.StrictMode>,
   );
 }

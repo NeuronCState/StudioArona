@@ -28,7 +28,9 @@ export const useConnectionStore = create<ConnectionState>()(
       effectiveMode: () => {
         const { serverStatus, userMode } = get();
         if (userMode !== 'auto') return userMode;
-        if (serverStatus === 'unknown') return 'online'; // default
+        // 默认 offline: 启动时 / 不知道 server 状态时, 当 offline (本地数据为主, 不发请求)
+        // useConnectionStatus 会 ping 8080/health, 通了再 setServerStatus('online')
+        if (serverStatus === 'unknown') return 'offline';
         return serverStatus;
       },
     }),
