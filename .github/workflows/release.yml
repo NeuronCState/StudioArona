@@ -27,22 +27,18 @@ jobs:
             os: macos-latest
             target: aarch64-apple-darwin
             bundle: dmg,app
-            bins: '**/bundle/macos/*.dmg **/bundle/macos/*.app'
           - label: macos-x64
             os: macos-13
             target: x86_64-apple-darwin
             bundle: dmg,app
-            bins: '**/bundle/macos/*.dmg **/bundle/macos/*.app'
           - label: windows-x64
             os: windows-latest
             target: x86_64-pc-windows-msvc
             bundle: msi,nsis
-            bins: '**/bundle/msi/*.msi **/bundle/nsis/*.exe'
           - label: linux-x64
             os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             bundle: deb,appimage
-            bins: '**/bundle/deb/*.deb **/bundle/appimage/*.AppImage'
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -64,7 +60,7 @@ jobs:
         with:
           workspaces: ./Client/tauri -> target
 
-      - name: Linux system deps (webkit2gtk-4.1 + gtk-3 + appindicator)
+      - name: Linux system deps (webkit2gtk-4.1 + gtk-3 + appimagetool)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
@@ -74,6 +70,8 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf
+          sudo wget -q https://github.com/AppImageCommunity/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /usr/local/bin/appimagetool
+          sudo chmod +x /usr/local/bin/appimagetool
 
       - name: Build client installers
         run: cd Client && pnpm install --frozen-lockfile && pnpm dlx @tauri-apps/cli@^2 build --target ${{ matrix.target }} --bundles ${{ matrix.bundle }} --ci --no-sign
@@ -84,8 +82,8 @@ jobs:
         with:
           name: ${{ matrix.label }}-${{ github.sha }}
           path: |
-            Client/tauri/target/${{ matrix.target }}/release/${{ matrix.bins }}
-          if-no-files-found: error
+            Client/tauri/target/${{ matrix.target }}/release/bundle/**/*
+          if-no-files-found: warn
           retention-days: 90
 
   release:
