@@ -1,7 +1,7 @@
-use tauri::Manager;
-use std::sync::Mutex;
-use std::process::Command;
 use std::path::PathBuf;
+use std::process::Command;
+use std::sync::Mutex;
+use tauri::Manager;
 
 /// 共享状态：桌面 Core 后端地址 (Center Rust daemon, 端口 8080)
 struct BackendState {
@@ -20,8 +20,8 @@ struct OcrState {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let backend_url = std::env::var("BACKEND_URL")
-        .unwrap_or_else(|_| "http://127.0.0.1:8080".to_string());
+    let backend_url =
+        std::env::var("BACKEND_URL").unwrap_or_else(|_| "http://127.0.0.1:8080".to_string());
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -141,6 +141,10 @@ pub fn run() {
             ocr_parse_b64,
             ocr_recognize_b64,
             ocr_idle_kill,
+            ocr_check_update,
+            ocr_install,
+            ocr_install_status,
+            ocr_activate,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -150,19 +154,14 @@ pub fn run() {
 /// 桌面应用启动时调用, 进程后台跑, 应用关闭时 kill.
 #[cfg(desktop)]
 fn spawn_sonetto() -> Option<u32> {
-    // 1. 确保 venv 存在 (首次启动自动建 + 装依赖, 30s 一次性)
+    let root = client_root()?;
     let venv_python = ensure_sonetto_venv()?;
-
-    // 2. 找 SonettoHere 源码 (venv dir 上一级 .sonetto-run/src)
-    let venv_src = {
-        let venv_canon = venv_python.canonicalize().unwrap_or(venv_python.clone());
-        let mut d = venv_canon.parent()?; // bin/
-        d = d.parent()?; // venv dir (Client/.venv-sonetto)
-        d = d.parent()?; // Client/
-        d.join(".sonetto-run") // Client/.sonetto-run
-    };
-    if !venv_src.join("src/api/server.py").exists() {
-        log::error!("SonettoHere src not found at {}", venv_src.display());
+    let sonetto_dir = root.join("services/sonetto");
+    if !sonetto_dir.join("api/server.py").exists() {
+        log::error!(
+            "Bundled SonettoHere runtime not found at {}",
+            sonetto_dir.display()
+        );
         return None;
     }
 
@@ -181,12 +180,14 @@ fn spawn_sonetto() -> Option<u32> {
         .arg("127.0.0.1")
         .arg("--port")
         .arg("8081")
-        .current_dir(&venv_src)
+        .current_dir(&sonetto_dir)
+        .env("PYTHONPATH", &sonetto_dir)
         .env("PYTHONUNBUFFERED", "1")
         .stdout(log_file)
-        .stderr(log_stderr.unwrap_or_else(|| {
-            std::fs::File::create(&log_path).expect("create sonetto log")
-        }))
+        .stderr(
+            log_stderr
+                .unwrap_or_else(|| std::fs::File::create(&log_path).expect("create sonetto log")),
+        )
         .spawn()
         .ok()?;
 
@@ -194,10 +195,11 @@ fn spawn_sonetto() -> Option<u32> {
 }
 
 /// 确保 SonettoHere venv 存在, 首次启动自动建 + 装依赖.
-/// 用 ~/.local/bin/uv (project-local 路径), Python 3.11 (SonettoHere langchain-mcp-adapters 需要 ≥3.10).
+/// Uses the Client-local runtime and Python 3.12 environment shared with OCR.
 #[cfg(desktop)]
 fn ensure_sonetto_venv() -> Option<PathBuf> {
-    let venv_dir = PathBuf::from("../.venv-sonetto");
+    let root = client_root()?;
+    let venv_dir = root.join(".venv-sonetto");
     let venv_python = venv_dir.join("bin/python3");
 
     if venv_python.exists() {
@@ -211,8 +213,8 @@ fn ensure_sonetto_venv() -> Option<PathBuf> {
     let uv = find_uv()?;
     log::info!("uv: {}", uv.display());
 
-    // 2. 找 Python 3.11
-    let python = find_python311()?;
+    // 2. Find Python 3.12
+    let python = find_python312()?;
     log::info!("python: {}", python.display());
 
     // 3. uv venv
@@ -228,15 +230,11 @@ fn ensure_sonetto_venv() -> Option<PathBuf> {
         return None;
     }
 
-    // 4. 找 requirements.txt (硬路径, 桌面应用不依赖 symlink)
-    let req_paths = [
-        PathBuf::from("../.sonetto-run/src/requirements.txt"),
-        PathBuf::from(".sonetto-run/src/requirements.txt"),
-        PathBuf::from("/Users/zhangxuanning/Downloads/SonettoHere-main/requirements.txt"),
-    ];
-    let req = req_paths.iter().find(|p| p.exists())?.clone();
-    if !req.exists() {
-        log::error!("requirements.txt not found");
+    // 4. Install from the runtime bundled inside Client.
+    let sonetto_req = root.join("services/sonetto/requirements.txt");
+    let ocr_req = root.join("services/ocr/requirements.txt");
+    if !sonetto_req.exists() || !ocr_req.exists() {
+        log::error!("bundled requirements not found");
         return None;
     }
 
@@ -249,7 +247,9 @@ fn ensure_sonetto_venv() -> Option<PathBuf> {
         .arg("-i")
         .arg("https://pypi.tuna.tsinghua.edu.cn/simple/")
         .arg("-r")
-        .arg(&req)
+        .arg(&sonetto_req)
+        .arg("-r")
+        .arg(&ocr_req)
         .status()
         .ok()?;
     if !install_status.success() {
@@ -263,32 +263,60 @@ fn ensure_sonetto_venv() -> Option<PathBuf> {
 
 #[cfg(desktop)]
 fn find_uv() -> Option<PathBuf> {
+    let home = std::env::var_os("HOME").map(PathBuf::from);
     let candidates = [
-        PathBuf::from("/Users/zhangxuanning/.local/bin/uv"),
-        PathBuf::from("/usr/local/bin/uv"),
-        PathBuf::from("/opt/homebrew/bin/uv"),
+        home.as_ref().map(|path| path.join(".local/bin/uv")),
+        home.as_ref().map(|path| path.join(".cargo/bin/uv")),
+        Some(PathBuf::from("/usr/local/bin/uv")),
+        Some(PathBuf::from("/opt/homebrew/bin/uv")),
     ];
-    for c in candidates.iter() {
+    for c in candidates.into_iter().flatten() {
         if c.exists() {
-            return Some(c.canonicalize().unwrap_or(c.clone()));
+            return Some(c.canonicalize().unwrap_or(c));
         }
     }
     None
 }
 
 #[cfg(desktop)]
-fn find_python311() -> Option<PathBuf> {
+fn find_python312() -> Option<PathBuf> {
+    let home = std::env::var_os("HOME").map(PathBuf::from);
     let candidates = [
-        PathBuf::from("/Users/zhangxuanning/.local/bin/python3.11"),
-        PathBuf::from("/usr/local/bin/python3.11"),
-        PathBuf::from("/opt/homebrew/bin/python3.11"),
+        home.as_ref().map(|path| path.join(".local/bin/python3.12")),
+        Some(PathBuf::from("/usr/local/bin/python3.12")),
+        Some(PathBuf::from("/opt/homebrew/bin/python3.12")),
+        Some(PathBuf::from("/usr/bin/python3")),
     ];
-    for c in candidates.iter() {
+    for c in candidates.into_iter().flatten() {
         if c.exists() {
-            return Some(c.canonicalize().unwrap_or(c.clone()));
+            return Some(c.canonicalize().unwrap_or(c));
         }
     }
     None
+}
+
+/// Resolve the Client directory without a developer-specific absolute path.
+fn client_root() -> Option<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.clone());
+        if let Some(parent) = cwd.parent() {
+            candidates.push(parent.to_path_buf());
+        }
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        let mut current = exe.parent();
+        for _ in 0..6 {
+            if let Some(path) = current {
+                candidates.push(path.to_path_buf());
+                current = path.parent();
+            }
+        }
+    }
+    candidates.into_iter().find(|path| {
+        path.join("services/sonetto/api/server.py").exists()
+            && path.join("web/package.json").exists()
+    })
 }
 
 #[cfg(desktop)]
@@ -337,7 +365,8 @@ async fn get_weather(state: tauri::State<'_, BackendState>) -> Result<serde_json
 #[tauri::command]
 async fn get_me(state: tauri::State<'_, BackendState>) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
-    let resp = client.get(format!("{}/api/me", state.base_url))
+    let resp = client
+        .get(format!("{}/api/me", state.base_url))
         .send()
         .await
         .map_err(|e| e.to_string())?;
@@ -347,9 +376,12 @@ async fn get_me(state: tauri::State<'_, BackendState>) -> Result<serde_json::Val
 
 /// 获取系统信息 (admin)
 #[tauri::command]
-async fn get_system_info(state: tauri::State<'_, BackendState>) -> Result<serde_json::Value, String> {
+async fn get_system_info(
+    state: tauri::State<'_, BackendState>,
+) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
-    let resp = client.get(format!("{}/api/admin/system", state.base_url))
+    let resp = client
+        .get(format!("{}/api/admin/system", state.base_url))
         .send()
         .await
         .map_err(|e| e.to_string())?;
@@ -367,27 +399,55 @@ const OCR_IDLE_SECS: u64 = 300; // 5 分钟空闲自动 kill
 
 /// OCR 服务根目录 (StudioArona/vendor/)
 fn ocr_vendor_root() -> PathBuf {
-    let exe = std::env::current_exe().ok();
-    if let Some(exe) = exe {
-        // macOS .app: <app>.app/Contents/MacOS/<bin> → 找 ../../../../..
-        if let Ok(canon) = exe.canonicalize() {
-            let mut d = canon.parent();
-            for _ in 0..5 {
-                if let Some(p) = d {
-                    if p.join("vendor").exists() {
-                        return p.to_path_buf();
-                    }
-                    d = p.parent();
-                }
-            }
-        }
-    }
-    // Dev fallback
-    PathBuf::from("..")
+    client_root().unwrap_or_else(|| PathBuf::from(".."))
 }
 
 fn ocr_vendor_dir() -> PathBuf {
     ocr_vendor_root().join("vendor").join("paddle-ocr")
+}
+
+/// 读 vendor/paddle-ocr/current.json 找当前激活版本, 返回 (model, mmproj) 路径.
+/// 兼容旧平铺布局: vendor/paddle-ocr/PaddleOCR-VL-*-GGUF.gguf.
+/// 找不到返回 None (未安装, 前端可引导用户跑 download_ocr.sh 或 POST /api/ocr/install).
+fn ocr_current_model_paths() -> Option<(PathBuf, PathBuf)> {
+    let vendor = ocr_vendor_dir();
+    let current_json = vendor.join("current.json");
+    if let Ok(s) = std::fs::read_to_string(&current_json) {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&s) {
+            if let Some(version) = v.get("version").and_then(|x| x.as_str()) {
+                let model = vendor
+                    .join(version)
+                    .join(format!("PaddleOCR-VL-{}-GGUF.gguf", version));
+                let mmproj = vendor
+                    .join(version)
+                    .join(format!("PaddleOCR-VL-{}-GGUF-mmproj.gguf", version));
+                if model.exists() && mmproj.exists() {
+                    return Some((model, mmproj));
+                }
+            }
+        }
+    }
+    // Fallback: 旧平铺布局 — 取平铺目录里第一个匹配的 gguf
+    if let Ok(entries) = std::fs::read_dir(&vendor) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name.starts_with("PaddleOCR-VL-")
+                        && name.ends_with("-GGUF.gguf")
+                        && !name.ends_with("-mmproj.gguf")
+                    {
+                        let mmproj_name = name.replace("-GGUF.gguf", "-GGUF-mmproj.gguf");
+                        let mmproj = path.with_file_name(mmproj_name);
+                        if mmproj.exists() {
+                            return Some((path, mmproj));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 fn ocr_llama_cpp_dir() -> PathBuf {
@@ -406,7 +466,6 @@ fn ocr_python_path() -> Option<PathBuf> {
     let candidates = [
         ocr_vendor_root().join(".venv-sonetto/bin/python3"),
         ocr_vendor_root().join(".venv-sonetto/bin/python"),
-        PathBuf::from("/Users/zhangxuanning/StudioArona/Client/.venv-sonetto/bin/python3"),
     ];
     candidates.into_iter().find(|p| p.exists())
 }
@@ -480,43 +539,62 @@ async fn ocr_ensure(state: tauri::State<'_, OcrState>) -> Result<serde_json::Val
 
     let vendor = ocr_vendor_dir();
     let llama_dir = ocr_llama_cpp_dir();
-    let plat = platform_key().ok_or_else(|| format!("Unsupported platform: {}-{}", std::env::consts::OS, std::env::consts::ARCH))?;
+    let plat = platform_key().ok_or_else(|| {
+        format!(
+            "Unsupported platform: {}-{}",
+            std::env::consts::OS,
+            std::env::consts::ARCH
+        )
+    })?;
 
-    let llama_server = llama_dir.join(plat).join(if cfg!(windows) { "llama-server.exe" } else { "llama-server" });
+    let llama_server = llama_dir.join(plat).join(if cfg!(windows) {
+        "llama-server.exe"
+    } else {
+        "llama-server"
+    });
     if !llama_server.exists() {
-        return Err(format!("llama-server not found at {}", llama_server.display()));
+        return Err(format!(
+            "llama-server not found at {}",
+            llama_server.display()
+        ));
     }
 
-    let model = vendor.join("PaddleOCR-VL-1.6-GGUF.gguf");
-    let mmproj = vendor.join("PaddleOCR-VL-1.6-GGUF-mmproj.gguf");
-    if !model.exists() {
-        return Err(format!("OCR model not found at {}", model.display()));
-    }
-    if !mmproj.exists() {
-        return Err(format!("OCR mmproj not found at {}", mmproj.display()));
-    }
+    let (model, mmproj) = ocr_current_model_paths().ok_or_else(|| {
+        format!(
+            "OCR model not installed. Run `bash scripts/download_ocr.sh 1.6` or POST /api/ocr/install {{\"version\": \"1.6\"}} from OCR page. Looked under: {}",
+            vendor.display()
+        )
+    })?;
 
     // 1. 启 llama-server
     let llama_log = ocr_log_path("ocr-llama.log");
     let llama_log_file = std::fs::OpenOptions::new()
-        .create(true).append(true).open(&llama_log)
+        .create(true)
+        .append(true)
+        .open(&llama_log)
         .map_err(|e| format!("open llama log: {}", e))?;
     let llama_stderr = llama_log_file.try_clone().ok();
 
     let llama_child = Command::new(&llama_server)
         .args([
-            "-m", model.to_str().unwrap(),
-            "--mmproj", mmproj.to_str().unwrap(),
-            "--port", &OCR_LLAMA_PORT.to_string(),
-            "--host", "127.0.0.1",
-            "-ngl", "99",
+            "-m",
+            model.to_str().unwrap(),
+            "--mmproj",
+            mmproj.to_str().unwrap(),
+            "--port",
+            &OCR_LLAMA_PORT.to_string(),
+            "--host",
+            "127.0.0.1",
+            "-ngl",
+            "99",
         ])
         .env("DYLD_LIBRARY_PATH", llama_dir.join(plat))
         .env("LD_LIBRARY_PATH", llama_dir.join(plat))
         .stdout(llama_log_file)
-        .stderr(llama_stderr.unwrap_or_else(|| {
-            std::fs::File::create(&llama_log).expect("create llama log")
-        }))
+        .stderr(
+            llama_stderr
+                .unwrap_or_else(|| std::fs::File::create(&llama_log).expect("create llama log")),
+        )
         .spawn()
         .map_err(|e| format!("spawn llama-server: {}", e))?;
 
@@ -529,61 +607,102 @@ async fn ocr_ensure(state: tauri::State<'_, OcrState>) -> Result<serde_json::Val
     for _ in 0..60 {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         let url = format!("http://127.0.0.1:{}/health", OCR_LLAMA_PORT);
-        if reqwest::get(&url).await.map(|r| r.status().is_success()).unwrap_or(false) {
+        if reqwest::get(&url)
+            .await
+            .map(|r| r.status().is_success())
+            .unwrap_or(false)
+        {
             ready = true;
             break;
         }
     }
     if !ready {
         kill_pid(llama_pid);
-        return Err(format!("llama-server failed to start within 60s, see {}", llama_log.display()));
+        return Err(format!(
+            "llama-server failed to start within 60s, see {}",
+            llama_log.display()
+        ));
     }
 
-    // 3. 启 fastapi
-    let python = ocr_python_path().ok_or_else(|| "Python venv not found (.venv-sonetto/bin/python3)".to_string())?;
-    let ocr_main = ocr_vendor_root().join("services/client_ocr/main.py");
+    // 3. 启 fastapi (复用 helper, install/update 也要起 fastapi 但不起 llama-server)
+    let fastapi_pid = ocr_ensure_fastapi(&state).await?;
+
+    Ok(serde_json::json!({
+        "status": "ready",
+        "started": true,
+        "llama_pid": llama_pid,
+        "fastapi_pid": fastapi_pid,
+        "load_secs_estimate": 30,
+    }))
+}
+
+/// 仅起 fastapi (不起 llama-server). 给 install/update/activate 命令复用.
+/// 已起着就直接返回 pid.
+async fn ocr_ensure_fastapi(state: &tauri::State<'_, OcrState>) -> Result<u32, String> {
+    if ocr_ping_fastapi().await {
+        if let Ok(guard) = state.fastapi_pid.lock() {
+            if let Some(pid) = *guard {
+                return Ok(pid);
+            }
+        }
+        // ping 通了但没记 pid — 重新启一个 (会冲突端口, 让它失败就好)
+    }
+
+    let python = ocr_python_path()
+        .ok_or_else(|| "Python venv not found (.venv-sonetto/bin/python3)".to_string())?;
+    let ocr_main = ocr_vendor_root().join("services/ocr/main.py");
     if !ocr_main.exists() {
         return Err(format!("OCR main.py not found at {}", ocr_main.display()));
     }
 
     let fastapi_log = ocr_log_path("ocr-fastapi.log");
     let fastapi_log_file = std::fs::OpenOptions::new()
-        .create(true).append(true).open(&fastapi_log)
+        .create(true)
+        .append(true)
+        .open(&fastapi_log)
         .map_err(|e| format!("open fastapi log: {}", e))?;
     let fastapi_stderr = fastapi_log_file.try_clone().ok();
 
-    let fastapi_child = Command::new(&python)
-        .args(["-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", &OCR_FASTAPI_PORT.to_string(), "--log-level", "info"])
-        .current_dir(ocr_vendor_root().join("services/client_ocr"))
-        .env("OCR_LLAMA_PORT", OCR_LLAMA_PORT.to_string())
-        .env("OCR_PORT", OCR_FASTAPI_PORT.to_string())
-        .env("PYTHONUNBUFFERED", "1")
-        .stdout(fastapi_log_file)
-        .stderr(fastapi_stderr.unwrap_or_else(|| {
-            std::fs::File::create(&fastapi_log).expect("create fastapi log")
-        }))
-        .spawn()
-        .map_err(|e| format!("spawn fastapi: {}", e))?;
+    let fastapi_child =
+        Command::new(&python)
+            .args([
+                "-m",
+                "uvicorn",
+                "main:app",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                &OCR_FASTAPI_PORT.to_string(),
+                "--log-level",
+                "info",
+            ])
+            .current_dir(ocr_vendor_root().join("services/ocr"))
+            .env("OCR_LLAMA_PORT", OCR_LLAMA_PORT.to_string())
+            .env("OCR_PORT", OCR_FASTAPI_PORT.to_string())
+            .env("PYTHONUNBUFFERED", "1")
+            .stdout(fastapi_log_file)
+            .stderr(fastapi_stderr.unwrap_or_else(|| {
+                std::fs::File::create(&fastapi_log).expect("create fastapi log")
+            }))
+            .spawn()
+            .map_err(|e| format!("spawn fastapi: {}", e))?;
 
     let fastapi_pid = fastapi_child.id();
     *state.fastapi_pid.lock().unwrap() = Some(fastapi_pid);
     log::info!("OCR fastapi spawned, pid={}", fastapi_pid);
 
-    // 4. 等 fastapi /health
+    // 等 fastapi /health (最多 15s)
     for _ in 0..30 {
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         if ocr_ping_fastapi().await {
-            return Ok(serde_json::json!({
-                "status": "ready",
-                "started": true,
-                "llama_pid": llama_pid,
-                "fastapi_pid": fastapi_pid,
-                "load_secs_estimate": 30,
-            }));
+            return Ok(fastapi_pid);
         }
     }
 
-    Err(format!("fastapi failed to start, see {}", fastapi_log.display()))
+    Err(format!(
+        "fastapi failed to start within 15s, see {}",
+        fastapi_log.display()
+    ))
 }
 
 #[tauri::command]
@@ -703,4 +822,115 @@ async fn ocr_recognize_b64(
 async fn ocr_idle_kill(state: tauri::State<'_, OcrState>) -> Result<serde_json::Value, String> {
     kill_ocr_processes(&state);
     Ok(serde_json::json!({"status": "killed"}))
+}
+
+// ============================================================
+// OCR 模型管理 (可选安装 + 升级)
+// 前端: 调这些 command → Rust 代理到 fastapi (同时按需启 fastapi)
+// ============================================================
+
+fn ocr_fastapi_url(path: &str) -> String {
+    format!("http://127.0.0.1:{}{}", OCR_FASTAPI_PORT, path)
+}
+
+#[tauri::command]
+async fn ocr_check_update(state: tauri::State<'_, OcrState>) -> Result<serde_json::Value, String> {
+    // 更新 last_used (install 期间也算"用了 OCR 服务")
+    if let Ok(mut guard) = state.last_used.lock() {
+        *guard = Some(std::time::Instant::now());
+    }
+    ocr_ensure_fastapi(&state).await?;
+    let resp = reqwest::get(ocr_fastapi_url("/api/ocr/check-update"))
+        .await
+        .map_err(|e| format!("check-update: {}", e))?;
+    let status = resp.status();
+    let json: serde_json::Value = resp.json().await.map_err(|e| format!("parse: {}", e))?;
+    if !status.is_success() {
+        return Err(format!("check-update failed ({}): {:?}", status, json));
+    }
+    Ok(json)
+}
+
+#[tauri::command]
+async fn ocr_install(
+    state: tauri::State<'_, OcrState>,
+    version: String,
+) -> Result<serde_json::Value, String> {
+    if let Ok(mut guard) = state.last_used.lock() {
+        *guard = Some(std::time::Instant::now());
+    }
+    ocr_ensure_fastapi(&state).await?;
+    let resp = reqwest::Client::new()
+        .post(ocr_fastapi_url("/api/ocr/install"))
+        .json(&serde_json::json!({"version": version, "activate": true}))
+        .send()
+        .await
+        .map_err(|e| format!("install: {}", e))?;
+    let status = resp.status();
+    let json: serde_json::Value = resp.json().await.map_err(|e| format!("parse: {}", e))?;
+    if !status.is_success() {
+        return Err(format!("install failed ({}): {:?}", status, json));
+    }
+    Ok(json)
+}
+
+#[tauri::command]
+async fn ocr_install_status(
+    state: tauri::State<'_, OcrState>,
+    job_id: String,
+) -> Result<serde_json::Value, String> {
+    if let Ok(mut guard) = state.last_used.lock() {
+        *guard = Some(std::time::Instant::now());
+    }
+    ocr_ensure_fastapi(&state).await?;
+    let resp = reqwest::get(ocr_fastapi_url(&format!(
+        "/api/ocr/install/status?job_id={}",
+        urlencoding_minimal(&job_id)
+    )))
+    .await
+    .map_err(|e| format!("install status: {}", e))?;
+    let status = resp.status();
+    let json: serde_json::Value = resp.json().await.map_err(|e| format!("parse: {}", e))?;
+    if !status.is_success() {
+        return Err(format!("install status failed ({}): {:?}", status, json));
+    }
+    Ok(json)
+}
+
+#[tauri::command]
+async fn ocr_activate(
+    state: tauri::State<'_, OcrState>,
+    version: String,
+) -> Result<serde_json::Value, String> {
+    if let Ok(mut guard) = state.last_used.lock() {
+        *guard = Some(std::time::Instant::now());
+    }
+    ocr_ensure_fastapi(&state).await?;
+    let resp = reqwest::Client::new()
+        .post(ocr_fastapi_url("/api/ocr/activate"))
+        .json(&serde_json::json!({"version": version}))
+        .send()
+        .await
+        .map_err(|e| format!("activate: {}", e))?;
+    let status = resp.status();
+    let json: serde_json::Value = resp.json().await.map_err(|e| format!("parse: {}", e))?;
+    if !status.is_success() {
+        return Err(format!("activate failed ({}): {:?}", status, json));
+    }
+    Ok(json)
+}
+
+/// 轻量 URL 编码 (只处理 job_id 可能的特殊字符, 不引 urlencoding crate)
+fn urlencoding_minimal(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '~') {
+            out.push(c);
+        } else {
+            for b in c.to_string().as_bytes() {
+                out.push_str(&format!("%{:02X}", b));
+            }
+        }
+    }
+    out
 }

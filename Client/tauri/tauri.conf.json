@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../web/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "cd /Users/zhangxuanning/StudioArona/Client/web && pnpm dev",
-    "beforeBuildCommand": "cd /Users/zhangxuanning/StudioArona/Client/web && pnpm build"
+    "beforeDevCommand": "cd ../web && pnpm dev",
+    "beforeBuildCommand": "cd ../web && pnpm build"
   },
   "app": {
     "windows": [
