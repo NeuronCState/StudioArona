@@ -62,55 +62,58 @@ open http://localhost:5173
 ## 目录结构
 
 ```
-StudioArona/                     # v3 monorepo
-├── README.md                    # 本文件
-├── .gitignore                   # vendor/ + node_modules/ + .venv/ 等排除
+StudioArona/                              # v3 monorepo (471 files / ~3.5 MB)
+├── README.md                             # 本文件
+├── .env.example                          # dev env 模板 (无敏感信息)
+├── .env.production.template              # production env 模板 (所有 secret 是 CHANGE_ME)
+├── .gitignore
+├── .gitattributes
 │
-├── Client/                      # 用户终端 — 前端 + 桌面壳
-│   ├── README.md                # Client 详情
-│   ├── run.py                   # 一键启动: venv + SonettoHere + OCR + Vite
-│   ├── web/                     # React + TS + Vite SPA
-│   │   └── src/
-│   │       ├── pages/           # 14 页面 (home/feeds/memory/schedule/...)
-│   │       ├── components/      # agent/ + studio/ + ui-kit + motion
-│   │       ├── stores/          # zustand: auth/session/sonetto-config/...
-│   │       └── lib/             # api/ + db/ + storage/ + sync/
-│   ├── tauri/                   # Rust 桌面壳
-│   │   └── src/lib.rs           # spawn SonettoHere + OCR (lazy)
-│   ├── packages/ui-kit/         # 共享 React 组件
-│   └── .venv-sonetto/           # Python 3.12 venv (首次启动自动建)
+├── .github/                              # CI workflows
+│   ├── PULL_REQUEST_TEMPLATE.md
+│   └── workflows/
+│       ├── nightly.yml                   # 每日 e2e/contract/security scan (过期, 引用旧 services/ 结构)
+│       ├── pr.yml                        # PR 流水线 (过期, 同上)
+│       └── release.yml                   # 多平台 release (macOS arm64+x64 + Windows + Linux)
 │
-├── Server/                      # 中心服务
-│   ├── README.md                # Server 详情
-│   ├── PROGRESS.md              # Server 开发日志
-│   ├── run.py                   # 一键启动: docker (PG/Redis) + cargo
-│   ├── center/                  # Rust center daemon
-│   │   └── src/
-│   │       ├── main.rs          # 20 endpoint 路由
-│   │       ├── auth.rs          # JWT (15min access + 7d refresh)
-│   │       ├── schedule.rs      # 乐观锁 PATCH
-│   │       ├── rss.rs           # RSS cron 5min
-│   │       ├── weather.rs       # OpenWeatherMap + wttr.in fallback
-│   │       ├── skills.rs        # marketplace install/uninstall
-│   │       └── memory.rs / vms.rs
-│   └── infra/
-│       ├── compose/docker-compose.yml  # postgres:16 + redis:7-alpine
-│       └── db/versions/         # 13 表 SQL migrations
+├── Client/                               # 用户端 — 前端 + Tauri 桌面壳 (409 files)
+│   ├── README.md
+│   ├── package.json + pnpm-lock.yaml + pnpm-workspace.yaml
+│   ├── run.py                            # 一键启动: venv + SonettoHere + OCR + Vite
+│   ├── packages/ui-kit/                  # 共享 React 组件 (Avatar, Button, Card, Dialog, ...)
+│   ├── services/
+│   │   ├── sonetto/                      # SonettoHere agent 运行时 (内置, 首次启动 uv venv + 装 deps)
+│   │   └── ocr/                          # OCR FastAPI 包装
+│   ├── tauri/                            # Tauri v2 桌面壳 (25 files)
+│   │   ├── Cargo.toml + Cargo.lock
+│   │   ├── tauri.conf.json
+│   │   ├── capabilities/default.json     # 权限: dialog/notification/shell/fs/scope=Documents/studioarona
+│   │   ├── icons/                        # .icns + .ico + 各种 png
+│   │   └── src/{main.rs, lib.rs}         # spawn SonettoHere + OCR (lazy, 5min 空闲 kill)
+│   └── web/                              # React + TS + Vite SPA (229 files)
+│       └── src/{pages, components, stores, lib, hooks, mocks, ...}
 │
-├── services/
-│   └── client_ocr/              # OCR 服务 (Python FastAPI)
-│       └── main.py              # PaddleOCR-VL 包装 + PDF→image (macOS Quartz)
-│
-├── scripts/
-│   └── download_ocr.sh          # OCR 资源下载 (hf-mirror + ghfast.top 镜像)
-│
-├── vendor/                      # OCR 资源 (1.85G, .gitignore 排除)
-│   ├── paddle-ocr/              # PaddleOCR-VL-1.6 GGUF (892M + 841M)
-│   └── llama.cpp/{plat}/        # 三平台 llama-server + .dylib/.so/.dll
-│
-├── Client/docs/                 # 客户端文档
-└── Server/docs/                 # 服务端文档
+└── Server/                               # 中心服务 (58 files)
+    ├── README.md
+    ├── run.py                            # 一键启动: docker (PG/Redis) + cargo run
+    ├── center/                           # Rust axum center daemon
+    │   ├── Cargo.toml + Cargo.lock
+    │   ├── src/                          # 20 endpoint: auth/schedule/rss/memory/skills/vms/weather/...
+    │   └── tests/                        # integration_http/isolation/round_trip/runtime_fixes
+    ├── infra/
+    │   ├── compose/docker-compose.yml    # postgres:16 + redis:7-alpine
+    │   └── db/versions/                  # 16 SQL migrations
+    ├── scripts/download_ocr.sh           # OCR 资源下载 (1.85G, hf-mirror 镜像)
+    └── services/ocr/                     # FastAPI OCR 服务 (PaddleOCR-VL-1.6 + llama.cpp)
 ```
+
+**运行时数据 (`.gitignore` 排除, 不在 repo 里)**:
+- `Client/.venv-sonetto/` — Python 3.12 venv (首次启动自动建, 装 SonettoHere + OCR deps)
+- `Client/vendor/` + `Server/vendor/` — OCR 模型 (1.85G, 首次 `python3 run.py --download-ocr` 拉)
+- `Client/web/dist/` — Vite build 产物 (Tauri build 时自动 build)
+- `Client/tauri/target/` — Rust 编译产物
+- `Server/center/target/` — Rust 编译产物
+- `Client/.run-logs/` + `Server/.run-logs/` — 运行时日志
 
 ---
 
@@ -251,7 +254,7 @@ v3.1 起, Agent 框架从 Hermes 切换到 SonettoHere (LangGraph ReAct).
 
 **Provider 配置**: Client `ProfileSettingsDialog` + `SetupPage` 用 SonettoHere schema 推 4 preset (minimax-cn / openai-test / deepseek / custom).
 
-**SonettoHere 运行时**: `Client/services/sonetto`。根目录副本仅用于上游参考，不参与启动.
+**SonettoHere 运行时**: `Client/services/sonetto` (内置于 Client, 首次启动 `uv venv` + `uv pip install` 清华源, ~30s 一次性).
 
 ---
 
@@ -261,7 +264,7 @@ v3.1 起, Agent 框架从 Hermes 切换到 SonettoHere (LangGraph ReAct).
 视觉: PaddleOCR-VL-1.6-GGUF-mmproj.gguf (841M)
 API: OpenAI 兼容 `/v1/chat/completions`
 
-**资源位置**: `vendor/paddle-ocr/*.gguf` + `vendor/llama.cpp/{plat}/*` (`.gitignore` 排除)
+**资源位置**: `Client/vendor/paddle-ocr/*.gguf` + `Client/vendor/llama.cpp/{plat}/*` (`.gitignore` 排除, 首次 `python3 Client/run.py --download-ocr` 拉)
 **首次下载**: `python3 Client/run.py --download-ocr` (1.85G, 5-30min)
 
 **桌面模式 (Tauri)**: 
