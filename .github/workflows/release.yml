@@ -76,14 +76,7 @@ jobs:
             patchelf
 
       - name: Build client installers
-        run: |
-          cd Client
-          pnpm install --frozen-lockfile
-          pnpm dlx @tauri-apps/cli@^2 build \
-            --target ${{ matrix.target }} \
-            --bundles ${{ matrix.bundle }} \
-            --ci \
-            --no-sign
+        run: cd Client && pnpm install --frozen-lockfile && pnpm dlx @tauri-apps/cli@^2 build --target ${{ matrix.target }} --bundles ${{ matrix.bundle }} --ci --no-sign
 
       - name: Upload installers
         if: success()
