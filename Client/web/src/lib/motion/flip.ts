@@ -1,4 +1,4 @@
-import { DURATION, EASING, bezierCSS } from './tokens';
+import { DURATION, EASING, bezierCSS } from "./tokens";
 
 /**
  * FLIP morph: smoothly animate `to` from the position/size of `from`.
@@ -25,13 +25,13 @@ export function flipMorph(from: HTMLElement, to: HTMLElement): Animation {
         transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`,
       },
       {
-        transform: 'translate(0, 0) scale(1, 1)',
+        transform: "translate(0, 0) scale(1, 1)",
       },
     ],
     {
       duration: DURATION.base,
       easing: bezierCSS(EASING.out),
-      fill: 'both',
+      fill: "both",
     },
   );
 }
@@ -39,8 +39,11 @@ export function flipMorph(from: HTMLElement, to: HTMLElement): Animation {
 /**
  * Convenience: call flipMorph then hide `from` when the animation finishes.
  */
-export async function flipReplace(from: HTMLElement, to: HTMLElement): Promise<void> {
+export async function flipReplace(
+  from: HTMLElement,
+  to: HTMLElement,
+): Promise<void> {
   const anim = flipMorph(from, to);
   await anim.finished;
-  from.style.display = 'none';
+  from.style.display = "none";
 }

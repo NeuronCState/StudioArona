@@ -1,31 +1,44 @@
-# Server/center/
+# Studio Arona Center
 
-**v3 Linux 中心 daemon** (Phase 3, 2 周) — 工作室协作能力后端。
+`center` 是 Studio Arona Server 当前唯一的主后端实现：一个独立运行的 Rust axum daemon，默认监听 `:8080`。
 
-跟 `desktop-core` 物理分离: 跑在工作室 Linux 工作站, 桌面 app 通过 HTTP/JWT 连过来。
+完整架构、API、环境变量、已知限制和启动方式见 [Server README](../README.md)。后续开发与验收要求见 [WORK_REQUIREMENTS.md](../WORK_REQUIREMENTS.md)。
 
 ## 职责
 
-| 能力 | 实现 |
-|---|---|
-| 跨用户 RSS 聚合 + 推送 | RSS daemon + email |
-| VM 编排 (libvirt / VirtualBox) | virt API |
-| NAS 用户系统 (配额 + 权限) | PG schema |
-| HomeAssistant 网关 (LAN 设备控制) | long-lived HTTP client |
-| 摄像头 / 人脸识别 (ONNX Runtime) | ONNX Runtime (可选) |
-| 反向 WebSocket (推送 ha_event/notification/vm_status) | axum WS + JWT |
-| 跨用户 skill/memory 同步 | sqlx + alembic-style migrations |
+- JWT 认证与多用户数据隔离。
+- 日程、Memory、RSS、网页监控和 Skill 安装元数据。
+- RSS/网页定时抓取。
+- SSE 与站内通知。
+- 可选 SMTP 离线邮件。
+- 天气、系统指标和开发阶段 VM mock。
 
-## 部署
+SonettoHere 不运行在 Center 中；它由 Client 在用户终端独立运行。
 
-- 单独 `studioarona-center` Rust 二进制
-- 监听 `:9000` (HTTP API) + `:9001` (WebSocket)
-- systemd unit 开机自启
-- 用 docker PG + Redis (跟桌面 app 共享同一份数据)
+## 开发
 
-## 跟 desktop-core 边界
+```bash
+cd Server/center
 
-- **desktop-core** 是个人的: 跑在用户终端, 单 user_id, 离线可用
-- **center** 是工作室的: 跑在 LAN server, 多 user_id, 永远在线
-- desktop-core 通过 `center-client` (Rust crate) 调 center HTTP API
-- center 不依赖 desktop-core, 它独立 axum 服务
+cargo run
+cargo fmt --check
+cargo test
+cargo clippy --all-targets -- -D warnings
+cargo build
+```
+
+数据库迁移通过 `sqlx::migrate!("../infra/db/versions")` 在启动时自动执行。
+
+## 当前状态
+
+Center 可以编译，但尚未达到生产验收标准。当前主要缺口包括：
+
+- IPv6 loopback SSRF 防护失败。
+- RSS 新条目没有通知和邮件闭环。
+- 网页摘要不是智能变化摘要。
+- 自定义 Skill 内容和 Sonetto 配置不能同步。
+- SSE presence 与邮箱验证不完整。
+- Marketplace 仍是静态 mock。
+- 缺少 PostgreSQL 集成测试。
+
+不要根据路由存在与否判断功能完成度，应以 [WORK_REQUIREMENTS.md](../WORK_REQUIREMENTS.md) 的最终验收标准为准。

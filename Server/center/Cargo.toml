@@ -4,11 +4,23 @@ version = "0.1.0"
 edition = "2021"
 description = "Studio Arona 中心 daemon — 协作与扩展能力"
 
+[lib]
+name = "studio_arona_center"
+path = "src/lib.rs"
+
+[[bin]]
+name = "studio-arona-center"
+path = "src/main.rs"
+
 [dependencies]
 # Web framework
 axum = { version = "0.7", features = ["macros", "http2"] }
 tower = "0.5"
 tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Async stream (for SSE) + broadcast for in-process event bus
+tokio-stream = "0.1"
+async-stream = "0.3"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -25,6 +37,11 @@ bcrypt = "0.15"
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 
+# AEAD encryption (P1#2 — agent_secrets at-rest encryption)
+aes-gcm = "0.10"
+base64 = "0.22"
+rand = "0.8"
+
 # Async
 tokio = { version = "1", features = ["full"] }
 futures = "0.3"
@@ -32,8 +49,27 @@ futures = "0.3"
 # HTTP client
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
-# RSS XML parsing
+# RSS / Atom XML parsing
 rss = "2"
+atom_syndication = "0.12"
+
+# URL parsing (SSRF guard)
+url = "2"
+
+# SMTP client (notification email fallback)
+lettre = { version = "0.11", default-features = false, features = ["builder", "rustls-tls", "tokio1-rustls", "smtp-transport"] }
+
+# HTML parsing + CSS selector (for page monitor)
+scraper = "0.20"
+
+# Stable content hash (DefaultHasher is not stable across rustc versions)
+sha2 = "0.10"
+
+# OnceCell for compiled regexes
+once_cell = "1"
+
+# Regex for HTML noise stripping
+regex = "1"
 
 # Logging
 tracing = "0.1"
@@ -45,6 +81,14 @@ thiserror = "1"
 
 # System metrics (real CPU / mem / disk / net)
 sysinfo = "0.30"
+
+[dev-dependencies]
+# P3#3: 集成测试 — 跑真实 PG 验证业务逻辑 (隔离矩阵 / 乐观锁 / outbox / SKIP LOCKED).
+# 用独立 test database (uuid 后缀), 测完 drop. 不引入 testcontainers, 复用 docker compose 起的 PG.
+tokio = { version = "1", features = ["full", "test-util", "macros"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tower = "0.5"
+axum = { version = "0.7", features = ["macros", "http2"] }
 
 [profile.dev]
 # 接近 release 性能, 避开 macOS Apple Silicon release build 链接器 bug

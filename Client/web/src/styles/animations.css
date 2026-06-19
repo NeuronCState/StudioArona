@@ -5,64 +5,127 @@
 
 /* ---------- Fade ---------- */
 @keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes fade-out {
-  from { opacity: 1; }
-  to   { opacity: 0; }
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 /* ---------- Slide ---------- */
 @keyframes slide-up {
-  from { opacity: 0; transform: translate3d(0, 12px, 0); }
-  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
 @keyframes slide-down {
-  from { opacity: 0; transform: translate3d(0, -12px, 0); }
-  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+  from {
+    opacity: 0;
+    transform: translate3d(0, -12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
 @keyframes slide-in-right {
-  from { opacity: 0; transform: translate3d(16px, 0, 0); }
-  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+  from {
+    opacity: 0;
+    transform: translate3d(16px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
 @keyframes slide-out-right {
-  from { opacity: 1; transform: translate3d(0, 0, 0); }
-  to   { opacity: 0; transform: translate3d(16px, 0, 0); }
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(16px, 0, 0);
+  }
 }
 
 /* ---------- Scale ---------- */
 @keyframes scale-in {
-  from { opacity: 0; transform: scale(0.96); }
-  to   { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes scale-out {
-  from { opacity: 1; transform: scale(1); }
-  to   { opacity: 0; transform: scale(0.96); }
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
 }
 
 /* ---------- Shake ---------- */
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  10%, 50%, 90% { transform: translateX(-4px); }
-  30%, 70% { transform: translateX(4px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  10%,
+  50%,
+  90% {
+    transform: translateX(-4px);
+  }
+  30%,
+  70% {
+    transform: translateX(4px);
+  }
 }
 
 /* ---------- Pulse (attract attention, NOT continuous) ---------- */
 @keyframes pulse-attention {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.04); }
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
 }
 
 /* ---------- Home ambient drift (compositor only) ---------- */
 @keyframes home-ambient-drift {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to   { transform: translate3d(-2%, -1%, 0) scale(1.04); }
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-2%, -1%, 0) scale(1.04);
+  }
 }
 
 /* ---------- Transition Utility Classes ---------- */
@@ -88,19 +151,36 @@
   animation: slide-up var(--duration-base) var(--ease-out) forwards;
 }
 
-.motion-stagger > *:nth-child(1) { animation-delay: 0ms; }
-.motion-stagger > *:nth-child(2) { animation-delay: 60ms; }
-.motion-stagger > *:nth-child(3) { animation-delay: 120ms; }
-.motion-stagger > *:nth-child(4) { animation-delay: 180ms; }
-.motion-stagger > *:nth-child(5) { animation-delay: 240ms; }
-.motion-stagger > *:nth-child(6) { animation-delay: 300ms; }
-.motion-stagger > *:nth-child(7) { animation-delay: 360ms; }
-.motion-stagger > *:nth-child(8) { animation-delay: 420ms; }
+.motion-stagger > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.motion-stagger > *:nth-child(2) {
+  animation-delay: 60ms;
+}
+.motion-stagger > *:nth-child(3) {
+  animation-delay: 120ms;
+}
+.motion-stagger > *:nth-child(4) {
+  animation-delay: 180ms;
+}
+.motion-stagger > *:nth-child(5) {
+  animation-delay: 240ms;
+}
+.motion-stagger > *:nth-child(6) {
+  animation-delay: 300ms;
+}
+.motion-stagger > *:nth-child(7) {
+  animation-delay: 360ms;
+}
+.motion-stagger > *:nth-child(8) {
+  animation-delay: 420ms;
+}
 
 /* ---------- Card hover/press micro-interactions ---------- */
 .motion-lift {
-  transition: transform var(--duration-fast) var(--ease-out),
-              box-shadow var(--duration-fast) var(--ease-out);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .motion-lift:hover {

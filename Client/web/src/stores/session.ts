@@ -1,6 +1,6 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
-export type WakeState = 'idle' | 'waking' | 'active' | 'leaving';
+export type WakeState = "idle" | "waking" | "active" | "leaving";
 
 export interface SessionSummary {
   id: string;
@@ -23,7 +23,7 @@ interface SessionState {
 }
 
 export const useSessionStore = create<SessionState>()((set) => ({
-  wakeState: 'idle',
+  wakeState: "idle",
   currentSessionId: null,
   sidebarCollapsed: false,
   sessions: [],
@@ -31,11 +31,12 @@ export const useSessionStore = create<SessionState>()((set) => ({
   setCurrentSessionId: (currentSessionId) => set({ currentSessionId }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSessions: (sessions) => set({ sessions }),
-  addSession: (session) =>
-    set((s) => ({ sessions: [session, ...s.sessions] })),
+  addSession: (session) => set((s) => ({ sessions: [session, ...s.sessions] })),
   renameSession: (id, title) =>
     set((s) => ({
-      sessions: s.sessions.map((sess) => (sess.id === id ? { ...sess, title } : sess)),
+      sessions: s.sessions.map((sess) =>
+        sess.id === id ? { ...sess, title } : sess,
+      ),
     })),
   removeSession: (id) =>
     set((s) => ({ sessions: s.sessions.filter((sess) => sess.id !== id) })),

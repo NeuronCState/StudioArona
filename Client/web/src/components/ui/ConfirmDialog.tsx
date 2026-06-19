@@ -12,9 +12,9 @@
  *     onClose={() => setShowConfirm(false)}
  *   />
  */
-import { Dialog } from '@javis/ui-kit';
-import { motion } from 'framer-motion';
-import { AlertTriangle } from 'lucide-react';
+import { Dialog } from "@javis/ui-kit";
+import { motion } from "framer-motion";
+import { AlertTriangle } from "lucide-react";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -36,22 +36,35 @@ export function ConfirmDialog({
   onConfirm,
   title,
   description,
-  confirmLabel = '确认',
-  cancelLabel = '取消',
+  confirmLabel = "确认",
+  cancelLabel = "取消",
   destructive = false,
   loading = false,
 }: ConfirmDialogProps) {
   return (
-    <Dialog open={open} onClose={onClose} title={title} description={description}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={title}
+      description={description}
+    >
       <div className="flex flex-col gap-4">
         {destructive && (
           <motion.div
             initial={{ scale: 0, rotate: -45 }}
             animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 22, delay: 0.05 }}
+            transition={{
+              type: "spring",
+              stiffness: 400,
+              damping: 22,
+              delay: 0.05,
+            }}
             className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 dark:bg-red-500/10"
           >
-            <AlertTriangle size={22} className="text-red-600 dark:text-red-400" />
+            <AlertTriangle
+              size={22}
+              className="text-red-600 dark:text-red-400"
+            />
           </motion.div>
         )}
 
@@ -70,11 +83,11 @@ export function ConfirmDialog({
             disabled={loading}
             className={
               destructive
-                ? 'rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500 disabled:opacity-50'
-                : 'rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500 disabled:opacity-50'
+                ? "rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500 disabled:opacity-50"
+                : "rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500 disabled:opacity-50"
             }
           >
-            {loading ? '处理中...' : confirmLabel}
+            {loading ? "处理中..." : confirmLabel}
           </button>
         </div>
       </div>

@@ -1,39 +1,53 @@
-import { useState } from 'react';
-import { isOfflineError } from "@/lib/api/error-helpers";
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Calendar as CalendarIcon, Clock, MapPin, Plus, Pencil, X, Trash2, CalendarClock, CalendarRange, Save } from 'lucide-react';
-import { api } from '@/lib/api/client';
-import { useLocalResource } from '@/lib/storage/useLocalResource';
-import { EmptyState, Button, Badge, Skeleton, CardError } from '@javis/ui-kit';
-import { cn } from '@/lib/utils';
-import { motion as m } from '@/lib/motion';
-import { Drawer } from '@/components/ui/Drawer';
-import { Calendar as CalendarPicker } from '@/components/ui/Calendar';
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Calendar as CalendarIcon,
+  Clock,
+  MapPin,
+  Plus,
+  Pencil,
+  X,
+  Trash2,
+  CalendarClock,
+  CalendarRange,
+  Save,
+} from "lucide-react";
+import { useLocalResource } from "@/lib/storage/useLocalResource";
+import {
+  scheduleResourceConfig,
+  type ScheduleDocument,
+} from "@/lib/resources/schedules";
+import {
+  EmptyState,
+  Button,
+  Badge,
+  Skeleton,
+  CardError,
+  OfflineBanner,
+} from "@javis/ui-kit";
+import { cn } from "@/lib/utils";
+import { motion as m } from "@/lib/motion";
+import { Drawer } from "@/components/ui/Drawer";
+import { Calendar as CalendarPicker } from "@/components/ui/Calendar";
 
-interface ScheduleEvent {
-  id: string;
-  title: string;
-  body?: string;
-  starts_at: string;
-  location?: string;
-  source: string;
-  serverId?: string | null;
-  dirty?: boolean;
-  updatedAt?: number;
-}
+type ScheduleEvent = ScheduleDocument;
 
 function toISOLocal(datetimeLocal: string): string {
-  if (!datetimeLocal) return '';
-  const d = new Date(datetimeLocal.includes('T') && !datetimeLocal.includes('Z') ? datetimeLocal + ':00' : datetimeLocal);
-  return isNaN(d.getTime()) ? '' : d.toISOString();
+  if (!datetimeLocal) return "";
+  const d = new Date(
+    datetimeLocal.includes("T") && !datetimeLocal.includes("Z")
+      ? datetimeLocal + ":00"
+      : datetimeLocal,
+  );
+  return isNaN(d.getTime()) ? "" : d.toISOString();
 }
 
 function toDatetimeLocal(iso: string): string {
-  if (!iso) return '';
+  if (!iso) return "";
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
@@ -52,7 +66,11 @@ function groupByDate(events: ScheduleEvent[]) {
   const groups: Record<string, ScheduleEvent[]> = {};
   for (const e of events) {
     const d = new Date(e.starts_at);
-    const key = d.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' });
+    const key = d.toLocaleDateString("zh-CN", {
+      month: "long",
+      day: "numeric",
+      weekday: "short",
+    });
     (groups[key] ??= []).push(e);
   }
   return groups;
@@ -69,28 +87,39 @@ function ScheduleEventForm({
   onSubmit,
   onCancel,
   isPending,
-  submitLabel = '保存',
+  submitLabel = "保存",
 }: {
   initialDate?: string; // ISO date (yyyy-mm-dd)
-  initialEvent?: { title: string; body?: string; starts_at: string; location?: string };
-  onSubmit: (data: { title: string; body: string; starts_at: string; location: string }) => void;
+  initialEvent?: {
+    title: string;
+    body?: string;
+    starts_at: string;
+    location?: string;
+  };
+  onSubmit: (data: {
+    title: string;
+    body: string;
+    starts_at: string;
+    location: string;
+  }) => void;
   onCancel: () => void;
   isPending: boolean;
   submitLabel?: string;
 }) {
   // 右侧表单 state
-  const [title, setTitle] = useState(initialEvent?.title ?? '');
-  const [body, setBody] = useState(initialEvent?.body ?? '');
+  const [title, setTitle] = useState(initialEvent?.title ?? "");
+  const [body, setBody] = useState(initialEvent?.body ?? "");
   const [startsAt, setStartsAt] = useState(() => {
     if (initialEvent?.starts_at) return toDatetimeLocal(initialEvent.starts_at);
     if (initialDate) return `${initialDate}T09:00`;
-    return '';
+    return "";
   });
-  const [location, setLocation] = useState(initialEvent?.location ?? '');
+  const [location, setLocation] = useState(initialEvent?.location ?? "");
 
   // 左侧日历选中的日期 (单独 state, 不直接绑 startsAt)
   const [selectedDate, setSelectedDate] = useState<string | null>(() => {
-    if (initialEvent?.starts_at) return toDatetimeLocal(initialEvent.starts_at).split('T')[0];
+    if (initialEvent?.starts_at)
+      return toDatetimeLocal(initialEvent.starts_at).split("T")[0];
     if (initialDate) return initialDate;
     return null;
   });
@@ -98,7 +127,8 @@ function ScheduleEventForm({
   const handleCalendarChange = (iso: string) => {
     setSelectedDate(iso);
     // 选新日期时, 保留时间(若有), 换日期部分
-    const oldTime = startsAt && startsAt.includes('T') ? startsAt.split('T')[1] : '09:00';
+    const oldTime =
+      startsAt && startsAt.includes("T") ? startsAt.split("T")[1] : "09:00";
     setStartsAt(`${iso}T${oldTime}`);
   };
 
@@ -109,11 +139,18 @@ function ScheduleEventForm({
       {/* 左侧: 大日历 */}
       <div className="flex flex-col border-b border-stone-700/50 p-6 md:border-b-0 md:border-r">
         <div className="mb-4">
-          <h3 className="font-serif text-base font-semibold text-stone-100">选择日期</h3>
+          <h3 className="font-serif text-base font-semibold text-stone-100">
+            选择日期
+          </h3>
           <p className="mt-1 text-xs text-stone-400">
             {selectedDate
-              ? new Date(selectedDate).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
-              : '点日历选一天'}
+              ? new Date(selectedDate).toLocaleDateString("zh-CN", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  weekday: "long",
+                })
+              : "点日历选一天"}
           </p>
         </div>
         <div className="flex-1">
@@ -129,7 +166,9 @@ function ScheduleEventForm({
       {/* 右侧: 详情表单 */}
       <div className="flex flex-col p-6">
         <div className="mb-6 flex items-center justify-between">
-          <h3 className="font-serif text-base font-semibold text-stone-100">日程详情</h3>
+          <h3 className="font-serif text-base font-semibold text-stone-100">
+            日程详情
+          </h3>
           <button
             onClick={onCancel}
             className="rounded-md p-1.5 text-stone-400 hover:bg-stone-800 hover:text-stone-100 transition-colors"
@@ -162,7 +201,7 @@ function ScheduleEventForm({
               value={startsAt}
               onChange={(e) => {
                 setStartsAt(e.target.value);
-                const datePart = e.target.value.split('T')[0];
+                const datePart = e.target.value.split("T")[0];
                 if (datePart) setSelectedDate(datePart);
               }}
               className="w-full rounded-lg border border-stone-700 bg-stone-800/60 px-3 py-2 text-sm text-stone-100 transition-colors focus:border-amber-500 focus:outline-none scheme-dark"
@@ -174,7 +213,10 @@ function ScheduleEventForm({
               地点
             </label>
             <div className="relative">
-              <MapPin size={12} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
+              <MapPin
+                size={12}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-500"
+              />
               <input
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
@@ -231,43 +273,29 @@ function ScheduleEventForm({
 }
 
 export function SchedulePage() {
-  const [view, setView] = useState<'upcoming' | 'all'>('upcoming');
+  const [view, setView] = useState<"upcoming" | "all">("upcoming");
   const [showAdd, setShowAdd] = useState(false);
-  const [addInitialDate, setAddInitialDate] = useState<string | undefined>(undefined);
-
-  const {
-    data: events,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: ['schedules', view],
-    queryFn: () =>
-      api.get<ScheduleEvent[]>(`/schedules${view === 'upcoming' ? '?upcoming=true' : ''}`),
-  });
+  const [addInitialDate, setAddInitialDate] = useState<string | undefined>(
+    undefined,
+  );
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editInitialEvent, setEditInitialEvent] = useState<ScheduleEvent | null>(null);
+  const [editInitialEvent, setEditInitialEvent] =
+    useState<ScheduleEvent | null>(null);
 
   // 本地优先 — ScheduleEvent 写 storage (Tauri fs / IDB), online 时 push server
   // (FeedsPage / MemoryPage / Skills 同 pattern — 1-7 收官后陆续 follow)
-  const localSchedules = useLocalResource<ScheduleEvent>({
-    table: 'schedules',
-    queryKey: ['schedules', view, 'local'],
-    serverList: () =>
-      api.get<ScheduleEvent[]>(`/schedules${view === 'upcoming' ? '?upcoming=true' : ''}`),
-    serverPush: (doc) => api.post<ScheduleEvent>('/schedules', {
-      title: doc.title,
-      body: doc.body,
-      starts_at: doc.starts_at,
-      location: doc.location,
-    }),
-    serverRemove: (id) => api.delete(`/schedules/${id}`),
-  });
+  const localSchedules = useLocalResource(scheduleResourceConfig(view));
+  const { data: events, isPending, isError, refetch } = localSchedules.query;
+  const { isOffline } = localSchedules;
 
   const addMutation = useMutation({
-    mutationFn: async (data: { title: string; body: string; starts_at: string; location: string }) => {
+    mutationFn: async (data: {
+      title: string;
+      body: string;
+      starts_at: string;
+      location: string;
+    }) => {
       const id = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       return localSchedules.save({
         id,
@@ -275,7 +303,7 @@ export function SchedulePage() {
         body: data.body,
         starts_at: data.starts_at,
         location: data.location,
-        source: 'local',
+        source: "local",
       });
     },
     onSuccess: () => {
@@ -285,7 +313,16 @@ export function SchedulePage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; title: string; body?: string; starts_at: string; location?: string }) => {
+    mutationFn: async ({
+      id,
+      ...data
+    }: {
+      id: string;
+      title: string;
+      body?: string;
+      starts_at: string;
+      location?: string;
+    }) => {
       const existing = (localSchedules.data ?? []).find((e) => e.id === id);
       if (!existing) return;
       return localSchedules.save({ ...existing, ...data });
@@ -305,12 +342,12 @@ export function SchedulePage() {
     setEditInitialEvent(e);
   }
 
-  if (isLoading) return <ScheduleSkeleton />;
+  if (isPending) return <ScheduleSkeleton />;
 
   if (isError) {
     return (
       <div className="mx-auto max-w-4xl p-6">
-        <CardError offline={isOfflineError(error)} message={error?.message} onRetry={() => refetch()} />
+        <CardError message="数据加载失败" onRetry={() => refetch()} />
       </div>
     );
   }
@@ -319,9 +356,17 @@ export function SchedulePage() {
 
   return (
     <div className="studio-page mx-auto max-w-5xl space-y-6 p-6">
+      {isOffline ? (
+        <OfflineBanner
+          message="未连接 server, 显示本地日程数据"
+          onRetry={() => refetch()}
+        />
+      ) : null}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-stone-400">Schedule</p>
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-stone-400">
+            Schedule
+          </p>
           <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[var(--color-text-primary)]">
             日程计划
           </h2>
@@ -330,32 +375,46 @@ export function SchedulePage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => { setAddInitialDate(undefined); setShowAdd(true); }} className="btn-primary gap-2">
+          <button
+            onClick={() => {
+              setAddInitialDate(undefined);
+              setShowAdd(true);
+            }}
+            className="btn-primary gap-2"
+          >
             <Plus size={16} />
             添加日程
           </button>
           <div className="relative inline-flex rounded-full bg-white/60 p-1 shadow-[var(--shadow-1)]">
-            {([
-              { id: 'upcoming' as const, label: '即将到来', Icon: CalendarClock },
-              { id: 'all' as const, label: '全部', Icon: CalendarRange },
-            ]).map(({ id, label, Icon }) => {
+            {[
+              {
+                id: "upcoming" as const,
+                label: "即将到来",
+                Icon: CalendarClock,
+              },
+              { id: "all" as const, label: "全部", Icon: CalendarRange },
+            ].map(({ id, label, Icon }) => {
               const active = view === id;
               return (
                 <button
                   key={id}
                   onClick={() => setView(id)}
                   className={cn(
-                    'relative z-10 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                    "relative z-10 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
                     active
-                      ? 'text-white'
-                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+                      ? "text-white"
+                      : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]",
                   )}
                 >
                   {active && (
                     <motion.span
                       layoutId="scheduleViewPill"
                       className="absolute inset-0 rounded-full bg-[var(--color-accent)] shadow-[var(--shadow-1)]"
-                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 380,
+                        damping: 30,
+                      }}
                     />
                   )}
                   <Icon size={12} className="relative z-10" />
@@ -370,7 +429,10 @@ export function SchedulePage() {
       {/* 新建日程全屏 sheet */}
       <Drawer
         open={showAdd}
-        onClose={() => { setShowAdd(false); setAddInitialDate(undefined); }}
+        onClose={() => {
+          setShowAdd(false);
+          setAddInitialDate(undefined);
+        }}
         from="top"
         variant="sheet"
         title="新建日程"
@@ -378,7 +440,10 @@ export function SchedulePage() {
         <ScheduleEventForm
           initialDate={addInitialDate}
           onSubmit={(data) => addMutation.mutate(data)}
-          onCancel={() => { setShowAdd(false); setAddInitialDate(undefined); }}
+          onCancel={() => {
+            setShowAdd(false);
+            setAddInitialDate(undefined);
+          }}
           isPending={addMutation.isPending}
           submitLabel="添加到日程"
         />
@@ -387,7 +452,10 @@ export function SchedulePage() {
       {/* 编辑日程全屏 sheet */}
       <Drawer
         open={editingId !== null}
-        onClose={() => { setEditingId(null); setEditInitialEvent(null); }}
+        onClose={() => {
+          setEditingId(null);
+          setEditInitialEvent(null);
+        }}
         from="top"
         variant="sheet"
         title="编辑日程"
@@ -399,7 +467,10 @@ export function SchedulePage() {
               if (!editingId) return;
               updateMutation.mutate({ id: editingId, ...data });
             }}
-            onCancel={() => { setEditingId(null); setEditInitialEvent(null); }}
+            onCancel={() => {
+              setEditingId(null);
+              setEditInitialEvent(null);
+            }}
             isPending={updateMutation.isPending}
             submitLabel="保存"
           />
@@ -413,14 +484,23 @@ export function SchedulePage() {
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: m.duration.fast / 1000, ease: m.easing.out }}
+            transition={{
+              duration: m.duration.fast / 1000,
+              ease: m.easing.out,
+            }}
           >
             <EmptyState
               icon={<CalendarIcon size={40} />}
               title="暂无日程"
-              description={'对阿洛娜说「帮我安排xxx」，我会自动创建日程。'}
+              description={"对阿洛娜说「帮我安排xxx」，我会自动创建日程。"}
               action={
-                <Button size="sm" onClick={() => { setAddInitialDate(undefined); setShowAdd(true); }}>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setAddInitialDate(undefined);
+                    setShowAdd(true);
+                  }}
+                >
                   添加日程
                 </Button>
               }
@@ -432,7 +512,10 @@ export function SchedulePage() {
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: m.duration.fast / 1000, ease: m.easing.out }}
+            transition={{
+              duration: m.duration.fast / 1000,
+              ease: m.easing.out,
+            }}
             className="space-y-8"
           >
             {Object.entries(grouped).map(([date, items]) => (
@@ -443,21 +526,24 @@ export function SchedulePage() {
                 <div className="space-y-2">
                   {items.map((event) => {
                     const d = new Date(event.starts_at);
-                    const time = d.toLocaleTimeString('zh-CN', {
-                      hour: '2-digit',
-                      minute: '2-digit',
+                    const time = d.toLocaleTimeString("zh-CN", {
+                      hour: "2-digit",
+                      minute: "2-digit",
                     });
                     const isPast = d.getTime() < Date.now();
                     return (
                       <div
                         key={event.id}
                         className={cn(
-                          'group flex items-start gap-4 rounded-[24px] border bg-[var(--color-surface-glass)] p-4 shadow-[var(--shadow-1)] backdrop-blur-xl',
-                          isPast && 'opacity-50',
+                          "group flex items-start gap-4 rounded-[24px] border bg-[var(--color-surface-glass)] p-4 shadow-[var(--shadow-1)] backdrop-blur-xl",
+                          isPast && "opacity-50",
                         )}
                       >
                         <div className="flex flex-col items-center pt-0.5">
-                          <Clock size={14} className="text-[var(--color-text-muted)]" />
+                          <Clock
+                            size={14}
+                            className="text-[var(--color-text-muted)]"
+                          />
                           <span className="mt-1 text-xs font-medium text-[var(--color-text-secondary)]">
                             {time}
                           </span>
@@ -467,7 +553,9 @@ export function SchedulePage() {
                             <p className="text-sm font-medium text-[var(--color-text-primary)]">
                               {event.title}
                             </p>
-                            {event.source === 'agent' && <Badge variant="accent">Arona</Badge>}
+                            {event.source === "agent" && (
+                              <Badge variant="accent">Arona</Badge>
+                            )}
                           </div>
                           {event.body && (
                             <p className="mt-1 text-xs text-[var(--color-text-secondary)] line-clamp-2">
@@ -482,14 +570,20 @@ export function SchedulePage() {
                           )}
                         </div>
                         <button
-                          onClick={(ev) => { ev.stopPropagation(); startEdit(event); }}
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            startEdit(event);
+                          }}
                           className="shrink-0 rounded-lg p-1.5 text-[var(--color-text-muted)] opacity-0 hover:bg-[var(--color-bg)] hover:text-[var(--color-accent)] group-hover:opacity-100 transition-all"
                           title="编辑"
                         >
                           <Pencil size={14} />
                         </button>
                         <button
-                          onClick={(ev) => { ev.stopPropagation(); deleteMutation.mutate(event.id); }}
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            deleteMutation.mutate(event.id);
+                          }}
                           className="shrink-0 rounded-lg p-1.5 text-[var(--color-text-muted)] opacity-0 hover:bg-[var(--color-bg)] hover:text-[var(--color-error)] group-hover:opacity-100 transition-all"
                           title="删除"
                         >

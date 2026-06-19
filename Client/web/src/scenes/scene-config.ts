@@ -31,28 +31,28 @@ export interface ScenePreset {
 }
 
 export const CLASSROOM_PRESET: ScenePreset = {
-  label: '教室',
+  label: "教室",
   lighting: {
     day: {
       sunPosition: [8, 12, 4],
-      sunColor: '#fff5e6',
+      sunColor: "#fff5e6",
       sunIntensity: 1.2,
-      ambientColor: '#b8d4f0',
+      ambientColor: "#b8d4f0",
       ambientIntensity: 0.4,
-      skyColor: '#87CEEB',
+      skyColor: "#87CEEB",
     },
     night: {
       sunPosition: [3, 2, -4],
-      sunColor: '#8899cc',
+      sunColor: "#8899cc",
       sunIntensity: 0.15,
-      ambientColor: '#1a1a3e',
+      ambientColor: "#1a1a3e",
       ambientIntensity: 0.08,
-      skyColor: '#0d0d2b',
+      skyColor: "#0d0d2b",
     },
   },
   models: {
-    day: '/assets/scenes/classroom-day.glb',
-    night: '/assets/scenes/classroom-night.glb',
+    day: "/assets/scenes/classroom-day.glb",
+    night: "/assets/scenes/classroom-night.glb",
   },
 };
 
@@ -64,12 +64,12 @@ export const SCENE_REGISTRY: Record<string, ScenePreset> = {
 /** Get lighting preset for a scene + time */
 export function getLighting(
   scene: string,
-  time: 'day' | 'night',
+  time: "day" | "night",
 ): LightingPreset {
   return SCENE_REGISTRY[scene]?.lighting[time] ?? CLASSROOM_PRESET.lighting.day;
 }
 
 /** Get model path for a scene + time */
-export function getModelPath(scene: string, time: 'day' | 'night'): string {
+export function getModelPath(scene: string, time: "day" | "night"): string {
   return SCENE_REGISTRY[scene]?.models[time] ?? CLASSROOM_PRESET.models.day;
 }

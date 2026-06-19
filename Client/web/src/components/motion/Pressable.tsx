@@ -9,31 +9,41 @@
  *
  * variant: card | button | ghost
  */
-import { motion, type HTMLMotionProps } from 'framer-motion'
-import { motion as m } from '../../lib/motion'
+import { motion, type HTMLMotionProps } from "framer-motion";
+import { motion as m } from "../../lib/motion";
 
-type Variant = 'card' | 'button' | 'ghost'
+type Variant = "card" | "button" | "ghost";
 
-interface PressableProps extends HTMLMotionProps<'div'> {
-  variant?: Variant
+interface PressableProps extends HTMLMotionProps<"div"> {
+  variant?: Variant;
   /** 强制 active 视觉（route 高亮、selected 项） */
-  active?: boolean
+  active?: boolean;
 }
 
 const variantHover = {
-  card: { y: -2, scale: 1.005, transition: { duration: m.duration.base / 1000, ease: m.easing.out } },
-  button: { scale: 1.02, transition: { duration: m.duration.fast / 1000, ease: m.easing.out } },
-  ghost: { scale: 1.01, transition: { duration: m.duration.fast / 1000, ease: m.easing.out } },
-} as const
+  card: {
+    y: -2,
+    scale: 1.005,
+    transition: { duration: m.duration.base / 1000, ease: m.easing.out },
+  },
+  button: {
+    scale: 1.02,
+    transition: { duration: m.duration.fast / 1000, ease: m.easing.out },
+  },
+  ghost: {
+    scale: 1.01,
+    transition: { duration: m.duration.fast / 1000, ease: m.easing.out },
+  },
+} as const;
 
 const variantTap = {
   card: { scale: 0.99, y: 0 },
   button: { scale: 0.97 },
   ghost: { scale: 0.985 },
-} as const
+} as const;
 
 export function Pressable({
-  variant = 'card',
+  variant = "card",
   active,
   className,
   children,
@@ -45,10 +55,10 @@ export function Pressable({
       whileTap={variantTap[variant]}
       animate={active ? { scale: 1 } : undefined}
       className={className}
-      data-active={active ? 'true' : undefined}
+      data-active={active ? "true" : undefined}
       {...rest}
     >
       {children}
     </motion.div>
-  )
+  );
 }

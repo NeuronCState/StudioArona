@@ -1,6 +1,6 @@
-import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { motion as m } from '@/lib/motion';
+import { motion } from "framer-motion";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { motion as m } from "@/lib/motion";
 
 /**
  * FocusToggle — 收回指示条
@@ -28,7 +28,7 @@ export function FocusToggle({ visible, open, onToggle }: FocusToggleProps) {
       <motion.button
         type="button"
         onClick={onToggle}
-        aria-label={open ? '收起专注侧栏' : '展开专注侧栏'}
+        aria-label={open ? "收起专注侧栏" : "展开专注侧栏"}
         aria-expanded={open}
         initial={{ opacity: 0, x: -8 }}
         animate={{ opacity: 1, x: 0 }}

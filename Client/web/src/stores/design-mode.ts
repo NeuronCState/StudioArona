@@ -1,7 +1,7 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
-export type DesignMode = 'arona' | 'studio';
+export type DesignMode = "arona" | "studio";
 
 interface DesignModeState {
   mode: DesignMode;
@@ -12,10 +12,11 @@ interface DesignModeState {
 export const useDesignModeStore = create<DesignModeState>()(
   persist(
     (set) => ({
-      mode: 'studio',
+      mode: "studio",
       setMode: (mode) => set({ mode }),
-      toggleMode: () => set((state) => ({ mode: state.mode === 'arona' ? 'studio' : 'arona' })),
+      toggleMode: () =>
+        set((state) => ({ mode: state.mode === "arona" ? "studio" : "arona" })),
     }),
-    { name: 'studio-arona-design-mode' },
+    { name: "studio-arona-design-mode" },
   ),
 );

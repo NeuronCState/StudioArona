@@ -13,8 +13,9 @@
  *
  * 旧 Hermes 字段保留为 deprecated, 留 type 兼容, 不再 emit (3 字段都是 Hermes 私有)
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSonettoConfigStore } from '@/stores/sonetto-config';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSonettoConfigStore } from "@/stores/sonetto-config";
+import { useAuthStore } from "@/stores/auth";
 
 // ============================================================
 // Types — SonettoHere 事件 schema
@@ -27,7 +28,7 @@ export interface AgentAttachment {
   uri: string;
   size: number;
   mimeType: string;
-  kind?: 'file' | 'folder';
+  kind?: "file" | "folder";
   /** 内部 file ref (Web 端用) */
   file?: File;
 }
@@ -37,14 +38,14 @@ export interface AgentToolCall {
   name: string;
   input: string;
   output?: string;
-  status: 'running' | 'done' | 'error';
+  status: "running" | "done" | "error";
   startedAt: number;
   endedAt?: number;
 }
 
 export interface AgentMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   createdAt: number;
   attachments?: AgentAttachment[];
@@ -56,6 +57,19 @@ export interface AgentMessage {
   toolCalls?: AgentToolCall[];
   /** 上下文用量 (server 推 context_usage) */
   contextUsage?: { used: number; max: number; percent: number; model: string };
+}
+
+interface SonettoEventPayload {
+  token?: string;
+  tool_name?: string;
+  input?: string;
+  output?: string;
+  content?: string;
+  used?: number;
+  max?: number;
+  percent?: number;
+  model?: string;
+  message?: string;
 }
 
 export interface UseAgentChat {
@@ -80,7 +94,10 @@ function nextId(prefix: string): string {
 
 function humanizeNetworkError(err: unknown, baseUrl: string): string {
   if (err instanceof Error) {
-    if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+    if (
+      err.message.includes("Failed to fetch") ||
+      err.message.includes("NetworkError")
+    ) {
       return `连不上 SonettoHere (${baseUrl})。请确认已运行 SonettoHere, 或检查端口是否被防火墙挡住。`;
     }
     return err.message;
@@ -92,11 +109,14 @@ function humanizeNetworkError(err: unknown, baseUrl: string): string {
 // Hook
 // ============================================================
 
-const DEFAULT_SONETTO_BASE_URL = 'http://127.0.0.1:8081';
+const DEFAULT_SONETTO_BASE_URL = "http://127.0.0.1:8081";
 const PROBE_TIMEOUT_MS = 3000;
+const CENTER_BASE_URL =
+  import.meta.env.VITE_CENTER_BASE_URL || "http://127.0.0.1:8080";
 
 export function useAgentChat(): UseAgentChat {
-  const { sonettoBaseUrl: storeBaseUrl, getActiveProvider } = useSonettoConfigStore();
+  const { sonettoBaseUrl: storeBaseUrl, getActiveProvider } =
+    useSonettoConfigStore();
   const sonettoBaseUrl = storeBaseUrl || DEFAULT_SONETTO_BASE_URL;
 
   const [messages, setMessages] = useState<AgentMessage[]>([]);
@@ -116,7 +136,9 @@ export function useAgentChat(): UseAgentChat {
     const ac = new AbortController();
     const timer = window.setTimeout(() => ac.abort(), PROBE_TIMEOUT_MS);
     try {
-      const res = await fetch(`${sonettoBaseUrl}/api/health`, { signal: ac.signal });
+      const res = await fetch(`${sonettoBaseUrl}/api/health`, {
+        signal: ac.signal,
+      });
       setSonettoReady(res.ok);
     } catch {
       setSonettoReady(false);
@@ -134,7 +156,9 @@ export function useAgentChat(): UseAgentChat {
   // --------------------------------------------------------
   const finalizeMessage = useCallback(
     (id: string, patch: Partial<AgentMessage>) => {
-      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch, pending: false } : m)));
+      setMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, ...patch, pending: false } : m)),
+      );
     },
     [],
   );
@@ -148,18 +172,15 @@ export function useAgentChat(): UseAgentChat {
     );
   }, []);
 
-  const addToolCall = useCallback(
-    (messageId: string, tool: AgentToolCall) => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? { ...m, toolCalls: [...(m.toolCalls ?? []), tool] }
-            : m,
-        ),
-      );
-    },
-    [],
-  );
+  const addToolCall = useCallback((messageId: string, tool: AgentToolCall) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? { ...m, toolCalls: [...(m.toolCalls ?? []), tool] }
+          : m,
+      ),
+    );
+  }, []);
 
   // --------------------------------------------------------
   // Send: 走 SonettoHere WebSocket
@@ -174,8 +195,8 @@ export function useAgentChat(): UseAgentChat {
 
       // 1. Append user message
       const userMsg: AgentMessage = {
-        id: nextId('u'),
-        role: 'user',
+        id: nextId("u"),
+        role: "user",
         content: trimmed,
         createdAt: Date.now(),
         attachments: items.length > 0 ? items : undefined,
@@ -184,13 +205,13 @@ export function useAgentChat(): UseAgentChat {
       setLastError(null);
 
       // 2. Append pending assistant bubble
-      const assistantId = nextId('a');
+      const assistantId = nextId("a");
       setMessages((prev) => [
         ...prev,
         {
           id: assistantId,
-          role: 'assistant',
-          content: '',
+          role: "assistant",
+          content: "",
           createdAt: Date.now(),
           pending: true,
         },
@@ -198,11 +219,12 @@ export function useAgentChat(): UseAgentChat {
       setIsStreaming(true);
 
       // 3. Build WebSocket URL
-      const wsBase = sonettoBaseUrl.replace(/^http/, 'ws');
+      const wsBase = sonettoBaseUrl.replace(/^http/, "ws");
       const url = `${wsBase}/ws/chat/${sessionIdRef.current}`;
 
       // 4. Get active provider (SonettoHere 用来选 model)
       const active = getActiveProvider();
+      const auth = useAuthStore.getState();
 
       // 5. Open WebSocket
       let ws: WebSocket;
@@ -226,13 +248,16 @@ export function useAgentChat(): UseAgentChat {
         }
         ws.send(
           JSON.stringify({
-            type: 'chat',
+            type: "chat",
             payload: {
               message: trimmed,
               auto_approve: false,
               private: false,
               provider_id: active.id,
-              model_name: active.models[0] || '',
+              model_name: active.models[0] || "",
+              center_access_token:
+                auth.tokenMode === "server" ? (auth.accessToken ?? "") : "",
+              center_base_url: CENTER_BASE_URL,
             },
           }),
         );
@@ -241,50 +266,50 @@ export function useAgentChat(): UseAgentChat {
       // 6. Consume events
       ws.onmessage = (ev) => {
         if (token.cancelled) return;
-        let evt: { type: string; payload?: any };
+        let evt: { type: string; payload?: SonettoEventPayload };
         try {
           evt = JSON.parse(ev.data);
         } catch {
           return;
         }
         switch (evt.type) {
-          case 'thinking_start':
+          case "thinking_start":
             // 标记开始 thinking (UI 折叠面板展开占位)
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === assistantId && !m.thinking
-                  ? { ...m, thinking: '' }
+                  ? { ...m, thinking: "" }
                   : m,
               ),
             );
             break;
-          case 'token': {
-            const tok = evt.payload?.token ?? '';
+          case "token": {
+            const tok = evt.payload?.token ?? "";
             if (tok) appendDelta(assistantId, tok);
             break;
           }
-          case 'thinking_end':
+          case "thinking_end":
             // thinking 段结束, 不动 content
             break;
-          case 'tool_start': {
+          case "tool_start": {
             const toolId = `t-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
             addToolCall(assistantId, {
               id: toolId,
-              name: evt.payload?.tool_name ?? 'unknown',
-              input: evt.payload?.input ?? '',
-              status: 'running',
+              name: evt.payload?.tool_name ?? "unknown",
+              input: evt.payload?.input ?? "",
+              status: "running",
               startedAt: Date.now(),
             });
             break;
           }
-          case 'tool_end': {
+          case "tool_end": {
             // 找到最近一个 running 的同名 tool
             setMessages((prev) => {
               const m = prev.find((x) => x.id === assistantId);
               if (!m) return prev;
               const tool = [...(m.toolCalls ?? [])]
                 .reverse()
-                .find((t) => t.status === 'running');
+                .find((t) => t.status === "running");
               if (!tool) return prev;
               return prev.map((x) => {
                 if (x.id !== assistantId) return x;
@@ -294,8 +319,8 @@ export function useAgentChat(): UseAgentChat {
                     t.id === tool.id
                       ? {
                           ...t,
-                          status: 'done' as const,
-                          output: evt.payload?.output ?? '',
+                          status: "done" as const,
+                          output: evt.payload?.output ?? "",
                           endedAt: Date.now(),
                         }
                       : t,
@@ -305,13 +330,13 @@ export function useAgentChat(): UseAgentChat {
             });
             break;
           }
-          case 'final_answer':
+          case "final_answer":
             // 可选: 覆盖 content (server 已通过 token 流推完, 这里兜底)
-            if (typeof evt.payload?.content === 'string') {
+            if (typeof evt.payload?.content === "string") {
               finalizeMessage(assistantId, { content: evt.payload.content });
             }
             break;
-          case 'context_usage': {
+          case "context_usage": {
             const u = evt.payload;
             if (u) {
               setMessages((prev) =>
@@ -323,7 +348,7 @@ export function useAgentChat(): UseAgentChat {
                           used: u.used ?? 0,
                           max: u.max ?? 0,
                           percent: u.percent ?? 0,
-                          model: u.model ?? '',
+                          model: u.model ?? "",
                         },
                       }
                     : m,
@@ -332,15 +357,15 @@ export function useAgentChat(): UseAgentChat {
             }
             break;
           }
-          case 'error': {
-            const msg = evt.payload?.message ?? 'SonettoHere 返回错误';
+          case "error": {
+            const msg = evt.payload?.message ?? "SonettoHere 返回错误";
             finalizeMessage(assistantId, { error: msg });
             setLastError(msg);
             setSonettoReady(false);
             setIsStreaming(false);
             break;
           }
-          case 'pong':
+          case "pong":
             // heartbeat 不用处理
             break;
         }
@@ -392,7 +417,7 @@ export function useAgentChat(): UseAgentChat {
     cancelRef.current.cancelled = true;
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       try {
-        wsRef.current.send(JSON.stringify({ type: 'cancel', payload: {} }));
+        wsRef.current.send(JSON.stringify({ type: "cancel", payload: {} }));
       } catch {
         /* ignore */
       }
@@ -418,7 +443,7 @@ export function useAgentChat(): UseAgentChat {
       const idx = messages.findIndex((m) => m.id === messageId);
       if (idx === -1) return;
       const msg = messages[idx];
-      if (msg.role !== 'user') return;
+      if (msg.role !== "user") return;
       // 删掉该 user 后所有 assistant
       setMessages((prev) => prev.slice(0, idx));
       await send(msg.content, msg.attachments ?? []);
@@ -437,14 +462,4 @@ export function useAgentChat(): UseAgentChat {
     sonettoReady,
     sonettoBaseUrl,
   };
-}
-
-// ============================================================
-// Test helpers (保留兼容旧测试)
-// ============================================================
-export function __setHermesConfigForTests(_partial: unknown): void {
-  /* deprecated, no-op */
-}
-export function __resetHermesConfigForTests(): void {
-  /* deprecated, no-op */
 }

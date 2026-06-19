@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 /**
  * Tracks whether the browser tab is currently visible.
@@ -6,13 +6,13 @@ import { useState, useEffect } from 'react';
  */
 export function useVisibility(): boolean {
   const [visible, setVisible] = useState(() =>
-    typeof document !== 'undefined' ? !document.hidden : true,
+    typeof document !== "undefined" ? !document.hidden : true,
   );
 
   useEffect(() => {
     const onChange = () => setVisible(!document.hidden);
-    document.addEventListener('visibilitychange', onChange);
-    return () => document.removeEventListener('visibilitychange', onChange);
+    document.addEventListener("visibilitychange", onChange);
+    return () => document.removeEventListener("visibilitychange", onChange);
   }, []);
 
   return visible;

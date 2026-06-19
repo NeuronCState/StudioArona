@@ -1,5 +1,6 @@
-import { useNavigate } from 'react-router-dom';
-import { Calendar } from 'lucide-react';
+import { useNavigate } from "react-router-dom";
+import { Calendar } from "lucide-react";
+import { useT } from "@/lib/i18n";
 
 interface ScheduleEvent {
   id: string;
@@ -11,32 +12,39 @@ interface ScheduleEvent {
 
 export function ScheduleTile({ events }: { events: ScheduleEvent[] }) {
   const navigate = useNavigate();
+  const t = useT();
   const count = events.length;
 
   return (
-    <div className="studio-tile h-full" onClick={() => navigate('/schedule')}>
+    <div className="studio-tile h-full" onClick={() => navigate("/schedule")}>
       <div className="studio-tile-inner tile-anim-1">
         <div className="studio-tile-header">
           <h3>
             <Calendar size={15} className="text-amber-500" />
-            Schedule
+            {t("tile.schedule.title")}
           </h3>
         </div>
 
         {count === 0 ? (
           <div className="tile-empty">
             <Calendar size={28} className="mb-1 opacity-30" />
-            <span className="text-xs">No events today</span>
+            <span className="text-xs">{t("tile.schedule.empty")}</span>
           </div>
         ) : (
           <div className="flex flex-1 flex-col min-h-0">
             <div className="flex-1 space-y-0.5">
               {events.map((event) => (
                 <div key={event.id} className="schedule-item">
-                  <span className={`schedule-dot ${event.isCurrent ? 'current' : event.isPast ? 'past' : 'upcoming'}`} />
+                  <span
+                    className={`schedule-dot ${event.isCurrent ? "current" : event.isPast ? "past" : "upcoming"}`}
+                  />
                   <div className="min-w-0 flex-1">
-                    <span className="text-[11px] font-medium text-stone-400 tabular-nums">{event.time}</span>
-                    <p className="truncate text-[13px] font-medium text-stone-700">{event.title}</p>
+                    <span className="text-[11px] font-medium text-stone-400 tabular-nums">
+                      {event.time}
+                    </span>
+                    <p className="truncate text-[13px] font-medium text-stone-700">
+                      {event.title}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -45,7 +53,12 @@ export function ScheduleTile({ events }: { events: ScheduleEvent[] }) {
         )}
 
         <div className="schedule-footer">
-          {count === 0 ? 'No events today' : `${count} event${count > 1 ? 's' : ''} today`}
+          {count === 0
+            ? t("tile.schedule.footer.empty")
+            : t("tile.schedule.footer.count", {
+                n: count,
+                s: count > 1 ? "s" : "",
+              })}
         </div>
       </div>
     </div>

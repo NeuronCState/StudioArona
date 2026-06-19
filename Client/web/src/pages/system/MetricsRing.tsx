@@ -15,7 +15,7 @@ export function MetricsRing({
   strokeWidth = 10,
   label,
   unit,
-  color = 'var(--color-accent)',
+  color = "var(--color-accent)",
 }: MetricsRingProps) {
   const pct = Math.min(100, Math.round((value / max) * 100));
   const radius = (size - strokeWidth) / 2;

@@ -15,18 +15,18 @@
  * - Esc 关闭 + body 滚动锁
  * - 点击遮罩关闭
  */
-import { useEffect, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
-import { motion as m } from '../../lib/motion';
+import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
+import { motion as m } from "../../lib/motion";
 
 interface DrawerProps {
   open: boolean;
   onClose: () => void;
-  from?: 'top' | 'right';
+  from?: "top" | "right";
   /** top 才有效: card = 顶部小卡片, sheet = 整页深色 sheet 覆盖 */
-  variant?: 'card' | 'sheet';
+  variant?: "card" | "sheet";
   title?: string;
   /** right drawer 用 */
   width?: string;
@@ -34,21 +34,21 @@ interface DrawerProps {
 }
 
 const topCardVariants = {
-  hidden: { y: '-100%', opacity: 0 },
+  hidden: { y: "-100%", opacity: 0 },
   show: { y: 0, opacity: 1 },
-  exit: { y: '-100%', opacity: 0 },
+  exit: { y: "-100%", opacity: 0 },
 };
 
 const topSheetVariants = {
-  hidden: { y: '-100%', opacity: 0 },
+  hidden: { y: "-100%", opacity: 0 },
   show: { y: 0, opacity: 1 },
-  exit: { y: '-100%', opacity: 0 },
+  exit: { y: "-100%", opacity: 0 },
 };
 
 const rightVariants = {
-  hidden: { x: '100%', opacity: 0 },
+  hidden: { x: "100%", opacity: 0 },
   show: { x: 0, opacity: 1 },
-  exit: { x: '100%', opacity: 0 },
+  exit: { x: "100%", opacity: 0 },
 };
 
 const overlayVariants = {
@@ -60,36 +60,36 @@ const overlayVariants = {
 export function Drawer({
   open,
   onClose,
-  from = 'top',
-  variant = 'card',
+  from = "top",
+  variant = "card",
   title,
-  width = '480px',
+  width = "480px",
   children,
 }: DrawerProps) {
   // Esc 关闭
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === "Escape") onClose();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
   // body 滚动锁
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
   }, [open]);
 
-  if (typeof document === 'undefined') return null;
+  if (typeof document === "undefined") return null;
 
-  const isTop = from === 'top';
-  const isSheet = isTop && variant === 'sheet';
+  const isTop = from === "top";
+  const isSheet = isTop && variant === "sheet";
   const panelVariants = isTop
     ? isSheet
       ? topSheetVariants
@@ -101,7 +101,7 @@ export function Drawer({
       {open && (
         <div
           className="fixed inset-0 z-[100]"
-          style={{ pointerEvents: 'auto' }}
+          style={{ pointerEvents: "auto" }}
           role="dialog"
           aria-modal="true"
         >
@@ -112,7 +112,10 @@ export function Drawer({
             initial="hidden"
             animate="show"
             exit="exit"
-            transition={{ duration: m.duration.base / 1000, ease: m.easing.out }}
+            transition={{
+              duration: m.duration.base / 1000,
+              ease: m.easing.out,
+            }}
             onClick={onClose}
           />
 
@@ -122,19 +125,19 @@ export function Drawer({
               isTop
                 ? isSheet
                   ? // sheet 模式: 全宽, 从 top 开始, 高度填满, 整页深色背景
-                    'absolute left-0 top-0 h-full w-full'
+                    "absolute left-0 top-0 h-full w-full"
                   : // card 模式: 居中圆角小卡
-                    'absolute left-1/2 top-0 -translate-x-1/2 w-full max-w-3xl px-4 pt-4'
+                    "absolute left-1/2 top-0 -translate-x-1/2 w-full max-w-3xl px-4 pt-4"
                 : // right 模式: 右侧整页高
-                  'absolute right-0 top-0 h-full w-full overflow-y-auto bg-[var(--color-surface)] shadow-2xl'
+                  "absolute right-0 top-0 h-full w-full overflow-y-auto bg-[var(--color-surface)] shadow-2xl"
             }
-            style={isTop ? undefined : { width, maxWidth: '100vw' }}
+            style={isTop ? undefined : { width, maxWidth: "100vw" }}
             variants={panelVariants}
             initial="hidden"
             animate="show"
             exit="exit"
             transition={{
-              type: 'spring',
+              type: "spring",
               stiffness: 380,
               damping: 38,
               mass: 0.9,
@@ -144,10 +147,10 @@ export function Drawer({
               className={
                 isSheet
                   ? // sheet: 整页深色背景, 无圆角
-                    'h-full bg-stone-900 text-stone-100'
+                    "h-full bg-stone-900 text-stone-100"
                   : isTop
-                  ? 'rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl'
-                  : 'h-full'
+                    ? "rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl"
+                    : "h-full"
               }
             >
               {/* header */}
@@ -155,15 +158,15 @@ export function Drawer({
                 className={
                   isSheet
                     ? // sheet header: 深色背景上的浅色文字
-                      'flex items-center justify-between border-b border-stone-700/60 px-6 py-4'
-                    : 'flex items-center justify-between border-b border-[var(--color-border)] px-5 py-3'
+                      "flex items-center justify-between border-b border-stone-700/60 px-6 py-4"
+                    : "flex items-center justify-between border-b border-[var(--color-border)] px-5 py-3"
                 }
               >
                 <h3
                   className={
                     isSheet
-                      ? 'text-base font-semibold text-stone-100'
-                      : 'text-sm font-semibold text-[var(--color-text-primary)]'
+                      ? "text-base font-semibold text-stone-100"
+                      : "text-sm font-semibold text-[var(--color-text-primary)]"
                   }
                 >
                   {title}
@@ -172,8 +175,8 @@ export function Drawer({
                   onClick={onClose}
                   className={
                     isSheet
-                      ? 'rounded-md p-1.5 text-stone-400 hover:bg-stone-800 hover:text-stone-100'
-                      : 'rounded-md p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text-primary)]'
+                      ? "rounded-md p-1.5 text-stone-400 hover:bg-stone-800 hover:text-stone-100"
+                      : "rounded-md p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text-primary)]"
                   }
                   aria-label="关闭"
                 >
@@ -182,7 +185,9 @@ export function Drawer({
               </div>
 
               {/* 内容 */}
-              <div className={isSheet ? 'p-6' : isTop ? 'p-5' : 'p-6'}>{children}</div>
+              <div className={isSheet ? "p-6" : isTop ? "p-5" : "p-6"}>
+                {children}
+              </div>
             </div>
           </motion.div>
         </div>

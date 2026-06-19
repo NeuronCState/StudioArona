@@ -1,4 +1,4 @@
-import { QueryClient, keepPreviousData } from '@tanstack/react-query';
+import { QueryClient, keepPreviousData } from "@tanstack/react-query";
 
 /**
  * Shared QueryClient factory with performance-tuned defaults.
@@ -21,8 +21,8 @@ export function createQueryClient(): QueryClient {
         staleTime: 30_000,
         gcTime: 5 * 60_000,
         retry: 1,
-        refetchOnWindowFocus: 'always',
-        networkMode: 'offlineFirst',
+        refetchOnWindowFocus: "always",
+        networkMode: "offlineFirst",
         placeholderData: keepPreviousData,
       },
     },

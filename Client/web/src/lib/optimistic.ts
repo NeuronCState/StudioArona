@@ -1,4 +1,4 @@
-import type { QueryClient, QueryKey } from '@tanstack/react-query';
+import type { QueryClient, QueryKey } from "@tanstack/react-query";
 
 /**
  * Apply an optimistic update to a query's cached data.
@@ -46,8 +46,10 @@ export function optimisticMutate<T, V>(
   updater: (old: T | undefined, variables: V) => T,
 ): (variables: V) => { previous: T | undefined } {
   return (variables: V) => {
-    const previous = optimisticUpdate(queryClient, queryKey, (old: T | undefined) =>
-      updater(old, variables),
+    const previous = optimisticUpdate(
+      queryClient,
+      queryKey,
+      (old: T | undefined) => updater(old, variables),
     );
     return { previous };
   };

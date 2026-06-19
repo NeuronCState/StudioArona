@@ -12,7 +12,7 @@ export function BarChartSimple({ data, height = 120 }: BarChartSimpleProps) {
           <div
             key={i}
             className="group relative flex flex-1 flex-col items-center"
-            style={{ height: '100%' }}
+            style={{ height: "100%" }}
           >
             <div className="flex w-full flex-1 items-end rounded-t-sm bg-surface">
               <div
@@ -21,10 +21,10 @@ export function BarChartSimple({ data, height = 120 }: BarChartSimpleProps) {
                   height: `${pct}%`,
                   backgroundColor:
                     pct > 90
-                      ? '#EF4444'
+                      ? "#EF4444"
                       : pct > 70
-                        ? '#F59E0B'
-                        : 'var(--color-accent)',
+                        ? "#F59E0B"
+                        : "var(--color-accent)",
                 }}
               />
             </div>

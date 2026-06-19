@@ -1,14 +1,14 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback } from "react";
 
 /**
  * Returns a throttled version of the callback that fires at most once per `delay` ms.
  * Uses leading-edge behaviour by default (fires immediately on first call).
  */
-export function useThrottle<T extends (...args: any[]) => void>(
-  callback: T,
+export function useThrottle<TArgs extends unknown[]>(
+  callback: (...args: TArgs) => void,
   delay: number,
   leading = true,
-): T {
+): (...args: TArgs) => void {
   const lastRun = useRef(0);
   const timeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cbRef = useRef(callback);
@@ -21,7 +21,7 @@ export function useThrottle<T extends (...args: any[]) => void>(
   }, []);
 
   return useCallback(
-    (...args: Parameters<T>) => {
+    (...args: TArgs) => {
       const now = Date.now();
 
       if (lastRun.current === 0 && !leading) {
@@ -32,13 +32,16 @@ export function useThrottle<T extends (...args: any[]) => void>(
         lastRun.current = now;
         cbRef.current(...args);
       } else if (timeout.current === null) {
-        timeout.current = setTimeout(() => {
-          lastRun.current = Date.now();
-          timeout.current = null;
-          cbRef.current(...args);
-        }, delay - (now - lastRun.current));
+        timeout.current = setTimeout(
+          () => {
+            lastRun.current = Date.now();
+            timeout.current = null;
+            cbRef.current(...args);
+          },
+          delay - (now - lastRun.current),
+        );
       }
     },
     [delay, leading],
-  ) as unknown as T;
+  );
 }

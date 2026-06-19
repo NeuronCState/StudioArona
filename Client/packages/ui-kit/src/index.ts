@@ -64,8 +64,8 @@ export type { ToastProps } from './components/Toast';
 export { CardSkeleton } from './components/CardSkeleton';
 export type { CardSkeletonProps } from './components/CardSkeleton';
 
-export { CardError } from './components/CardError';
-export type { CardErrorProps } from './components/CardError';
+export { CardError, OfflineBanner } from './components/CardError';
+export type { CardErrorProps, OfflineBannerProps } from './components/CardError';
 
 export { CardEmpty } from './components/CardEmpty';
 export type { CardEmptyProps } from './components/CardEmpty';

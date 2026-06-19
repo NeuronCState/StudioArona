@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { motion as m } from '@/lib/motion';
-import { useAgentChat, type AgentAttachment } from './useAgentChat';
-import { AgentPanelHeader } from './AgentPanelHeader';
-import { AgentMessageList } from './AgentMessageList';
-import { TaskTrackerBar } from './TaskTrackerBar';
-import { AgentInput } from './AgentInput';
-import { AgentErrorToast } from './AgentErrorToast';
+import { useEffect, useRef, useState, useCallback } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { motion as m } from "@/lib/motion";
+import { useAgentChat, type AgentAttachment } from "./useAgentChat";
+import { AgentPanelHeader } from "./AgentPanelHeader";
+import { AgentMessageList } from "./AgentMessageList";
+import { TaskTrackerBar } from "./TaskTrackerBar";
+import { AgentInput } from "./AgentInput";
+import { AgentErrorToast } from "./AgentErrorToast";
 
 interface AgentPanelProps {
   open: boolean;
@@ -14,19 +14,23 @@ interface AgentPanelProps {
   agentName?: string;
 }
 
-const DEFAULT_AGENT_NAME = '阿洛娜';
+const DEFAULT_AGENT_NAME = "阿洛娜";
 
 /**
  * AgentPanel — GPT-style chat surface that diffuses out of the centered
  * trigger button. Lives inside the right content area only (sidebar + header
  * remain visible). Supports Esc / outside-click to close and traps focus.
  *
- * The chat itself is backed by `useAgentChat`, which talks to the local
- * Hermes OpenAI-compatible endpoint via SSE. Connection / streaming
+ * The chat itself is backed by `useAgentChat`, which talks to the bundled
+ * SonettoHere runtime over WebSocket. Connection and streaming
  * failures surface as a top-of-panel toast (dismissible) AND as an inline
  * banner on the failed assistant bubble.
  */
-export function AgentPanel({ open, onClose, agentName = DEFAULT_AGENT_NAME }: AgentPanelProps) {
+export function AgentPanel({
+  open,
+  onClose,
+  agentName = DEFAULT_AGENT_NAME,
+}: AgentPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const chat = useAgentChat();
   const [attachments, setAttachments] = useState<AgentAttachment[]>([]);
@@ -38,10 +42,10 @@ export function AgentPanel({ open, onClose, agentName = DEFAULT_AGENT_NAME }: Ag
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === "Escape") onClose();
     };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
   // Focus first interactive element when opened.
@@ -67,7 +71,10 @@ export function AgentPanel({ open, onClose, agentName = DEFAULT_AGENT_NAME }: Ag
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: m.duration.fast / 1000, ease: m.easing.out }}
+            transition={{
+              duration: m.duration.fast / 1000,
+              ease: m.easing.out,
+            }}
             onClick={onClose}
             aria-hidden="true"
             className="absolute inset-0 z-30 bg-black/15 backdrop-blur-[2px]"
@@ -105,13 +112,15 @@ export function AgentPanel({ open, onClose, agentName = DEFAULT_AGENT_NAME }: Ag
             <AgentPanelHeader
               agentName={agentName}
               onClose={onClose}
-              hermesReady={chat.sonettoReady}
+              sonettoReady={chat.sonettoReady}
               onRetryConnection={() => window.location.reload()}
             />
             <div className="relative flex-1 overflow-hidden">
               {/* 顶部任务进度条: 当前 assistant message 的 tool calls */}
               {(() => {
-                const last = chat.messages.filter((m) => m.role === 'assistant').slice(-1)[0];
+                const last = chat.messages
+                  .filter((m) => m.role === "assistant")
+                  .slice(-1)[0];
                 if (!last?.toolCalls?.length) return null;
                 return <TaskTrackerBar toolCalls={last.toolCalls} />;
               })()}

@@ -1,31 +1,63 @@
-import { lazy, Suspense, useEffect } from 'react';
-import { Route, Routes, useLocation } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
-import { StudioAppShell } from './components/studio/StudioAppShell';
-import { FeedsPage } from './pages/feeds/FeedsPage';
-import { LoginPage } from './pages/login/LoginPage';
-import { SetupPage } from './pages/setup/SetupPage';
-import { StorageMigrationBanner } from './components/studio/StorageMigrationBanner';
-import { ConflictMergeDialog } from './components/studio/ConflictMergeDialog';
-import { useSync } from './lib/sync/useSync';
-import { MemoryPage } from './pages/memory/MemoryPage';
-import { SkillsPage } from './pages/skills/SkillsPage';
-import { SchedulePage } from './pages/schedule/SchedulePage';
-import { AdminPage } from './pages/admin/AdminPage';
-import { StudioHomePage } from './pages/studio/StudioHomePage';
-import { SystemPage } from './pages/system/SystemPage';
-import { VmsPage } from './pages/vms/VmsPage';
-import { OCRPage } from './pages/ocr/OCRPage';
-import { useAuthStore } from './stores/auth';
-import { useSonettoConfigStore } from './stores/sonetto-config';
-import { useDesignModeStore } from './stores/design-mode';
-import { useTheme } from './hooks/useTheme';
-import { motion as m } from './lib/motion';
+import { lazy, Suspense, useEffect, useRef } from "react";
+import { Route, Routes, useLocation } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import { StudioAppShell } from "./components/studio/StudioAppShell";
+import { StorageMigrationBanner } from "./components/studio/StorageMigrationBanner";
+import { ConflictMergeDialog } from "./components/studio/ConflictMergeDialog";
+import { useAuthStore } from "./stores/auth";
+import { useSonettoConfigStore } from "./stores/sonetto-config";
+import { useDesignModeStore } from "./stores/design-mode";
+import { useTheme } from "./hooks/useTheme";
+import { motion as m } from "./lib/motion";
+import { useReducedMotion } from "./hooks/useReducedMotion";
 
 // AronaShell is lazy-loaded so Three.js / PIXI / Spine are never in the
 // initial Studio-mode bundle. They download only when user switches to Arona.
 const AronaShell = lazy(() =>
-  import('./components/arona/AronaShell').then((m) => ({ default: m.AronaShell })),
+  import("./components/arona/AronaShell").then((m) => ({
+    default: m.AronaShell,
+  })),
+);
+const LoginPage = lazy(() =>
+  import("./pages/login/LoginPage").then((m) => ({ default: m.LoginPage })),
+);
+const SetupPage = lazy(() =>
+  import("./pages/setup/SetupPage").then((m) => ({ default: m.SetupPage })),
+);
+const StudioHomePage = lazy(() =>
+  import("./pages/studio/StudioHomePage").then((m) => ({
+    default: m.StudioHomePage,
+  })),
+);
+const FeedsPage = lazy(() =>
+  import("./pages/feeds/FeedsPage").then((m) => ({ default: m.FeedsPage })),
+);
+const SchedulePage = lazy(() =>
+  import("./pages/schedule/SchedulePage").then((m) => ({
+    default: m.SchedulePage,
+  })),
+);
+const AdminPage = lazy(() =>
+  import("./pages/admin/AdminPage").then((m) => ({ default: m.AdminPage })),
+);
+const SystemPage = lazy(() =>
+  import("./pages/system/SystemPage").then((m) => ({ default: m.SystemPage })),
+);
+const VmsPage = lazy(() =>
+  import("./pages/vms/VmsPage").then((m) => ({ default: m.VmsPage })),
+);
+const OCRPage = lazy(() =>
+  import("./pages/ocr/OCRPage").then((m) => ({ default: m.OCRPage })),
+);
+const AgentConfigPage = lazy(() =>
+  import("./pages/config/AgentConfigPage").then((m) => ({
+    default: m.AgentConfigPage,
+  })),
+);
+const PersonalSettingsPage = lazy(() =>
+  import("./pages/settings/PersonalSettingsPage").then((m) => ({
+    default: m.PersonalSettingsPage,
+  })),
 );
 
 function ShellFallback() {
@@ -38,26 +70,64 @@ function ShellFallback() {
 
 function AppRoutes() {
   const location = useLocation();
+  const reducedMotion = useReducedMotion();
+  const previousPath = useRef(location.pathname);
+  const routeOrder = [
+    "/",
+    "/feeds",
+    "/schedule",
+    "/ocr",
+    "/config",
+    "/vms",
+    "/system",
+    "/admin",
+    "/settings",
+  ];
+  const currentIndex = routeOrder.indexOf(location.pathname);
+  const previousIndex = routeOrder.indexOf(previousPath.current);
+  const direction = currentIndex >= previousIndex ? 1 : -1;
+
+  useEffect(() => {
+    previousPath.current = location.pathname;
+    document.getElementById("main-content")?.scrollTo({ top: 0 });
+  }, [location.pathname]);
+
+  const variants = {
+    enter: (value: number) =>
+      reducedMotion
+        ? { opacity: 1 }
+        : { opacity: 0, x: value * 18, scale: 0.995 },
+    center: { opacity: 1, x: 0, scale: 1 },
+    exit: (value: number) =>
+      reducedMotion
+        ? { opacity: 1 }
+        : { opacity: 0, x: value * -12, scale: 0.997 },
+  };
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    <AnimatePresence mode="wait" initial={false} custom={direction}>
       <motion.div
         key={location.pathname}
         className="h-full w-full"
-        initial={{ y: 6, opacity: 0.6 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: -4, opacity: 0.6 }}
-        transition={{ duration: m.duration.fast / 1000, ease: m.easing.out }}
+        custom={direction}
+        variants={variants}
+        initial="enter"
+        animate="center"
+        exit="exit"
+        transition={{
+          duration: reducedMotion ? 0 : m.duration.base / 1000,
+          ease: m.easing.out,
+        }}
       >
         <Routes location={location}>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/memory" element={<MemoryPage />} />
-          <Route path="/skills" element={<SkillsPage />} />
+          <Route path="/" element={<StudioHomePage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/schedule" element={<SchedulePage />} />
           <Route path="/feeds" element={<FeedsPage />} />
           <Route path="/system" element={<SystemPage />} />
           <Route path="/vms" element={<VmsPage />} />
           <Route path="/ocr" element={<OCRPage />} />
+          <Route path="/config" element={<AgentConfigPage />} />
+          <Route path="/settings" element={<PersonalSettingsPage />} />
           <Route path="/me/feeds" element={<FeedsPage />} />
         </Routes>
       </motion.div>
@@ -65,14 +135,8 @@ function AppRoutes() {
   );
 }
 
-function HomePage() {
-  return <StudioHomePage />;
-}
-
 export default function App() {
   useTheme();
-  // 双向同步 coordinator — schedules 表 dirty doc → server, 409 入 ConflictStore
-  useSync();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const setupComplete = useSonettoConfigStore((s) => s.setupComplete);
   const mode = useDesignModeStore((s) => s.mode);
@@ -81,18 +145,26 @@ export default function App() {
   // ?setupbypass=1 跳过 SetupPage (SonettoHere 没配也能进)
   const devBypass =
     import.meta.env.DEV &&
-    new URLSearchParams(window.location.search).get('devbypass') === '1';
+    new URLSearchParams(window.location.search).get("devbypass") === "1";
   const setupBypass =
     devBypass ||
-    new URLSearchParams(window.location.search).get('setupbypass') === '1';
+    new URLSearchParams(window.location.search).get("setupbypass") === "1";
 
   // devbypass 模式强制设 authenticated (避免后续 401 自动 logout)
   useEffect(() => {
     if (devBypass && !isAuthenticated) {
       useAuthStore.getState().login(
-        'dev-bypass-token',
-        'dev-bypass-refresh',
-        { id: 'dev', username: 'dev', display_name: 'Dev User', role: 'admin', created_at: new Date().toISOString() } as any,
+        "dev-bypass-token",
+        "dev-bypass-refresh",
+        {
+          id: "dev",
+          username: "dev",
+          display_name: "Dev User",
+          role: "admin",
+          created_at: new Date().toISOString(),
+          preferences: {},
+          face_enrolled: false,
+        },
         { local: true },
       );
     }
@@ -102,24 +174,32 @@ export default function App() {
   }, [devBypass, setupBypass, isAuthenticated]);
 
   if (!isAuthenticated && !devBypass) {
-    return <LoginPage />;
+    return (
+      <Suspense fallback={<ShellFallback />}>
+        <LoginPage />
+      </Suspense>
+    );
   }
 
   // 注册后首次进入，显示配置引导页
   if (!setupComplete && !setupBypass) {
-    return <SetupPage />;
+    return (
+      <Suspense fallback={<ShellFallback />}>
+        <SetupPage />
+      </Suspense>
+    );
   }
 
   return (
     <AnimatePresence mode="wait">
-      {mode === 'arona' ? (
+      {mode === "arona" ? (
         <motion.div
           key="arona"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.35, ease: 'easeInOut' }}
-          style={{ position: 'absolute', inset: 0 }}
+          transition={{ duration: 0.35, ease: "easeInOut" }}
+          style={{ position: "absolute", inset: 0 }}
         >
           <Suspense fallback={<ShellFallback />}>
             <AronaShell />
@@ -131,15 +211,17 @@ export default function App() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.35, ease: 'easeInOut' }}
-          style={{ position: 'absolute', inset: 0 }}
+          transition={{ duration: 0.35, ease: "easeInOut" }}
+          style={{ position: "absolute", inset: 0 }}
         >
           <StudioAppShell>
             {/* AppRoutes 内层已包 AnimatePresence */}
-            <AppRoutes />
+            <Suspense fallback={<ShellFallback />}>
+              <AppRoutes />
+            </Suspense>
             {/* Tauri 桌面首次启动: IDB 旧数据 → 提示迁 fs (~/Documents/studioarona/) */}
             <StorageMigrationBanner />
-            {/* useSync 收到 409 时弹, 让用户手动合并 server/client 字段 */}
+            {/* 本地资源同步收到 409 时弹出手动合并。 */}
             <ConflictMergeDialog />
           </StudioAppShell>
         </motion.div>

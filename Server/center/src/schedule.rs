@@ -39,16 +39,24 @@ pub async fn list_schedules(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let _user_id = extract_user_id(&headers, &state.config.jwt_secret)
-        .map_err(|(s, v)| (s, Json(v)))?;
+    let (user_id, _, _) =
+        extract_user_id(&headers, &state.config.jwt_secret).map_err(|(s, v)| (s, Json(v)))?;
 
     let rows = sqlx::query_as::<_, ScheduleRow>(
         "SELECT id::text, title, description, start_at, end_at, location, visibility, updated_at
-         FROM schedules ORDER BY start_at ASC LIMIT 100",
+         FROM schedules
+         WHERE user_id = $1::uuid
+         ORDER BY start_at ASC LIMIT 100",
     )
+    .bind(&user_id)
     .fetch_all(&state.db)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+    })?;
 
     let items: Vec<_> = rows.iter().map(row_to_json).collect();
     Ok(Json(json!(items)))
@@ -60,8 +68,8 @@ pub async fn get_schedule(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let (user_id, _, _) = extract_user_id(&headers, &state.config.jwt_secret)
-        .map_err(|(s, v)| (s, Json(v)))?;
+    let (user_id, _, _) =
+        extract_user_id(&headers, &state.config.jwt_secret).map_err(|(s, v)| (s, Json(v)))?;
 
     let row: Option<ScheduleRow> = sqlx::query_as(
         "SELECT id::text, title, description, start_at, end_at, location, visibility, updated_at
@@ -71,7 +79,12 @@ pub async fn get_schedule(
     .bind(&user_id)
     .fetch_optional(&state.db)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+    })?;
 
     let row = row.ok_or_else(|| {
         (
@@ -136,8 +149,8 @@ pub async fn create_schedule(
     headers: HeaderMap,
     Json(input): Json<ScheduleInput>,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
-    let (user_id, _, _) = extract_user_id(&headers, &state.config.jwt_secret)
-        .map_err(|(s, v)| (s, Json(v)))?;
+    let (user_id, _, _) =
+        extract_user_id(&headers, &state.config.jwt_secret).map_err(|(s, v)| (s, Json(v)))?;
     let duration = input.duration_minutes.unwrap_or(60);
     let end_at = input.starts_at + chrono::Duration::minutes(duration as i64);
 
@@ -177,8 +190,8 @@ pub async fn update_schedule(
     Path(id): Path<String>,
     Json(input): Json<ScheduleInput>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let (user_id, _, _) = extract_user_id(&headers, &state.config.jwt_secret)
-        .map_err(|(s, v)| (s, Json(v)))?;
+    let (user_id, _, _) =
+        extract_user_id(&headers, &state.config.jwt_secret).map_err(|(s, v)| (s, Json(v)))?;
     let duration = input.duration_minutes.unwrap_or(60);
     let end_at = input.starts_at + chrono::Duration::minutes(duration as i64);
 
@@ -234,7 +247,12 @@ pub async fn update_schedule(
     .bind(&user_id)
     .execute(&state.db)
     .await
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": e.to_string()})),
+        )
+    })?;
 
     if affected.rows_affected() == 0 {
         return Err((
@@ -260,15 +278,20 @@ pub async fn delete_schedule(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, Json<Value>)> {
-    let (user_id, _, _) = extract_user_id(&headers, &state.config.jwt_secret)
-        .map_err(|(s, v)| (s, Json(v)))?;
+    let (user_id, _, _) =
+        extract_user_id(&headers, &state.config.jwt_secret).map_err(|(s, v)| (s, Json(v)))?;
 
     let affected = sqlx::query("DELETE FROM schedules WHERE id = $1::uuid AND user_id = $2::uuid")
         .bind(&id)
         .bind(&user_id)
         .execute(&state.db)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
 
     if affected.rows_affected() == 0 {
         return Err((

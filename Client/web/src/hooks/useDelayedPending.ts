@@ -12,7 +12,7 @@
  *   const loading = useDelayedPending(isPending, { delay: 300 })
  *   if (loading) return <Skeleton />
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
 interface UseDelayedPendingOptions {
   /** 延迟显示时间, ms. 默认 300. */

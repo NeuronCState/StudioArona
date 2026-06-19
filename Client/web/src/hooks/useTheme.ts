@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { useEffect } from "react";
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
-type Theme = 'system' | 'light' | 'dark';
+type Theme = "system" | "light" | "dark";
 
 interface ThemeState {
   theme: Theme;
@@ -13,32 +13,39 @@ interface ThemeState {
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
-      theme: 'system',
+      theme: "system",
       setTheme: (theme) => {
         set({ theme });
         applyTheme(theme);
       },
       toggle: () => {
         const current = get().theme;
-        const next: Theme = current === 'dark' ? 'light' : current === 'light' ? 'system' : 'dark';
+        const next: Theme =
+          current === "dark"
+            ? "light"
+            : current === "light"
+              ? "system"
+              : "dark";
         set({ theme: next });
         applyTheme(next);
       },
     }),
-    { name: 'javis-theme' },
+    { name: "javis-theme" },
   ),
 );
 
-function resolveTheme(theme: Theme): 'light' | 'dark' {
-  if (theme === 'system') {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+function resolveTheme(theme: Theme): "light" | "dark" {
+  if (theme === "system") {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
   }
   return theme;
 }
 
 function applyTheme(theme: Theme) {
   const resolved = resolveTheme(theme);
-  document.documentElement.setAttribute('data-theme', resolved);
+  document.documentElement.setAttribute("data-theme", resolved);
 }
 
 export function useTheme() {
@@ -49,11 +56,11 @@ export function useTheme() {
   useEffect(() => {
     applyTheme(theme);
 
-    if (theme === 'system') {
-      const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      const handler = () => applyTheme('system');
-      mq.addEventListener('change', handler);
-      return () => mq.removeEventListener('change', handler);
+    if (theme === "system") {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      const handler = () => applyTheme("system");
+      mq.addEventListener("change", handler);
+      return () => mq.removeEventListener("change", handler);
     }
   }, [theme]);
 

@@ -1,4 +1,4 @@
-import type { TrainingJob } from '@/types/contracts';
+import type { TrainingJob } from "@/types/contracts";
 
 interface TrainingTableProps {
   jobs: TrainingJob[];
@@ -28,22 +28,26 @@ export function TrainingTable({ jobs }: TrainingTableProps) {
                 <td className="py-2">
                   <span
                     className={
-                      job.status === 'running'
-                        ? 'text-green-600'
-                        : job.status === 'error'
-                          ? 'text-red-600'
-                          : 'text-text-muted'
+                      job.status === "running"
+                        ? "text-green-600"
+                        : job.status === "error"
+                          ? "text-red-600"
+                          : "text-text-muted"
                     }
                   >
                     {job.status}
                   </span>
                 </td>
                 <td className="py-2 font-mono text-text-secondary">
-                  {job.total_steps ? `${job.current_step}/${job.total_steps}` : `step ${job.current_step}`}
+                  {job.total_steps
+                    ? `${job.current_step}/${job.total_steps}`
+                    : `step ${job.current_step}`}
                 </td>
-                <td className="py-2 font-mono text-text-secondary">{job.elapsed_h.toFixed(1)}h</td>
                 <td className="py-2 font-mono text-text-secondary">
-                  {job.eta_h ? `${job.eta_h.toFixed(1)}h` : '—'}
+                  {job.elapsed_h.toFixed(1)}h
+                </td>
+                <td className="py-2 font-mono text-text-secondary">
+                  {job.eta_h ? `${job.eta_h.toFixed(1)}h` : "—"}
                 </td>
               </tr>
             ))}

@@ -1,26 +1,33 @@
-import { useAuthStore } from '@/stores/auth';
-import type { UIAction } from '@/types/ui-actions';
+import { useAuthStore } from "@/stores/auth";
+import type { UIAction } from "@/types/ui-actions";
 
 // ── SSE event types (discriminated union) ──
 
 export type SSEEvent =
-  | { type: 'token'; text: string }
-  | { type: 'tool_call'; id: string; tool: string; args: unknown }
-  | { type: 'tool_result'; id: string; tool: string; status: 'ok' | 'error'; result?: unknown; error?: string }
-  | { type: 'ui_action'; action: UIAction }
-  | { type: 'done' }
-  | { type: 'error'; message: string };
+  | { type: "token"; text: string }
+  | { type: "tool_call"; id: string; tool: string; args: unknown }
+  | {
+      type: "tool_result";
+      id: string;
+      tool: string;
+      status: "ok" | "error";
+      result?: unknown;
+      error?: string;
+    }
+  | { type: "ui_action"; action: UIAction }
+  | { type: "done" }
+  | { type: "error"; message: string };
 
 // ── Wire → typed event mapper ──
 
 function parseSSEEvent(eventName: string, raw: unknown): SSEEvent | null {
   try {
     switch (eventName) {
-      case 'token': {
+      case "token": {
         const d = raw as { delta?: string; text?: string };
-        return { type: 'token', text: d.text ?? d.delta ?? '' };
+        return { type: "token", text: d.text ?? d.delta ?? "" };
       }
-      case 'tool_call': {
+      case "tool_call": {
         const d = raw as {
           id: string;
           skill?: string;
@@ -30,13 +37,13 @@ function parseSSEEvent(eventName: string, raw: unknown): SSEEvent | null {
           input?: unknown;
         };
         return {
-          type: 'tool_call',
+          type: "tool_call",
           id: d.id,
-          tool: d.tool ?? d.name ?? d.skill ?? 'unknown',
+          tool: d.tool ?? d.name ?? d.skill ?? "unknown",
           args: d.args ?? d.input,
         };
       }
-      case 'tool_result': {
+      case "tool_result": {
         const d = raw as {
           id: string;
           skill?: string;
@@ -46,25 +53,25 @@ function parseSSEEvent(eventName: string, raw: unknown): SSEEvent | null {
           summary?: unknown;
           error?: string;
         };
-        const failed = d.status === 'error' || !!d.error;
+        const failed = d.status === "error" || !!d.error;
         return {
-          type: 'tool_result',
+          type: "tool_result",
           id: d.id,
-          tool: d.tool ?? d.skill ?? 'unknown',
-          status: failed ? 'error' : 'ok',
+          tool: d.tool ?? d.skill ?? "unknown",
+          status: failed ? "error" : "ok",
           result: d.result ?? d.summary,
           error: d.error,
         };
       }
-      case 'ui_action': {
-        return { type: 'ui_action', action: raw as UIAction };
+      case "ui_action": {
+        return { type: "ui_action", action: raw as UIAction };
       }
-      case 'done': {
-        return { type: 'done' };
+      case "done": {
+        return { type: "done" };
       }
-      case 'error': {
+      case "error": {
         const d = raw as { message?: string };
-        return { type: 'error', message: d.message ?? 'Unknown server error' };
+        return { type: "error", message: d.message ?? "Unknown server error" };
       }
       default:
         return null;
@@ -95,11 +102,11 @@ export function createSSEConnection(
   const token = useAuthStore.getState().accessToken;
 
   fetch(`/api/chat/sessions/${sessionId}/messages`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(getCsrfToken() ? { 'X-CSRF-Token': getCsrfToken() as string } : {}),
+      ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken() as string } : {}),
     },
     body: JSON.stringify({ content }),
     signal: controller.signal,
@@ -110,24 +117,24 @@ export function createSSEConnection(
       }
 
       const reader = res.body?.getReader();
-      if (!reader) throw new Error('No response body');
+      if (!reader) throw new Error("No response body");
 
       const decoder = new TextDecoder();
-      let buffer = '';
-      let currentEvent = '';
+      let buffer = "";
+      let currentEvent = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
 
         for (const line of lines) {
-          if (line.startsWith('event: ')) {
+          if (line.startsWith("event: ")) {
             currentEvent = line.slice(7).trim();
-          } else if (line.startsWith('data: ')) {
+          } else if (line.startsWith("data: ")) {
             const raw = line.slice(6);
             let data: unknown;
             try {
@@ -145,7 +152,7 @@ export function createSSEConnection(
       }
     })
     .catch((err) => {
-      if (err.name !== 'AbortError') {
+      if (err.name !== "AbortError") {
         onError?.(err);
       }
     });

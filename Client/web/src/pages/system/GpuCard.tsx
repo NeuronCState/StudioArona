@@ -1,4 +1,4 @@
-import type { GPU } from '@/types/contracts';
+import type { GPU } from "@/types/contracts";
 
 interface GpuCardProps {
   gpu: GPU;
@@ -16,7 +16,14 @@ export function GpuCard({ gpu }: GpuCardProps) {
       <div className="flex items-center gap-6">
         {/* Ring progress */}
         <svg width="100" height="100" className="shrink-0">
-          <circle cx="50" cy="50" r={radius} fill="none" stroke="var(--color-border)" strokeWidth="8" />
+          <circle
+            cx="50"
+            cy="50"
+            r={radius}
+            fill="none"
+            stroke="var(--color-border)"
+            strokeWidth="8"
+          />
           <circle
             cx="50"
             cy="50"
@@ -29,10 +36,20 @@ export function GpuCard({ gpu }: GpuCardProps) {
             strokeLinecap="round"
             transform="rotate(-90 50 50)"
           />
-          <text x="50" y="46" textAnchor="middle" className="fill-text-primary text-sm font-medium">
+          <text
+            x="50"
+            y="46"
+            textAnchor="middle"
+            className="fill-text-primary text-sm font-medium"
+          >
             {memPct}%
           </text>
-          <text x="50" y="60" textAnchor="middle" className="fill-text-muted text-2xs">
+          <text
+            x="50"
+            y="60"
+            textAnchor="middle"
+            className="fill-text-muted text-2xs"
+          >
             VRAM
           </text>
         </svg>
@@ -46,7 +63,9 @@ export function GpuCard({ gpu }: GpuCardProps) {
           </div>
           <div className="flex justify-between">
             <span className="text-text-secondary">利用率</span>
-            <span className="font-mono text-text-primary">{Math.round(gpu.util_pct)}%</span>
+            <span className="font-mono text-text-primary">
+              {Math.round(gpu.util_pct)}%
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-text-secondary">温度</span>

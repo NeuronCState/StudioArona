@@ -1,4 +1,4 @@
-import type { NetworkDevice } from '@/types/contracts';
+import type { NetworkDevice } from "@/types/contracts";
 
 interface NetworkTableProps {
   devices: NetworkDevice[];
@@ -24,15 +24,23 @@ export function NetworkTable({ devices }: NetworkTableProps) {
             {devices.map((dev) => (
               <tr key={dev.mac} className="border-b border-border-subtle">
                 <td className="py-2 font-mono text-text-primary">{dev.ip}</td>
-                <td className="py-2 font-mono text-text-secondary">{dev.mac}</td>
+                <td className="py-2 font-mono text-text-secondary">
+                  {dev.mac}
+                </td>
                 <td className="py-2 text-text-primary">{dev.hostname}</td>
                 <td className="py-2 text-text-secondary">{dev.vendor}</td>
                 <td className="py-2">
-                  <span className={dev.online ? 'text-green-600' : 'text-text-muted'}>
-                    {dev.online ? '在线' : '离线'}
+                  <span
+                    className={
+                      dev.online ? "text-green-600" : "text-text-muted"
+                    }
+                  >
+                    {dev.online ? "在线" : "离线"}
                   </span>
                 </td>
-                <td className="py-2 text-text-muted">{new Date(dev.last_seen).toLocaleString()}</td>
+                <td className="py-2 text-text-muted">
+                  {new Date(dev.last_seen).toLocaleString()}
+                </td>
               </tr>
             ))}
           </tbody>

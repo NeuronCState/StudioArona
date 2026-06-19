@@ -1,12 +1,12 @@
-import { useCallback, useRef, useState } from 'react';
-import { createSSEConnection, type SSEEvent } from '@/lib/sse-client';
-import { dispatchUIAction } from '@/lib/ui-actions';
+import { useCallback, useRef, useState } from "react";
+import { createSSEConnection, type SSEEvent } from "@/lib/sse-client";
+import { dispatchUIAction } from "@/lib/ui-actions";
 
 export interface ToolCallRecord {
   id: string;
   tool: string;
   args?: unknown;
-  status: 'loading' | 'ok' | 'error';
+  status: "loading" | "ok" | "error";
   result?: unknown;
   error?: string;
   latencyMs?: number;
@@ -14,7 +14,7 @@ export interface ToolCallRecord {
 }
 
 export interface StreamMessage {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   toolCalls?: ToolCallRecord[];
   isStreaming?: boolean;
@@ -28,14 +28,18 @@ export function useChatStream(sessionId: string | null) {
 
   // Flush accumulated content to React state via requestAnimationFrame
   const scheduleFlush = useCallback(
-    (getContent: () => string, getToolCalls: () => ToolCallRecord[], streaming: boolean) => {
+    (
+      getContent: () => string,
+      getToolCalls: () => ToolCallRecord[],
+      streaming: boolean,
+    ) => {
       if (flushRef.current) return; // already scheduled
       flushRef.current = requestAnimationFrame(() => {
         flushRef.current = null;
         setMessages((prev) => {
           const updated = [...prev];
           const last = updated[updated.length - 1];
-          if (last.role === 'assistant') {
+          if (last.role === "assistant") {
             updated[updated.length - 1] = {
               ...last,
               content: getContent(),
@@ -55,15 +59,15 @@ export function useChatStream(sessionId: string | null) {
       if (!sessionId || isStreaming) return;
 
       // Add user message
-      setMessages((prev) => [...prev, { role: 'user', content }]);
+      setMessages((prev) => [...prev, { role: "user", content }]);
 
       // Start assistant message
-      let assistantContent = '';
+      let assistantContent = "";
       const toolCalls: ToolCallRecord[] = [];
 
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: '', toolCalls: [], isStreaming: true },
+        { role: "assistant", content: "", toolCalls: [], isStreaming: true },
       ]);
       setIsStreaming(true);
 
@@ -72,7 +76,7 @@ export function useChatStream(sessionId: string | null) {
         content,
         (event: SSEEvent) => {
           switch (event.type) {
-            case 'token': {
+            case "token": {
               assistantContent += event.text;
               scheduleFlush(
                 () => assistantContent,
@@ -81,12 +85,12 @@ export function useChatStream(sessionId: string | null) {
               );
               break;
             }
-            case 'tool_call': {
+            case "tool_call": {
               const record: ToolCallRecord = {
                 id: event.id,
                 tool: event.tool,
                 args: event.args,
-                status: 'loading',
+                status: "loading",
                 startedAt: Date.now(),
               };
               toolCalls.push(record);
@@ -97,13 +101,15 @@ export function useChatStream(sessionId: string | null) {
               );
               break;
             }
-            case 'tool_result': {
+            case "tool_result": {
               const tc = toolCalls.find((t) => t.id === event.id);
               if (tc) {
                 tc.status = event.status;
                 tc.result = event.result;
                 tc.error = event.error;
-                tc.latencyMs = tc.startedAt ? Date.now() - tc.startedAt : undefined;
+                tc.latencyMs = tc.startedAt
+                  ? Date.now() - tc.startedAt
+                  : undefined;
               }
               scheduleFlush(
                 () => assistantContent,
@@ -112,18 +118,18 @@ export function useChatStream(sessionId: string | null) {
               );
               break;
             }
-            case 'ui_action': {
+            case "ui_action": {
               dispatchUIAction(event.action);
               break;
             }
-            case 'done': {
+            case "done": {
               // Force immediate flush on done
               if (flushRef.current) cancelAnimationFrame(flushRef.current);
               flushRef.current = null;
               setMessages((prev) => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
-                if (last.role === 'assistant') {
+                if (last.role === "assistant") {
                   updated[updated.length - 1] = {
                     ...last,
                     content: assistantContent,
@@ -136,14 +142,14 @@ export function useChatStream(sessionId: string | null) {
               setIsStreaming(false);
               break;
             }
-            case 'error': {
+            case "error": {
               assistantContent += `\n\n⚠️ ${event.message}`;
               if (flushRef.current) cancelAnimationFrame(flushRef.current);
               flushRef.current = null;
               setMessages((prev) => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
-                if (last.role === 'assistant') {
+                if (last.role === "assistant") {
                   updated[updated.length - 1] = {
                     ...last,
                     content: assistantContent,
@@ -158,7 +164,7 @@ export function useChatStream(sessionId: string | null) {
           }
         },
         (error) => {
-          console.error('SSE error:', error);
+          console.error("SSE error:", error);
           setIsStreaming(false);
         },
       );
@@ -174,7 +180,7 @@ export function useChatStream(sessionId: string | null) {
     setMessages((prev) => {
       const updated = [...prev];
       const last = updated[updated.length - 1];
-      if (last.role === 'assistant' && last.isStreaming) {
+      if (last.role === "assistant" && last.isStreaming) {
         updated[updated.length - 1] = { ...last, isStreaming: false };
       }
       return updated;

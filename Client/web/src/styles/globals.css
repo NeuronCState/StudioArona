@@ -1,4 +1,4 @@
-@import './tokens.css';
+@import "./tokens.css";
 
 @tailwind base;
 @tailwind components;
@@ -7,7 +7,10 @@
 @layer base {
   * {
     border-color: var(--color-border);
-    transition: background-color 1s ease, color 1s ease, border-color 1s ease;
+    transition:
+      background-color 1s ease,
+      color 1s ease,
+      border-color 1s ease;
   }
 
   body {
@@ -16,7 +19,9 @@
     background-color: var(--color-bg);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    transition: background-color 1s ease, color 1s ease;
+    transition:
+      background-color 1s ease,
+      color 1s ease;
   }
 
   /* ───── 滚动条: 完全隐藏 (最稳定的方案) ─────
@@ -34,7 +39,8 @@
     -ms-overflow-style: none;
   }
 
-  code, pre {
+  code,
+  pre {
     font-family: var(--font-mono);
   }
 }
@@ -94,11 +100,22 @@
   @apply text-sm leading-relaxed;
   color: var(--color-text-primary);
 }
-.prose-javis p { @apply mb-2 last:mb-0; }
-.prose-javis ul, .prose-javis ol { @apply mb-2 pl-5; }
-.prose-javis ul { @apply list-disc; }
-.prose-javis ol { @apply list-decimal; }
-.prose-javis li { @apply mb-0.5; }
+.prose-javis p {
+  @apply mb-2 last:mb-0;
+}
+.prose-javis ul,
+.prose-javis ol {
+  @apply mb-2 pl-5;
+}
+.prose-javis ul {
+  @apply list-disc;
+}
+.prose-javis ol {
+  @apply list-decimal;
+}
+.prose-javis li {
+  @apply mb-0.5;
+}
 
 .prose-javis code {
   @apply rounded px-1.5 py-0.5 font-mono text-xs;
@@ -149,12 +166,16 @@
   @apply my-3;
   border-color: var(--color-border);
 }
-.prose-javis strong { @apply font-semibold; }
-.prose-javis em { @apply italic; }
+.prose-javis strong {
+  @apply font-semibold;
+}
+.prose-javis em {
+  @apply italic;
+}
 
 /* Streaming cursor */
 .stream-cursor > *:last-child::after {
-  content: '▌';
+  content: "▌";
   animation: cursorBlink 1s step-end infinite;
   color: var(--color-accent);
 }

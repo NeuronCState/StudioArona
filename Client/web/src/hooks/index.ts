@@ -8,8 +8,7 @@
  *   import { useVisibility, useReducedMotion } from '@/hooks';
  */
 
-export { useReducedMotion } from './useReducedMotion';
-export { useVisibility } from './useVisibility';
-export { useIdle } from './useIdle';
-export { useThrottle } from './useThrottle';
-export { useVirtualList } from './useVirtualList';
+export { useReducedMotion } from "./useReducedMotion";
+export { useVisibility } from "./useVisibility";
+export { useIdle } from "./useIdle";
+export { useThrottle } from "./useThrottle";

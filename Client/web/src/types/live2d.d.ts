@@ -7,16 +7,9 @@
  */
 
 // ── pixi-spine ──
-declare module 'pixi-spine' {
-  export { Spine } from '@pixi-spine/loader-uni';
-  export * from '@pixi-spine/base';
-}
-
-// ── Window globals ──
-declare global {
-  interface Window {
-    // No longer need PIXI or Live2DCubismCore on window
-  }
+declare module "pixi-spine" {
+  export { Spine } from "@pixi-spine/loader-uni";
+  export * from "@pixi-spine/base";
 }
 
 export {};

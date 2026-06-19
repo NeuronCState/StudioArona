@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { AlertCircle, X } from 'lucide-react';
-import { motion as m } from '@/lib/motion';
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { AlertCircle, X } from "lucide-react";
+import { motion as m } from "@/lib/motion";
 
 interface AgentErrorToastProps {
   /** Latest human-readable error from the chat hook, or null when
@@ -51,7 +51,10 @@ export function AgentErrorToast({
             initial={{ opacity: 0, y: -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
-            transition={{ duration: m.duration.fast / 1000, ease: m.easing.out }}
+            transition={{
+              duration: m.duration.fast / 1000,
+              ease: m.easing.out,
+            }}
             role="alert"
             data-testid="agent-error-toast"
             className="pointer-events-auto flex w-full max-w-md items-start gap-2.5 rounded-lg border border-[var(--color-error)]/50 bg-[var(--color-error)]/10 px-3 py-2 shadow-[var(--shadow-2)] backdrop-blur"

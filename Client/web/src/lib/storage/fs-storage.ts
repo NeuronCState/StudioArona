@@ -6,9 +6,24 @@
  *
  * 通过 @tauri-apps/api 的 invoke + tauri-plugin-fs 写
  */
-import { mkdir, readDir, readTextFile, writeTextFile, remove, exists } from '@tauri-apps/plugin-fs';
+import {
+  mkdir,
+  readDir,
+  readTextFile,
+  writeTextFile,
+  remove,
+  exists,
+} from "@tauri-apps/plugin-fs";
+import { homeDir } from "@tauri-apps/api/path";
 
-type Table = 'schedules' | 'feeds' | 'feedItems' | 'memories' | 'skills' | 'weather' | 'system';
+type Table =
+  | "schedules"
+  | "feeds"
+  | "feedItems"
+  | "memories"
+  | "skills"
+  | "weather"
+  | "system";
 
 /** 解析 ~/Documents/studioarona/<table>/<id>.json 的绝对路径 */
 async function filePath(table: Table, id: string): Promise<string> {
@@ -16,8 +31,6 @@ async function filePath(table: Table, id: string): Promise<string> {
   // appDataDir() = $HOME/Library/Application Support/<bundleId> (Tauri 默认)
   // 但我们想要 ~/Documents/, 所以用 $HOME + 拼
   // Tauri 2 没直接给 $HOME, 但 fs scope 已经 allow $HOME/Documents/studioarona/**
-  // 用 homeDir from @tauri-apps/api/path
-  const { homeDir } = await import('@tauri-apps/api/path');
   const home = await homeDir();
   // 拼: $HOME/Documents/studioarona/<table>/<id>.json
   // 不用 sep, Tauri fs 在 macOS 接受正斜杠
@@ -26,7 +39,6 @@ async function filePath(table: Table, id: string): Promise<string> {
 
 /** 解析目录路径: $HOME/Documents/studioarona/<table>/ */
 async function dirPath(table: Table): Promise<string> {
-  const { homeDir } = await import('@tauri-apps/api/path');
   const home = await homeDir();
   return `${home}Documents/studioarona/${table}`;
 }
@@ -41,7 +53,10 @@ async function ensureDir(dir: string): Promise<void> {
   }
 }
 
-export async function put(table: Table, doc: Record<string, unknown>): Promise<void> {
+export async function put(
+  table: Table,
+  doc: Record<string, unknown>,
+): Promise<void> {
   const id = String(doc.id);
   const dir = await dirPath(table);
   await ensureDir(dir);
@@ -50,7 +65,10 @@ export async function put(table: Table, doc: Record<string, unknown>): Promise<v
   await writeTextFile(file, json);
 }
 
-export async function get<T = unknown>(table: Table, id: string): Promise<T | undefined> {
+export async function get<T = unknown>(
+  table: Table,
+  id: string,
+): Promise<T | undefined> {
   const file = await filePath(table, id);
   try {
     if (!(await exists(file))) return undefined;
@@ -72,7 +90,10 @@ export async function del(table: Table, id: string): Promise<void> {
   }
 }
 
-export async function list<T = unknown>(table: Table, opts?: { sortBy?: string; reverse?: boolean }): Promise<T[]> {
+export async function list<T = unknown>(
+  table: Table,
+  opts?: { sortBy?: string; reverse?: boolean },
+): Promise<T[]> {
   const all = await listAll<T>(table);
   let result = all;
   if (opts?.sortBy) {
@@ -97,8 +118,8 @@ export async function listAll<T = unknown>(table: Table): Promise<T[]> {
     const entries = await readDir(dir);
     const docs: T[] = [];
     for (const entry of entries) {
-      if (entry.isFile && entry.name?.endsWith('.json')) {
-        const id = entry.name.replace('.json', '');
+      if (entry.isFile && entry.name?.endsWith(".json")) {
+        const id = entry.name.replace(".json", "");
         const doc = await get<T>(table, id);
         if (doc) docs.push(doc);
       }
@@ -126,7 +147,13 @@ export async function clear(table: Table): Promise<void> {
 
 /** 是否有任何数据 (用于迁移检测) */
 export async function hasAnyData(): Promise<boolean> {
-  const tables: Table[] = ['schedules', 'feeds', 'feedItems', 'memories', 'skills'];
+  const tables: Table[] = [
+    "schedules",
+    "feeds",
+    "feedItems",
+    "memories",
+    "skills",
+  ];
   for (const t of tables) {
     const items = await listAll(t);
     if (items.length > 0) return true;

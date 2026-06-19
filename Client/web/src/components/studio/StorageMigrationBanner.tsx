@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { FolderOpen, Database, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { FolderOpen, Database, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
-import { needsMigration, migrateFromIdb, backendType } from '@/lib/storage';
-import { Button } from '@javis/ui-kit';
+import { needsMigration, migrateFromIdb, backendType } from "@/lib/storage";
+import { Button } from "@javis/ui-kit";
 
 /**
  * StorageMigrationBanner — Tauri 桌面端首次启动时, 检测到 IDB 已有数据但 fs 还没数据时
@@ -15,7 +15,7 @@ import { Button } from '@javis/ui-kit';
  * - 用户选 "迁移" / "跳过" / 关闭
  * - 选过的偏好 localStorage 记录 (一次性, 不再弹)
  */
-const MIGRATION_DISMISSED_KEY = 'studio-arona-migration-dismissed';
+const MIGRATION_DISMISSED_KEY = "studio-arona-migration-dismissed";
 
 export function StorageMigrationBanner() {
   const [show, setShow] = useState(false);
@@ -24,12 +24,12 @@ export function StorageMigrationBanner() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (backendType() !== 'tauri-fs') return; // 仅 Tauri 桌面
+    if (backendType() !== "tauri-fs") return; // 仅 Tauri 桌面
 
     // 已选过迁移/跳过, 不再弹
-    if (localStorage.getItem(MIGRATION_DISMISSED_KEY) === '1') return;
+    if (localStorage.getItem(MIGRATION_DISMISSED_KEY) === "1") return;
 
-    needsMigration().then(needs => {
+    needsMigration().then((needs) => {
       if (needs) setShow(true);
     });
   }, []);
@@ -44,13 +44,13 @@ export function StorageMigrationBanner() {
       setResult(`迁移失败: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setMigrating(false);
-      localStorage.setItem(MIGRATION_DISMISSED_KEY, '1');
+      localStorage.setItem(MIGRATION_DISMISSED_KEY, "1");
       setTimeout(() => setShow(false), 3000);
     }
   };
 
   const handleSkip = () => {
-    localStorage.setItem(MIGRATION_DISMISSED_KEY, '1');
+    localStorage.setItem(MIGRATION_DISMISSED_KEY, "1");
     setShow(false);
   };
 
@@ -66,7 +66,10 @@ export function StorageMigrationBanner() {
         >
           <div className="flex max-w-lg items-start gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-lg dark:border-stone-700 dark:bg-stone-900">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/30">
-              <Database size={20} className="text-amber-600 dark:text-amber-400" />
+              <Database
+                size={20}
+                className="text-amber-600 dark:text-amber-400"
+              />
             </div>
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex items-center justify-between">
@@ -100,7 +103,7 @@ export function StorageMigrationBanner() {
                 >
                   <span className="inline-flex items-center gap-1.5">
                     <FolderOpen size={14} />
-                    {migrating ? '迁移中...' : '迁移到 ~/Documents/'}
+                    {migrating ? "迁移中..." : "迁移到 ~/Documents/"}
                   </span>
                 </Button>
                 <Button size="sm" variant="ghost" onClick={handleSkip}>

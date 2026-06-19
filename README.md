@@ -28,10 +28,7 @@
 - **Docker** (启 PG/Redis)
 - **Rust** (`curl https://sh.rustup.rs -sSf | sh`)
 - **Node.js 22** + **pnpm 9**
-- **SonettoHere** (Agent framework) — clone 到 `~/Downloads/SonettoHere-main`:
-  ```bash
-  gh repo clone Miso2233/SonettoHere ~/Downloads/SonettoHere-main
-  ```
+- **SonettoHere Agent runtime** 已内置于 `Client/services/sonetto`，无需单独克隆
 
 ### 启动
 
@@ -246,7 +243,7 @@ WEATHER_API_KEY=
 
 v3.1 起, Agent 框架从 Hermes 切换到 SonettoHere (LangGraph ReAct).
 
-**SonettoHere 0 改原则**: 借用 SonettoHere 的设计 (Vue) → Client 用 React 重写, 兼容努力全在 Client 侧.
+**集成原则**: Agent 后端运行时内置于 Client；上游 Vue 界面由 StudioArona React 界面替代.
 
 **协议** (`ws://127.0.0.1:8081/ws/chat/{session_id}`):
 - Client send: `chat` / `cancel` / `ping`
@@ -254,7 +251,7 @@ v3.1 起, Agent 框架从 Hermes 切换到 SonettoHere (LangGraph ReAct).
 
 **Provider 配置**: Client `ProfileSettingsDialog` + `SetupPage` 用 SonettoHere schema 推 4 preset (minimax-cn / openai-test / deepseek / custom).
 
-**SonettoHere 源码**: `~/Downloads/SonettoHere-main` (GitHub clone, 不进 repo).
+**SonettoHere 运行时**: `Client/services/sonetto`。根目录副本仅用于上游参考，不参与启动.
 
 ---
 

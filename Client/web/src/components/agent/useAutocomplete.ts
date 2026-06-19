@@ -4,8 +4,8 @@
  * 检测 textarea 输入 `/` 触发, 上箭头/下箭头切换, 回车选中, Esc 关闭.
  * 候选列表从父组件传入 (skills + native commands + MCP tool 等).
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AutocompleteItem } from './AutocompletePanel';
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { AutocompleteItem } from "./AutocompletePanel";
 
 export function useAutocomplete(
   text: string,
@@ -13,7 +13,7 @@ export function useAutocomplete(
   onInsert: (insertText: string) => void,
 ) {
   const [open, setOpen] = useState(false);
-  const [filterText, setFilterText] = useState('');
+  const [filterText, setFilterText] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -26,7 +26,7 @@ export function useAutocomplete(
     // 找最后一个 `/` 在光标前
     const cursorPos = textarea.selectionStart ?? text.length;
     const beforeCursor = text.slice(0, cursorPos);
-    const match = beforeCursor.match(/\/([^\s\/]*)$/);
+    const match = beforeCursor.match(/\/([^\s/]*)$/);
 
     if (match) {
       setOpen(true);
@@ -38,7 +38,7 @@ export function useAutocomplete(
       setPosition({ x: rect.left, y: rect.top });
     } else {
       setOpen(false);
-      setFilterText('');
+      setFilterText("");
     }
   }, [text]);
 
@@ -52,17 +52,17 @@ export function useAutocomplete(
   const handleKey = useCallback(
     (e: { key: string; preventDefault: () => void }): boolean => {
       if (!open || filtered.length === 0) return false;
-      if (e.key === 'ArrowDown') {
+      if (e.key === "ArrowDown") {
         e.preventDefault();
         setActiveIndex((i) => (i + 1) % filtered.length);
         return true;
       }
-      if (e.key === 'ArrowUp') {
+      if (e.key === "ArrowUp") {
         e.preventDefault();
         setActiveIndex((i) => (i - 1 + filtered.length) % filtered.length);
         return true;
       }
-      if (e.key === 'Enter' || e.key === 'Tab') {
+      if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
         const item = filtered[activeIndex];
         if (item) {
@@ -71,7 +71,7 @@ export function useAutocomplete(
         }
         return true;
       }
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         e.preventDefault();
         setOpen(false);
         return true;

@@ -139,7 +139,8 @@
 /* Studio Page */
 [data-design-mode="studio"] .studio-page {
   min-height: 100%;
-  animation: studio-page-enter var(--studio-duration-slow) var(--studio-ease-out);
+  animation: studio-page-enter var(--studio-duration-slow)
+    var(--studio-ease-out);
 }
 
 @keyframes studio-page-enter {
@@ -174,7 +175,8 @@
 
 /* Studio Message */
 [data-design-mode="studio"] .studio-message {
-  animation: studio-message-enter var(--studio-duration-base) var(--studio-ease-out);
+  animation: studio-message-enter var(--studio-duration-base)
+    var(--studio-ease-out);
 }
 
 @keyframes studio-message-enter {
@@ -196,7 +198,8 @@
 }
 
 @keyframes studio-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {

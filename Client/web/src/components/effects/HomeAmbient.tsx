@@ -1,4 +1,4 @@
-import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 /**
  * Home page ambient backdrop.
@@ -18,9 +18,9 @@ export function HomeAmbient(): JSX.Element {
   //        /assets/textures/home-ambient-night.webp)
   //       For now use a pure CSS radial gradient as a light placeholder.
   const gradient =
-    'radial-gradient(ellipse 80% 60% at 20% 30%, rgba(103,215,255,0.10) 0%, transparent 50%), ' +
-    'radial-gradient(ellipse 60% 80% at 80% 60%, rgba(168,184,255,0.08) 0%, transparent 50%), ' +
-    'radial-gradient(ellipse 70% 50% at 50% 90%, rgba(75,163,255,0.06) 0%, transparent 50%)';
+    "radial-gradient(ellipse 80% 60% at 20% 30%, rgba(103,215,255,0.10) 0%, transparent 50%), " +
+    "radial-gradient(ellipse 60% 80% at 80% 60%, rgba(168,184,255,0.08) 0%, transparent 50%), " +
+    "radial-gradient(ellipse 70% 50% at 50% 90%, rgba(75,163,255,0.06) 0%, transparent 50%)";
 
   return (
     <div
@@ -28,8 +28,8 @@ export function HomeAmbient(): JSX.Element {
       style={{
         background: gradient,
         animation: reduced
-          ? 'none'
-          : 'home-ambient-drift 30s ease-in-out infinite alternate',
+          ? "none"
+          : "home-ambient-drift 30s ease-in-out infinite alternate",
       }}
       aria-hidden="true"
     />

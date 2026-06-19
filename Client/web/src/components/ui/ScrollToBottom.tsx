@@ -1,13 +1,16 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronDown } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { ChevronDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ScrollToBottomProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
   threshold?: number;
 }
 
-export function ScrollToBottom({ containerRef, threshold = 300 }: ScrollToBottomProps) {
+export function ScrollToBottom({
+  containerRef,
+  threshold = 300,
+}: ScrollToBottomProps) {
   const [visible, setVisible] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -29,19 +32,22 @@ export function ScrollToBottom({ containerRef, threshold = 300 }: ScrollToBottom
       timeoutRef.current = setTimeout(checkScroll, 100);
     };
 
-    el.addEventListener('scroll', handleScroll, { passive: true });
+    el.addEventListener("scroll", handleScroll, { passive: true });
 
     // Initial check
     checkScroll();
 
     return () => {
-      el.removeEventListener('scroll', handleScroll);
+      el.removeEventListener("scroll", handleScroll);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [checkScroll]);
 
   const scrollToBottom = () => {
-    containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: 'smooth' });
+    containerRef.current?.scrollTo({
+      top: containerRef.current.scrollHeight,
+      behavior: "smooth",
+    });
   };
 
   return (

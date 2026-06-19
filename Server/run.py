@@ -226,8 +226,26 @@ def cargo_run() -> None:
     env = os.environ.copy()
     env.setdefault("RUST_LOG", "info,sqlx=warn")
     env.setdefault("DATABASE_URL", "postgres://javis:javis@localhost:5432/javis")
-    env.setdefault("REDIS_URL", "redis://localhost:6379")
+    # P2#2: 不再注入 REDIS_URL — 单实例部署不需要 Redis.
     env.setdefault("JWT_SECRET", env.get("JWT_SECRET", "dev-only-change-me-please-32-chars"))
+
+    # 加载 .env.local (如果有) — 给 Rust center 注入 SMTP_* 配置 (P1#6 邮件降级)
+    env_local = ROOT / ".env.local"
+    if env_local.exists():
+        for line in env_local.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, _, v = line.partition("=")
+            k = k.strip()
+            v = v.strip().strip('"').strip("'")
+            # P2#2: 移除 REDIS_URL — 单实例不再需要.
+            if k == "REDIS_URL":
+                log("  (ignoring REDIS_URL in .env.local: single-instance build)")
+                continue
+            if k.startswith(("SMTP_", "NOTIFY_SMTP_", "DATABASE_URL", "JWT_SECRET")):
+                env.setdefault(k, v)
+        log("loaded env overrides from .env.local")
 
     binary = CENTER_DIR / "target" / "debug" / "studio-arona-center"
     if not binary.exists():
@@ -248,8 +266,23 @@ def cargo_daemon() -> None:
     env = os.environ.copy()
     env.setdefault("RUST_LOG", "info,sqlx=warn")
     env.setdefault("DATABASE_URL", "postgres://javis:javis@localhost:5432/javis")
-    env.setdefault("REDIS_URL", "redis://localhost:6379")
+    # P2#2: 不再注入 REDIS_URL — 单实例部署不需要 Redis.
     env.setdefault("JWT_SECRET", env.get("JWT_SECRET", "dev-only-change-me-please-32-chars"))
+    # 加载 .env.local 的 SMTP 配置 (P1#6)
+    env_local = ROOT / ".env.local"
+    if env_local.exists():
+        for line in env_local.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, _, v = line.partition("=")
+            k = k.strip()
+            v = v.strip().strip('"').strip("'")
+            # P2#2: 移除 REDIS_URL — 单实例不再需要.
+            if k == "REDIS_URL":
+                continue
+            if k.startswith(("SMTP_", "NOTIFY_SMTP_", "DATABASE_URL", "JWT_SECRET")):
+                env.setdefault(k, v)
     binary = CENTER_DIR / "target" / "debug" / "studio-arona-center"
     f = open(log_path, "ab")
     p = subprocess.Popen(
@@ -309,6 +342,10 @@ def main() -> None:
         ensure_ocr_vendor()
         return
 
+    if args.build:
+        cargo_build()
+        return
+
     if not args.no_docker:
         docker_up()
 
@@ -328,10 +365,6 @@ def main() -> None:
             time.sleep(1)
         else:
             log("OCR not ready in 30s, check .run-logs/ocr.log")
-
-    if args.build:
-        cargo_build()
-        return
 
     if args.daemon:
         cargo_daemon()

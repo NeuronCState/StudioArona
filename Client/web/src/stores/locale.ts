@@ -1,7 +1,7 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
-export type Locale = 'zh' | 'en';
+export type Locale = "zh" | "en";
 
 interface LocaleState {
   locale: Locale;
@@ -12,10 +12,11 @@ interface LocaleState {
 export const useLocaleStore = create<LocaleState>()(
   persist(
     (set) => ({
-      locale: 'zh',
+      locale: "zh",
       setLocale: (locale) => set({ locale }),
-      toggleLocale: () => set((s) => ({ locale: s.locale === 'zh' ? 'en' : 'zh' })),
+      toggleLocale: () =>
+        set((s) => ({ locale: s.locale === "zh" ? "en" : "zh" })),
     }),
-    { name: 'studio-arona-locale' },
+    { name: "studio-arona-locale" },
   ),
 );

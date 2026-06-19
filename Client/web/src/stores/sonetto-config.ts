@@ -14,17 +14,18 @@
  * 新 useSonettoConfigStore 字段: providers[] { id, provider_type, label, api_key, base_url, models[], context_window }
  *   + activeProviderId + sonettoBaseUrl + sonettoReady + syncToSonetto()
  */
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 export interface SonettoProviderConfig {
   id: string;
-  provider_type: 'openai' | string;
+  provider_type: "openai" | string;
   label: string;
   api_key: string;
   base_url: string;
   models: string[];
   context_window?: number;
+  enabled?: boolean;
 }
 
 export interface SonettoProviderPreset {
@@ -45,6 +46,7 @@ interface SonettoConfigState {
   addProvider: (config: SonettoProviderConfig) => void;
   updateProvider: (id: string, config: SonettoProviderConfig) => void;
   removeProvider: (id: string) => void;
+  replaceProviders: (providers: SonettoProviderConfig[]) => void;
   setActiveProvider: (id: string) => void;
   markSetupComplete: () => void;
   getActiveProvider: () => SonettoProviderConfig;
@@ -55,49 +57,49 @@ interface SonettoConfigState {
 /** 4 个 preset — 跟 SonettoHere 默认 providers 对齐 (无本地 Hermes, 已拆) */
 export const SONETTO_PRESETS: SonettoProviderPreset[] = [
   {
-    label: 'MiniMax CN',
+    label: "MiniMax CN",
     config: {
-      id: 'minimax-cn',
-      provider_type: 'openai',
-      label: 'MiniMax CN',
-      api_key: '',
-      base_url: 'https://api.minimax.chat/v1',
-      models: ['MiniMax-M2.5-highspeed', 'MiniMax-M2.5'],
+      id: "minimax-cn",
+      provider_type: "openai",
+      label: "MiniMax CN",
+      api_key: "",
+      base_url: "https://api.minimax.chat/v1",
+      models: ["MiniMax-M2.5-highspeed", "MiniMax-M2.5"],
       context_window: 256000,
     },
   },
   {
-    label: 'OpenAI',
+    label: "OpenAI",
     config: {
-      id: 'openai',
-      provider_type: 'openai',
-      label: 'OpenAI',
-      api_key: '',
-      base_url: 'https://api.openai.com/v1',
-      models: ['gpt-4o-mini', 'gpt-4o'],
+      id: "openai",
+      provider_type: "openai",
+      label: "OpenAI",
+      api_key: "",
+      base_url: "https://api.openai.com/v1",
+      models: ["gpt-4o-mini", "gpt-4o"],
       context_window: 128000,
     },
   },
   {
-    label: 'DeepSeek',
+    label: "DeepSeek",
     config: {
-      id: 'deepseek',
-      provider_type: 'openai',
-      label: 'DeepSeek',
-      api_key: '',
-      base_url: 'https://api.deepseek.com/v1',
-      models: ['deepseek-chat', 'deepseek-coder'],
+      id: "deepseek",
+      provider_type: "openai",
+      label: "DeepSeek",
+      api_key: "",
+      base_url: "https://api.deepseek.com/v1",
+      models: ["deepseek-chat", "deepseek-coder"],
       context_window: 64000,
     },
   },
   {
-    label: '自定义',
+    label: "自定义",
     config: {
-      id: 'custom',
-      provider_type: 'openai',
-      label: '自定义',
-      api_key: '',
-      base_url: '',
+      id: "custom",
+      provider_type: "openai",
+      label: "自定义",
+      api_key: "",
+      base_url: "",
       models: [],
       context_window: 32000,
     },
@@ -120,13 +122,21 @@ interface OldHermesConfig {
 
 /** 旧 Hermes preset → SonettoHere 字段映射 (用户已配的不丢) */
 const HERMES_PRESET_MAP: Record<string, SonettoProviderConfig> = {
-  'http://127.0.0.1:8645': SONETTO_PRESETS[0].config, // 旧 "本地 Hermes" → 默认 MiniMax
-  'https://api.minimax.chat': { ...SONETTO_PRESETS[0].config, base_url: 'https://api.minimax.chat/v1' },
-  'https://api.openai.com/v1': { ...SONETTO_PRESETS[1].config, base_url: 'https://api.openai.com/v1' },
-  'https://api.deepseek.com/v1': SONETTO_PRESETS[2].config,
+  "http://127.0.0.1:8645": SONETTO_PRESETS[0].config, // 旧 "本地 Hermes" → 默认 MiniMax
+  "https://api.minimax.chat": {
+    ...SONETTO_PRESETS[0].config,
+    base_url: "https://api.minimax.chat/v1",
+  },
+  "https://api.openai.com/v1": {
+    ...SONETTO_PRESETS[1].config,
+    base_url: "https://api.openai.com/v1",
+  },
+  "https://api.deepseek.com/v1": SONETTO_PRESETS[2].config,
 };
 
-function migrateOldHermes(old: OldHermesConfig | undefined): SonettoProviderConfig[] {
+function migrateOldHermes(
+  old: OldHermesConfig | undefined,
+): SonettoProviderConfig[] {
   if (!old?.providers?.length) return [DEFAULT_PROVIDER];
   return old.providers.map((p, i) => {
     const matched = HERMES_PRESET_MAP[p.baseUrl] ?? SONETTO_PRESETS[3].config; // 不匹配 → 自定义
@@ -146,7 +156,7 @@ export const useSonettoConfigStore = create<SonettoConfigState>()(
       providers: [DEFAULT_PROVIDER],
       activeProviderId: DEFAULT_PROVIDER.id,
       setupComplete: false,
-      sonettoBaseUrl: 'http://127.0.0.1:8081',
+      sonettoBaseUrl: "http://127.0.0.1:8081",
       sonettoReady: null,
 
       setSonettoBaseUrl: (url) => set({ sonettoBaseUrl: url }),
@@ -165,7 +175,8 @@ export const useSonettoConfigStore = create<SonettoConfigState>()(
       removeProvider: (id) =>
         set((state) => {
           const newProviders = state.providers.filter((p) => p.id !== id);
-          const finalProviders = newProviders.length > 0 ? newProviders : [DEFAULT_PROVIDER];
+          const finalProviders =
+            newProviders.length > 0 ? newProviders : [DEFAULT_PROVIDER];
           return {
             providers: finalProviders,
             activeProviderId:
@@ -174,6 +185,19 @@ export const useSonettoConfigStore = create<SonettoConfigState>()(
                 : state.activeProviderId,
           };
         }),
+      replaceProviders: (providers) =>
+        set((state) => ({
+          providers,
+          activeProviderId: providers.some(
+            (provider) =>
+              provider.id === state.activeProviderId &&
+              provider.enabled !== false,
+          )
+            ? state.activeProviderId
+            : (providers.find((provider) => provider.enabled !== false)?.id ??
+              providers[0]?.id ??
+              ""),
+        })),
 
       setActiveProvider: (id) => set({ activeProviderId: id }),
       markSetupComplete: () => set({ setupComplete: true }),
@@ -188,22 +212,28 @@ export const useSonettoConfigStore = create<SonettoConfigState>()(
       },
 
       syncToSonetto: async () => {
-        const { sonettoBaseUrl, getActiveProvider, providers, setSonettoReady } = get();
+        const {
+          sonettoBaseUrl,
+          getActiveProvider,
+          providers,
+          setSonettoReady,
+        } = get();
         try {
           // 推 active provider
           const active = getActiveProvider();
           const r1 = await fetch(`${sonettoBaseUrl}/api/providers`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(active),
           });
-          if (!r1.ok) throw new Error(`POST /api/providers failed: ${r1.status}`);
+          if (!r1.ok)
+            throw new Error(`POST /api/providers failed: ${r1.status}`);
           // 也推其他 provider (SonettoHere 端单条管理)
           for (const p of providers) {
             if (p.id === active.id) continue;
             await fetch(`${sonettoBaseUrl}/api/providers`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify(p),
             });
           }
@@ -215,7 +245,7 @@ export const useSonettoConfigStore = create<SonettoConfigState>()(
       },
     }),
     {
-      name: 'studio-arona-sonetto-config',
+      name: "studio-arona-sonetto-config",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         providers: state.providers,
@@ -227,13 +257,15 @@ export const useSonettoConfigStore = create<SonettoConfigState>()(
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         try {
-          const raw = localStorage.getItem('studio-arona-hermes-config');
+          const raw = localStorage.getItem("studio-arona-hermes-config");
           if (!raw) return;
           const parsed = JSON.parse(raw);
           if (parsed?.state?.providers?.length) {
             const migrated = migrateOldHermes(parsed.state);
             state.providers = migrated;
-            state.activeProviderId = migrated[parsed.state.activeProviderIndex ?? 0]?.id ?? migrated[0].id;
+            state.activeProviderId =
+              migrated[parsed.state.activeProviderIndex ?? 0]?.id ??
+              migrated[0].id;
             // 旧 key 不删, 用户能查, 但新写入只到新 key
           }
         } catch {

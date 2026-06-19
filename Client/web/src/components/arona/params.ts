@@ -32,25 +32,25 @@
 
 // Expression animation IDs for track 1
 export const SPINE_EXPRESSIONS = {
-  DEFAULT: '00',
-  HAPPY: '25',
-  MILD: '13',
-  SLEEPY: '18',
-  UPBEAT: '12',
-  CURIOUS: '29',
-  EXCITED: '31',
-  SURPRISED: '32',
+  DEFAULT: "00",
+  HAPPY: "25",
+  MILD: "13",
+  SLEEPY: "18",
+  UPBEAT: "12",
+  CURIOUS: "29",
+  EXCITED: "31",
+  SURPRISED: "32",
 } as const;
 
 // Idle animation names for track 0
 export const SPINE_IDLE = {
-  DEFAULT: 'Idle_01',
-  BG: 'Idle_background_00',
+  DEFAULT: "Idle_01",
+  BG: "Idle_background_00",
 } as const;
 
 // Body animation names for track 2
 export const SPINE_BODY = {
-  PAT: 'Pat_01_A',
-  PAT_END: 'PatEnd_01_A',
-  LOOK_END: 'LookEnd_01_A',
+  PAT: "Pat_01_A",
+  PAT_END: "PatEnd_01_A",
+  LOOK_END: "LookEnd_01_A",
 } as const;

@@ -1,14 +1,23 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Pencil, Trash2, Calendar, Rss, Server, MessageSquare, MessageSquarePlus, X } from 'lucide-react';
-import { api } from '@/lib/api/client';
-import type { VM, Schedule, Feed } from '@/types/contracts';
-import { useFocusChatsStore, type FocusChat } from '@/stores/focus-chats';
-import { useFocusModeStore } from '@/stores/focus-mode';
-import { motion as m } from '@/lib/motion';
-import { cn } from '@/lib/utils';
-import { useT } from '@/lib/i18n';
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Pencil,
+  Trash2,
+  Calendar,
+  Rss,
+  Server,
+  MessageSquare,
+  MessageSquarePlus,
+  X,
+} from "lucide-react";
+import { api } from "@/lib/api/client";
+import type { VM, Schedule, Feed } from "@/types/contracts";
+import { useFocusChatsStore, type FocusChat } from "@/stores/focus-chats";
+import { useFocusModeStore } from "@/stores/focus-mode";
+import { motion as m } from "@/lib/motion";
+import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 /**
  * FocusSidebar — 专注模式左侧拉出
@@ -30,7 +39,7 @@ export interface FocusSidebarProps {
   onClose: () => void;
 }
 
-type RegionKey = 'schedule' | 'feeds' | 'vms';
+type RegionKey = "schedule" | "feeds" | "vms";
 
 export function FocusSidebar({ open, onClose }: FocusSidebarProps) {
   return (
@@ -75,15 +84,18 @@ function FocusSidebarContent({ onClose }: { onClose: () => void }) {
       {/* 新对话按钮 — FocusSidebar 内部, 拉到时才显示 */}
       <motion.button
         type="button"
-        onClick={() => { createChat(); setFocusMode(true); }}
+        onClick={() => {
+          createChat();
+          setFocusMode(true);
+        }}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.97 }}
         transition={{ duration: m.duration.fast / 1000, ease: m.easing.out }}
         className="sidebar-new-chat"
-        title={t('sidebar.newChat')}
+        title={t("sidebar.newChat")}
       >
         <MessageSquarePlus size={14} />
-        <span>{t('sidebar.newChat')}</span>
+        <span>{t("sidebar.newChat")}</span>
       </motion.button>
 
       {/* History (60%) */}
@@ -106,7 +118,7 @@ function FocusSidebarContent({ onClose }: { onClose: () => void }) {
 
 function formatRelative(ts: number): string {
   const diff = Date.now() - ts;
-  if (diff < 60_000) return '刚刚';
+  if (diff < 60_000) return "刚刚";
   const minutes = Math.round(diff / 60_000);
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.round(diff / 3_600_000);
@@ -209,10 +221,10 @@ function HistoryItem({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       e.preventDefault();
       commit();
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       e.preventDefault();
       cancel();
     }
@@ -225,7 +237,7 @@ function HistoryItem({
 
   return (
     <li
-      className={cn('focus-chat-item', isActive && 'is-active')}
+      className={cn("focus-chat-item", isActive && "is-active")}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
@@ -245,7 +257,9 @@ function HistoryItem({
       ) : (
         <>
           <span className="focus-chat-title">{chat.title}</span>
-          <span className="focus-chat-time">{formatRelative(chat.updatedAt)}</span>
+          <span className="focus-chat-time">
+            {formatRelative(chat.updatedAt)}
+          </span>
         </>
       )}
 
@@ -332,19 +346,19 @@ function HistoryItem({
 
 function RegionPane({ region }: { region: RegionKey }) {
   switch (region) {
-    case 'schedule':
+    case "schedule":
       return <ScheduleRegion />;
-    case 'feeds':
+    case "feeds":
       return <FeedsRegion />;
-    case 'vms':
+    case "vms":
       return <VmsRegion />;
   }
 }
 
 function ScheduleRegion() {
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['schedules', 'upcoming'],
-    queryFn: () => api.get<Schedule[]>('/schedules?upcoming=true'),
+    queryKey: ["schedules", "upcoming"],
+    queryFn: () => api.get<Schedule[]>("/schedules?upcoming=true"),
     staleTime: 60_000,
   });
   const empty = !isLoading && !isError && (!data || data.length === 0);
@@ -370,8 +384,8 @@ function ScheduleRegion() {
 
 function FeedsRegion() {
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['feeds'],
-    queryFn: () => api.get<Feed[]>('/feeds'),
+    queryKey: ["feeds"],
+    queryFn: () => api.get<Feed[]>("/feeds"),
     staleTime: 60_000,
   });
   const empty = !isLoading && !isError && (!data || data.length === 0);
@@ -387,7 +401,7 @@ function FeedsRegion() {
       <ul className="focus-region-list">
         {(data ?? []).slice(0, 4).map((f) => (
           <li key={f.id} className="focus-region-item">
-            <span className="focus-region-title">{f.title ?? '(无标题)'}</span>
+            <span className="focus-region-title">{f.title ?? "(无标题)"}</span>
           </li>
         ))}
       </ul>
@@ -397,8 +411,8 @@ function FeedsRegion() {
 
 function VmsRegion() {
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['vms'],
-    queryFn: () => api.get<VM[]>('/vms'),
+    queryKey: ["vms"],
+    queryFn: () => api.get<VM[]>("/vms"),
     staleTime: 30_000,
   });
   const empty = !isLoading && !isError && (!data || data.length === 0);
@@ -415,7 +429,7 @@ function VmsRegion() {
         {(data ?? []).slice(0, 4).map((v) => (
           <li key={v.id} className="focus-region-item">
             <span className="focus-region-title">{v.name ?? v.id}</span>
-            <span className="focus-region-meta">{v.status ?? '—'}</span>
+            <span className="focus-region-meta">{v.status ?? "—"}</span>
           </li>
         ))}
       </ul>
@@ -452,7 +466,9 @@ function RegionShell({
         ) : offline ? (
           <div className="focus-offline">
             <span>server 未连接</span>
-            <span className="focus-offline-hint">{offlineMsg ?? '连接后显示真实数据'}</span>
+            <span className="focus-offline-hint">
+              {offlineMsg ?? "连接后显示真实数据"}
+            </span>
           </div>
         ) : empty ? (
           <div className="focus-offline">

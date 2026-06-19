@@ -1,7 +1,7 @@
 /**
  * ConflictStore — zustand 状态机, 存「dirty doc 被 server 拒 (409)」的待合并冲突
  *
- * 触发: useSync 推 dirty doc 时收到 409, 把 server doc + client doc 存进这里
+ * 触发: 本地资源同步收到 409, 把 server doc + client doc 存进这里
  * 消费: ConflictMergeDialog 列 conflict, 用户选 / 编, 调 resolve() 写回本地 + push server
  *
  * 设计:
@@ -9,10 +9,10 @@
  * - value = { serverDoc, clientDoc, fieldDiff[], detectedAt }
  * - 不持久化 (冲突是 transient, 关页面就丢; 用户还没解决的冲突回放下也没用)
  */
-import { create } from 'zustand';
+import { create } from "zustand";
 
 export interface ScheduleConflict {
-  table: 'schedules';
+  table: "schedules";
   docId: string;
   serverDoc: Record<string, unknown>;
   clientDoc: Record<string, unknown>;
@@ -49,6 +49,6 @@ export const useConflictStore = create<ConflictState>((set) => ({
 }));
 
 /** 给外部按 table+id 取冲突 key */
-export function conflictKey(table: Conflict['table'], docId: string): string {
+export function conflictKey(table: Conflict["table"], docId: string): string {
   return `${table}:${docId}`;
 }

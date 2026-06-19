@@ -1,6 +1,6 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
-export type ToastLevel = 'info' | 'warn' | 'error';
+export type ToastLevel = "info" | "warn" | "error";
 
 export interface Toast {
   id: string;
@@ -23,5 +23,6 @@ export const useUIStore = create<UIState>()((set) => ({
       set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
     }, 4000);
   },
-  removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+  removeToast: (id) =>
+    set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 }));

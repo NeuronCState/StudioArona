@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import Stats from 'stats.js';
+import { useEffect, useRef } from "react";
+import Stats from "stats.js";
 
 /**
  * Dev-only FPS + memory HUD overlay.
@@ -14,11 +14,11 @@ export function PerfHud(): JSX.Element | null {
   useEffect(() => {
     const stats = new Stats();
     stats.showPanel(1); // 0=fps, 1=ms/frame, 2=mb (memory)
-    stats.dom.style.position = 'absolute';
-    stats.dom.style.left = 'auto';
-    stats.dom.style.right = '8px';
-    stats.dom.style.bottom = '8px';
-    stats.dom.style.top = 'auto';
+    stats.dom.style.position = "absolute";
+    stats.dom.style.left = "auto";
+    stats.dom.style.right = "8px";
+    stats.dom.style.bottom = "8px";
+    stats.dom.style.top = "auto";
 
     if (containerRef.current) {
       containerRef.current.appendChild(stats.dom);

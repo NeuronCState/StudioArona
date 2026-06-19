@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronUp, Bot } from 'lucide-react';
-import { api } from '@/lib/api/client';
-import { formatCountdown } from '@/lib/utils';
-import type { Schedule } from '@/types/contracts';
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronDown, ChevronUp, Bot } from "lucide-react";
+import { api } from "@/lib/api/client";
+import { formatCountdown } from "@/lib/utils";
+import type { Schedule } from "@/types/contracts";
 
 interface ScheduleTimelineProps {
-  scope: 'personal' | 'shared';
+  scope: "personal" | "shared";
 }
 
 function isWithin24h(dueAt: string): boolean {
@@ -22,14 +22,18 @@ function isPastDue(dueAt: string): boolean {
 
 function formatTime(dueAt: string): string {
   const d = new Date(dueAt);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 export function ScheduleTimeline({ scope }: ScheduleTimelineProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const { data: schedules, isLoading, isError } = useQuery({
-    queryKey: ['schedules', scope],
+  const {
+    data: schedules,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["schedules", scope],
     queryFn: () => api.get<Schedule[]>(`/schedules?scope=${scope}`),
   });
 
@@ -79,16 +83,14 @@ export function ScheduleTimeline({ scope }: ScheduleTimelineProps) {
             <button
               onClick={() => toggle(item.id)}
               className={`flex w-full items-start gap-4 px-1 py-2 text-left transition-colors hover:bg-surface ${
-                expired ? 'opacity-60' : ''
+                expired ? "opacity-60" : ""
               }`}
             >
               {/* Time column */}
               <div className="flex w-16 shrink-0 flex-col items-end pt-0.5">
                 <span
                   className={`text-xs tabular-nums ${
-                    urgent
-                      ? 'font-semibold text-accent'
-                      : 'text-text-muted'
+                    urgent ? "font-semibold text-accent" : "text-text-muted"
                   }`}
                 >
                   {formatTime(item.starts_at)}
@@ -101,10 +103,10 @@ export function ScheduleTimeline({ scope }: ScheduleTimelineProps) {
                 <div
                   className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full border-2 ${
                     expired
-                      ? 'border-text-muted bg-transparent'
+                      ? "border-text-muted bg-transparent"
                       : urgent
-                        ? 'border-accent bg-accent'
-                        : 'border-text-muted bg-surface-raised'
+                        ? "border-accent bg-accent"
+                        : "border-text-muted bg-surface-raised"
                   }`}
                 />
 
@@ -114,8 +116,8 @@ export function ScheduleTimeline({ scope }: ScheduleTimelineProps) {
                     <span
                       className={`text-sm font-medium ${
                         expired
-                          ? 'text-text-muted line-through'
-                          : 'text-text-primary'
+                          ? "text-text-muted line-through"
+                          : "text-text-primary"
                       }`}
                     >
                       {item.title}
@@ -125,7 +127,7 @@ export function ScheduleTimeline({ scope }: ScheduleTimelineProps) {
                         已过期
                       </span>
                     )}
-                    {item.source === 'agent' && (
+                    {item.source === "agent" && (
                       <span className="inline-flex items-center gap-1 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] text-accent">
                         <Bot size={10} />
                         由阿洛娜创建
@@ -148,7 +150,7 @@ export function ScheduleTimeline({ scope }: ScheduleTimelineProps) {
                       </span>
                     ) : (
                       <span className="text-xs text-text-muted">
-                        {expired ? '已过期' : formatCountdown(item.starts_at)}
+                        {expired ? "已过期" : formatCountdown(item.starts_at)}
                       </span>
                     )}
                   </div>

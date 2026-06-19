@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from "react";
 
 const DEFAULT_IDLE_MS = 30_000;
 
@@ -17,8 +17,10 @@ export function useIdle(timeout: number = DEFAULT_IDLE_MS): boolean {
   }, [timeout]);
 
   useEffect(() => {
-    const events: (keyof WindowEventMap)[] = ['mousemove', 'keydown', 'scroll'];
-    events.forEach((evt) => window.addEventListener(evt, reset, { passive: true }));
+    const events: (keyof WindowEventMap)[] = ["mousemove", "keydown", "scroll"];
+    events.forEach((evt) =>
+      window.addEventListener(evt, reset, { passive: true }),
+    );
 
     // Start initial timer
     timerRef.current = setTimeout(() => setIdle(true), timeout);

@@ -6,5 +6,5 @@
  *   - Timing primitives (DURATION, EASING, bezierCSS, timing)
  */
 
-export { flipMorph, flipReplace } from './flip';
-export { DURATION, EASING, bezierCSS, timing } from './tokens';
+export { flipMorph, flipReplace } from "./flip";
+export { DURATION, EASING, bezierCSS, timing } from "./tokens";

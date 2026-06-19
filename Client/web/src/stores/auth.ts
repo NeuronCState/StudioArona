@@ -1,6 +1,6 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import type { UserProfile } from '@/types/contracts';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { UserProfile } from "@/types/contracts";
 
 interface AuthState {
   accessToken: string | null;
@@ -11,7 +11,7 @@ interface AuthState {
    * 'server' = server 签发的真 JWT (默认, 可走 401/refresh 链)
    * 'local' = 本地 fake token (admin / dev bypass), client.ts 跳过 server 避免假 token 触发 logout
    */
-  tokenMode: 'server' | 'local';
+  tokenMode: "server" | "local";
   login: (
     accessToken: string,
     refreshToken: string,
@@ -31,14 +31,14 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       user: null,
       isAuthenticated: false,
-      tokenMode: 'server',
+      tokenMode: "server",
       login: (accessToken, refreshToken, user, opts) =>
         set({
           accessToken,
           refreshToken,
           user,
           isAuthenticated: true,
-          tokenMode: opts?.local ? 'local' : 'server',
+          tokenMode: opts?.local ? "local" : "server",
         }),
       logout: () =>
         set({
@@ -46,13 +46,13 @@ export const useAuthStore = create<AuthState>()(
           refreshToken: null,
           user: null,
           isAuthenticated: false,
-          tokenMode: 'server',
+          tokenMode: "server",
         }),
       setUser: (user) => set({ user }),
       setAccessToken: (accessToken) => set({ accessToken }),
     }),
     {
-      name: 'javis-auth',
+      name: "javis-auth",
       partialize: (state) => ({
         accessToken: state.accessToken,
         refreshToken: state.refreshToken,

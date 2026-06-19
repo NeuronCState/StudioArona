@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Trash2, Upload } from 'lucide-react';
-import type { VM } from '@/types/contracts';
-import { XTermTerminal } from './XTermTerminal';
+import { useState } from "react";
+import { Trash2, Upload } from "lucide-react";
+import type { VM } from "@/types/contracts";
+import { XTermTerminal } from "./XTermTerminal";
 
 interface VmDetailProps {
   vm: VM;
@@ -31,16 +31,26 @@ export function VmDetail({ vm, onBack: _onBack, onDestroy }: VmDetailProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
-        <span>{vm.spec_cpu ?? '-'} 核 / {vm.spec_ram_mb != null ? `${(vm.spec_ram_mb / 1024).toFixed(0)} GB` : '-'} / {vm.spec_disk_gb ?? '-'} GB / {vm.hypervisor}</span>
+        <span>
+          {vm.spec_cpu ?? "-"} 核 /{" "}
+          {vm.spec_ram_mb != null
+            ? `${(vm.spec_ram_mb / 1024).toFixed(0)} GB`
+            : "-"}{" "}
+          / {vm.spec_disk_gb ?? "-"} GB / {vm.hypervisor}
+        </span>
       </div>
 
       {/* Web SSH terminal */}
-      {vm.status === 'running' && (
+      {vm.status === "running" && (
         <div className="card p-0 overflow-hidden">
           <div className="flex items-center gap-2 border-b border-[var(--color-border)] px-4 py-2 text-xs text-[var(--color-text-secondary)]">
-            <span className="font-mono">SSH: {vm.console_path ?? 'N/A'}</span>
+            <span className="font-mono">SSH: {vm.console_path ?? "N/A"}</span>
           </div>
-          <XTermTerminal host="localhost" port={vm.console_path ? 2222 : undefined} mockMode />
+          <XTermTerminal
+            host="localhost"
+            port={vm.console_path ? 2222 : undefined}
+            mockMode
+          />
         </div>
       )}
 
@@ -68,7 +78,7 @@ export function VmDetail({ vm, onBack: _onBack, onDestroy }: VmDetailProps) {
               </div>
             </div>
           ) : (
-            '拖拽文件到此处或点击上传'
+            "拖拽文件到此处或点击上传"
           )}
         </div>
       </div>
@@ -77,15 +87,25 @@ export function VmDetail({ vm, onBack: _onBack, onDestroy }: VmDetailProps) {
       <div className="card border-red-200">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-[var(--color-text-primary)]">销毁虚拟机</p>
-            <p className="text-xs text-[var(--color-text-muted)]">此操作不可逆</p>
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">
+              销毁虚拟机
+            </p>
+            <p className="text-xs text-[var(--color-text-muted)]">
+              此操作不可逆
+            </p>
           </div>
           {showConfirm ? (
             <div className="flex gap-2">
-              <button onClick={onDestroy} className="rounded-lg bg-red-500 px-3 py-1.5 text-xs text-white hover:bg-red-600">
+              <button
+                onClick={onDestroy}
+                className="rounded-lg bg-red-500 px-3 py-1.5 text-xs text-white hover:bg-red-600"
+              >
                 确认销毁
               </button>
-              <button onClick={() => setShowConfirm(false)} className="btn-secondary text-xs">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="btn-secondary text-xs"
+              >
                 取消
               </button>
             </div>

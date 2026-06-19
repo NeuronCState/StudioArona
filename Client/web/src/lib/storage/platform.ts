@@ -6,7 +6,10 @@
  * - 浏览器: 都不存在
  */
 export function isTauri(): boolean {
-  if (typeof window === 'undefined') return false;
-  return !!(window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ ||
-         !!(window as unknown as { __TAURI__?: unknown }).__TAURI__;
+  if (typeof window === "undefined") return false;
+  return (
+    !!(window as unknown as { __TAURI_INTERNALS__?: unknown })
+      .__TAURI_INTERNALS__ ||
+    !!(window as unknown as { __TAURI__?: unknown }).__TAURI__
+  );
 }

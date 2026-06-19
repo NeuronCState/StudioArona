@@ -6,10 +6,10 @@
  * - status: running (spinner) / done (✓) / error (✗)
  * - 视觉风格延续 StudioArona: stone/amber 调色板
  */
-import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronDown, Wrench, Loader2, Check, X } from 'lucide-react';
-import { useState } from 'react';
-import type { AgentToolCall } from './useAgentChat';
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, Wrench, Loader2, Check, X } from "lucide-react";
+import { useState } from "react";
+import type { AgentToolCall } from "./useAgentChat";
 
 interface ToolCallCardProps {
   tool: AgentToolCall;
@@ -30,9 +30,11 @@ function formatInput(input: string): string {
 }
 
 export function ToolCallCard({ tool }: ToolCallCardProps) {
-  const [open, setOpen] = useState(tool.status === 'running');
+  const [open, setOpen] = useState(tool.status === "running");
   const Icon = getToolIcon(tool.name);
-  const elapsed = tool.endedAt ? Math.round((tool.endedAt - tool.startedAt) / 1000 * 10) / 10 : null;
+  const elapsed = tool.endedAt
+    ? Math.round(((tool.endedAt - tool.startedAt) / 1000) * 10) / 10
+    : null;
 
   return (
     <motion.div
@@ -40,11 +42,11 @@ export function ToolCallCard({ tool }: ToolCallCardProps) {
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.2 }}
       className={`my-1.5 overflow-hidden rounded-md border ${
-        tool.status === 'error'
-          ? 'border-red-300 dark:border-red-800'
-          : tool.status === 'done'
-          ? 'border-emerald-200 dark:border-emerald-900'
-          : 'border-amber-200 dark:border-amber-900'
+        tool.status === "error"
+          ? "border-red-300 dark:border-red-800"
+          : tool.status === "done"
+            ? "border-emerald-200 dark:border-emerald-900"
+            : "border-amber-200 dark:border-amber-900"
       } bg-[var(--color-bg)]`}
     >
       <button
@@ -52,9 +54,9 @@ export function ToolCallCard({ tool }: ToolCallCardProps) {
         className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs hover:bg-[var(--color-surface)]"
         aria-expanded={open}
       >
-        {tool.status === 'running' ? (
+        {tool.status === "running" ? (
           <Loader2 size={12} className="animate-spin text-amber-500" />
-        ) : tool.status === 'done' ? (
+        ) : tool.status === "done" ? (
           <Check size={12} className="text-emerald-500" />
         ) : (
           <X size={12} className="text-red-500" />
@@ -68,19 +70,19 @@ export function ToolCallCard({ tool }: ToolCallCardProps) {
         )}
         <ChevronDown
           size={11}
-          className={`ml-auto text-stone-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`ml-auto text-stone-400 transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
       <AnimatePresence>
         {open && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
+            animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.18 }}
             className="border-t border-[var(--color-border)]"
           >
-            {tool.input && tool.input !== '{}' && (
+            {tool.input && tool.input !== "{}" && (
               <div className="border-b border-stone-100 px-2.5 py-1.5 dark:border-stone-800">
                 <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-stone-400">
                   参数

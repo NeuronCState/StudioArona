@@ -1,16 +1,18 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { useState } from 'react';
-import { Card, Surface, Tabs, EmptyState, Button } from '@javis/ui-kit';
-import { Inbox } from 'lucide-react';
+import type { Meta, StoryObj } from "@storybook/react";
+import { useState } from "react";
+import { Card, Surface, Tabs, EmptyState, Button } from "@javis/ui-kit";
+import { Inbox } from "lucide-react";
 
-export default { title: 'UI Kit/Layout' } as Meta;
+export default { title: "UI Kit/Layout" } as Meta;
 
 export const Cards: StoryObj = {
   render: () => (
     <div className="flex flex-col gap-4">
       <Card padding="md">
         <h3 className="font-medium">Card (md padding)</h3>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">A standard card with border and shadow.</p>
+        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          A standard card with border and shadow.
+        </p>
       </Card>
       <Card padding="sm">
         <p className="text-sm">Card (sm padding)</p>
@@ -29,11 +31,15 @@ export const Surfaces: StoryObj = {
     <div className="flex flex-col gap-4">
       <Surface padding="md">
         <h3 className="font-medium">Standard Surface</h3>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Subtle shadow, for grouping content.</p>
+        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          Subtle shadow, for grouping content.
+        </p>
       </Surface>
       <Surface padding="md" elevated>
         <h3 className="font-medium">Elevated Surface</h3>
-        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Stronger shadow for overlays.</p>
+        <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+          Stronger shadow for overlays.
+        </p>
       </Surface>
     </div>
   ),
@@ -41,14 +47,14 @@ export const Surfaces: StoryObj = {
 
 export const TabExample: StoryObj = {
   render: () => {
-    const [active, setActive] = useState('tab1');
+    const [active, setActive] = useState("tab1");
     return (
       <div>
         <Tabs
           tabs={[
-            { id: 'tab1', label: 'Timeline' },
-            { id: 'tab2', label: 'Grid' },
-            { id: 'tab3', label: 'Graph' },
+            { id: "tab1", label: "Timeline" },
+            { id: "tab2", label: "Grid" },
+            { id: "tab3", label: "Graph" },
           ]}
           activeTab={active}
           onTabChange={setActive}

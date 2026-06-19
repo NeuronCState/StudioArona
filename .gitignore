@@ -24,9 +24,19 @@ storybook-static/
 # Run.py runtime logs (Client/.run-logs, Server/.run-logs)
 .run-logs/
 
-# SonettoHere venv + symlink (Client/.venv-sonetto, Client/.sonetto-run)
+# SonettoHere local venv and runtime-generated user data
 .venv-sonetto/
-.sonetto-run/
+Client/services/sonetto/.env
+Client/services/sonetto/providers.yaml
+Client/services/sonetto/studio_config.yaml*
+Client/services/sonetto/config/personas/USER.md
+Client/services/sonetto/config/personas/SOUL.md
+Client/services/sonetto/config/personas/memory.yaml*
+Client/services/sonetto/api/data/const-sessions/
+Client/services/sonetto/anthropic_skills/*
+!Client/services/sonetto/anthropic_skills/.gitkeep
+!Client/services/sonetto/anthropic_skills/studio-arona/
+!Client/services/sonetto/anthropic_skills/studio-arona/SKILL.md
 
 # IDE
 .vscode/

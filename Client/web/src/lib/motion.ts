@@ -25,19 +25,24 @@ export const motion = {
     list: 0.04, // 列表项 40ms 间隔
     page: 0.08, // 页面元素 80ms 间隔
   },
-} as const
+} as const;
 
 /** 转成 framer-motion transition 对象 */
 export const t = {
-  instant: { duration: motion.duration.instant / 1000, ease: motion.easing.out },
+  instant: {
+    duration: motion.duration.instant / 1000,
+    ease: motion.easing.out,
+  },
   fast: { duration: motion.duration.fast / 1000, ease: motion.easing.out },
   base: { duration: motion.duration.base / 1000, ease: motion.easing.out },
   slow: { duration: motion.duration.slow / 1000, ease: motion.easing.out },
   spring: { duration: motion.duration.base / 1000, ease: motion.easing.spring },
-} as const
+} as const;
 
 /** 列表容器 variants — 子项 stagger */
-export const listContainer = (staggerKey: keyof typeof motion.stagger = 'list') => ({
+export const listContainer = (
+  staggerKey: keyof typeof motion.stagger = "list",
+) => ({
   hidden: { opacity: 1 },
   show: {
     opacity: 1,
@@ -46,7 +51,7 @@ export const listContainer = (staggerKey: keyof typeof motion.stagger = 'list') 
       delayChildren: 0.05,
     },
   },
-})
+});
 
 /** 列表子项 variants — y 8→0 + opacity */
 export const listItem = {
@@ -54,13 +59,20 @@ export const listItem = {
   show: {
     opacity: 1,
     y: 0,
-    transition: { duration: motion.duration.base / 1000, ease: motion.easing.out },
+    transition: {
+      duration: motion.duration.base / 1000,
+      ease: motion.easing.out,
+    },
   },
-}
+};
 
 /** 单元素淡入 */
 export const fadeIn = (delay = 0) => ({
   initial: { opacity: 0, y: 8 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: motion.duration.base / 1000, ease: motion.easing.out, delay },
-})
+  transition: {
+    duration: motion.duration.base / 1000,
+    ease: motion.easing.out,
+    delay,
+  },
+});

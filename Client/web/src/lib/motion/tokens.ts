@@ -22,15 +22,20 @@ export const EASING = {
 } as const;
 
 /** Convert cubic-bezier array to CSS string */
-export function bezierCSS(points: readonly [number, number, number, number]): string {
-  return `cubic-bezier(${points.join(',')})`;
+export function bezierCSS(
+  points: readonly [number, number, number, number],
+): string {
+  return `cubic-bezier(${points.join(",")})`;
 }
 
 /** Create a Web Animations API timing object from tokens */
-export function timing(duration: number, easing: readonly [number, number, number, number]): KeyframeAnimationOptions {
+export function timing(
+  duration: number,
+  easing: readonly [number, number, number, number],
+): KeyframeAnimationOptions {
   return {
     duration,
     easing: bezierCSS(easing),
-    fill: 'both',
+    fill: "both",
   };
 }

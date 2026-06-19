@@ -1,6 +1,6 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
-import { persist } from 'zustand/middleware';
+import { persist } from "zustand/middleware";
 
 /**
  * Focus mode UI state — 三个核心开关
@@ -25,10 +25,11 @@ export const useFocusModeStore = create<FocusModeState>()(
       focusSidebarOpen: true,
       setFocusMode: (on) => set({ focusMode: on }),
       setFocusSidebarOpen: (open) => set({ focusSidebarOpen: open }),
-      toggleFocusSidebar: () => set({ focusSidebarOpen: !get().focusSidebarOpen }),
+      toggleFocusSidebar: () =>
+        set({ focusSidebarOpen: !get().focusSidebarOpen }),
     }),
     {
-      name: 'studio-arona-focus-mode',
+      name: "studio-arona-focus-mode",
       partialize: (state) => ({ focusSidebarOpen: state.focusSidebarOpen }),
     },
   ),

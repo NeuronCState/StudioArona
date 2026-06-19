@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
-import { useConnectionStore } from '@/stores/connection';
+import { useEffect, useRef } from "react";
+import { useConnectionStore } from "@/stores/connection";
 
-const CENTER_URL = import.meta.env.VITE_CENTER_URL || 'http://127.0.0.1:8080';
+const CENTER_URL = import.meta.env.VITE_CENTER_URL || "http://127.0.0.1:8080";
 const PING_INTERVAL_MS = 30_000;
 const PING_TIMEOUT_MS = 3_000;
 
@@ -29,15 +29,15 @@ export function useConnectionStatus() {
         clearTimeout(tid);
         if (r.ok) {
           failCountRef.current = 0;
-          setServerStatus('online');
+          setServerStatus("online");
         } else {
           failCountRef.current += 1;
-          if (failCountRef.current >= 2) setServerStatus('offline');
+          if (failCountRef.current >= 2) setServerStatus("offline");
         }
       } catch {
         // Network error: server not reachable
         failCountRef.current += 1;
-        if (failCountRef.current >= 2) setServerStatus('offline');
+        if (failCountRef.current >= 2) setServerStatus("offline");
       }
     }
 

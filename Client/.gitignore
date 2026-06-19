@@ -1,4 +1,3 @@
 
-# SonettoHere 集成 (本地 Python venv + 数据)
-.sonetto-run/
+# SonettoHere local Python environment; runtime data rules live in the root ignore file.
 .venv-sonetto/

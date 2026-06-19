@@ -1,16 +1,16 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { useMutation } from '@tanstack/react-query';
-import { api } from '@/lib/api/client';
-import { useAuthStore } from '@/stores/auth';
-import { useSonettoConfigStore } from '@/stores/sonetto-config';
-import { Spinner } from '@javis/ui-kit';
-import { LoginBackdrop } from '@/components/effects/LoginBackdrop';
-import { db } from '@/lib/db';
-import type { UserProfile } from '@/types/contracts';
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useMutation } from "@tanstack/react-query";
+import { api } from "@/lib/api/client";
+import { useAuthStore } from "@/stores/auth";
+import type { UserProfile } from "@/types/contracts";
+import { useSonettoConfigStore } from "@/stores/sonetto-config";
+import { Spinner } from "@javis/ui-kit";
+import { LoginBackdrop } from "@/components/effects/LoginBackdrop";
+import { db } from "@/lib/db";
 
 /**
  * 清空所有用户数据表 — admin/admin123 本地注册时调用, 当作全新账号.
@@ -18,13 +18,13 @@ import type { UserProfile } from '@/types/contracts';
  */
 async function clearAllUserData(): Promise<{ hadData: boolean }> {
   const tables = [
-    'schedules',
-    'feeds',
-    'feedItems',
-    'memories',
-    'skills',
-    'weather',
-    'systemMetrics',
+    "schedules",
+    "feeds",
+    "feedItems",
+    "memories",
+    "skills",
+    "weather",
+    "systemMetrics",
   ] as const;
   let hadData = false;
   for (const t of tables) {
@@ -35,61 +35,64 @@ async function clearAllUserData(): Promise<{ hadData: boolean }> {
 }
 
 const loginSchema = z.object({
-  username: z.string().min(1, '请输入用户名'),
-  password: z.string().min(1, '请输入密码'),
+  username: z.string().min(1, "请输入用户名"),
+  password: z.string().min(1, "请输入密码"),
 });
 
 const registerSchema = z.object({
-  username: z.string().min(2, '用户名至少 2 个字符'),
-  displayName: z.string().min(1, '请输入显示名'),
-  password: z.string().min(6, '密码至少 6 位'),
-
+  username: z.string().min(2, "用户名至少 2 个字符"),
+  displayName: z.string().min(1, "请输入显示名"),
+  password: z.string().min(6, "密码至少 6 位"),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
 type RegisterForm = z.infer<typeof registerSchema>;
 
 const presetAvatars = [
-  { id: 'cat', emoji: '🐱', label: '猫咪' },
-  { id: 'dog', emoji: '🐶', label: '小狗' },
-  { id: 'fox', emoji: '🦊', label: '狐狸' },
-  { id: 'panda', emoji: '🐼', label: '熊猫' },
-  { id: 'rabbit', emoji: '🐰', label: '兔子' },
-  { id: 'bear', emoji: '🐻', label: '小熊' },
+  { id: "cat", emoji: "🐱", label: "猫咪" },
+  { id: "dog", emoji: "🐶", label: "小狗" },
+  { id: "fox", emoji: "🦊", label: "狐狸" },
+  { id: "panda", emoji: "🐼", label: "熊猫" },
+  { id: "rabbit", emoji: "🐰", label: "兔子" },
+  { id: "bear", emoji: "🐻", label: "小熊" },
 ];
 
 export function LoginPage() {
   const login = useAuthStore((s) => s.login);
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [selectedAvatar, setSelectedAvatar] = useState('');
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [selectedAvatar, setSelectedAvatar] = useState("");
   const [shakeKey, setShakeKey] = useState(0);
 
   const loginForm = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
-  const registerForm = useForm<RegisterForm>({ resolver: zodResolver(registerSchema) });
+  const registerForm = useForm<RegisterForm>({
+    resolver: zodResolver(registerSchema),
+  });
 
   const loginMutation = useMutation({
     mutationFn: (data: LoginForm) =>
-      api.post<{ access_token: string; refresh_token: string; user: UserProfile }>(
-        '/auth/login',
-        data,
-      ),
-    onSuccess: (data) => login(data.access_token, data.refresh_token, data.user),
+      api.post<{
+        access_token: string;
+        refresh_token: string;
+        user: UserProfile;
+      }>("/auth/login", data),
+    onSuccess: (data) =>
+      login(data.access_token, data.refresh_token, data.user),
     onError: () => setShakeKey((k) => k + 1),
   });
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterForm) => {
       // admin/admin123 特殊路径: 不连 server, 直接本地注册, 已有数据全部清空当新账号
-      if (data.username === 'admin' && data.password === 'admin123') {
+      if (data.username === "admin" && data.password === "admin123") {
         const { hadData } = await clearAllUserData();
         return {
           access_token: `admin-local-token-${Date.now()}`,
           refresh_token: `admin-local-refresh-${Date.now()}`,
           user: {
-            id: 'admin',
-            username: 'admin',
-            display_name: data.displayName || 'Admin',
-            role: 'admin',
+            id: "admin",
+            username: "admin",
+            display_name: data.displayName || "Admin",
+            role: "admin",
             created_at: new Date().toISOString(),
             preferences: {},
             face_enrolled: false,
@@ -99,25 +102,28 @@ export function LoginPage() {
         };
       }
       // 正常路径: 打 server 注册
-      return api.post<{ access_token: string; refresh_token: string; user: UserProfile }>(
-        '/auth/register',
-        {
-          username: data.username,
-          display_name: data.displayName,
-          password: data.password,
-          avatar: selectedAvatar || undefined,
-        },
-      );
+      return api.post<{
+        access_token: string;
+        refresh_token: string;
+        user: UserProfile;
+      }>("/auth/register", {
+        username: data.username,
+        display_name: data.displayName,
+        password: data.password,
+        avatar: selectedAvatar || undefined,
+      });
     },
     onSuccess: (data) => {
       // admin 路径: 本地 fake token, 标记 local 模式, client.ts 跳过 server
       // 避免 prefetch 触发 401 → refresh → 401 → 自动 logout
-      const isAdmin = '__isAdmin' in data && data.__isAdmin;
-      login(data.access_token, data.refresh_token, data.user, { local: isAdmin });
+      const isAdmin = "__isAdmin" in data && data.__isAdmin;
+      login(data.access_token, data.refresh_token, data.user, {
+        local: isAdmin,
+      });
       // admin 路径: 跳过 SetupPage, 直接跳首页 (跟 dev bypass button 一致)
       if (isAdmin) {
         useSonettoConfigStore.getState().markSetupComplete();
-        window.location.href = '/';
+        window.location.href = "/";
       }
     },
     onError: () => setShakeKey((k) => k + 1),
@@ -134,7 +140,9 @@ export function LoginPage() {
         <div className="relative z-10 text-center max-w-sm px-8">
           <div className="mb-8 flex justify-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--color-accent)] shadow-[var(--shadow-2)] hover:scale-105 hover:rotate-3 transition-transform duration-300">
-              <span className="text-3xl font-serif font-bold text-white">A</span>
+              <span className="text-3xl font-serif font-bold text-white">
+                A
+              </span>
             </div>
           </div>
           <h1 className="font-serif text-3xl font-semibold text-[var(--color-text-primary)]">
@@ -161,21 +169,21 @@ export function LoginPage() {
           {/* Tabs */}
           <div className="mb-6 flex rounded-xl bg-[var(--color-bg)] p-1">
             <button
-              onClick={() => setMode('login')}
+              onClick={() => setMode("login")}
               className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
-                mode === 'login'
-                  ? 'bg-[var(--color-surface)] shadow-[var(--shadow-1)] text-[var(--color-text-primary)] font-semibold'
-                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+                mode === "login"
+                  ? "bg-[var(--color-surface)] shadow-[var(--shadow-1)] text-[var(--color-text-primary)] font-semibold"
+                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
               }`}
             >
               登录
             </button>
             <button
-              onClick={() => setMode('register')}
+              onClick={() => setMode("register")}
               className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
-                mode === 'register'
-                  ? 'bg-[var(--color-surface)] shadow-[var(--shadow-1)] text-[var(--color-text-primary)] font-semibold'
-                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+                mode === "register"
+                  ? "bg-[var(--color-surface)] shadow-[var(--shadow-1)] text-[var(--color-text-primary)] font-semibold"
+                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
               }`}
             >
               注册
@@ -193,76 +201,78 @@ export function LoginPage() {
                 transition={{ duration: 0.2 }}
                 className="mb-4 animate-shake rounded-lg border border-[var(--color-error)] bg-[var(--color-error)]/5 px-4 py-2.5 text-sm text-[var(--color-error)]"
               >
-                {mode === 'login'
-                  ? '登录失败，请检查用户名和密码'
-                  : '注册失败，请检查信息或稍后重试'}
+                {mode === "login"
+                  ? "登录失败，请检查用户名和密码"
+                  : "注册失败，请检查信息或稍后重试"}
               </motion.div>
             )}
           </AnimatePresence>
 
           {/* Forms with transition */}
           <AnimatePresence mode="wait">
-            {mode === 'login' ? (
+            {mode === "login" ? (
               <motion.form
                 key="login"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
                 transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-                onSubmit={loginForm.handleSubmit((data) => loginMutation.mutate(data))}
+                onSubmit={loginForm.handleSubmit((data) =>
+                  loginMutation.mutate(data),
+                )}
                 className="space-y-4"
               >
-              <div>
-                <label
-                  htmlFor="login-username"
-                  className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]"
-                >
-                  用户名
-                </label>
-                <input
-                  id="login-username"
-                  {...loginForm.register('username')}
-                  className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors"
-                  autoComplete="username"
-                  placeholder="输入用户名"
-                />
-                {loginForm.formState.errors.username && (
-                  <p className="mt-1 text-xs text-[var(--color-error)]">
-                    {loginForm.formState.errors.username.message}
-                  </p>
-                )}
-              </div>
+                <div>
+                  <label
+                    htmlFor="login-username"
+                    className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]"
+                  >
+                    用户名
+                  </label>
+                  <input
+                    id="login-username"
+                    {...loginForm.register("username")}
+                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors"
+                    autoComplete="username"
+                    placeholder="输入用户名"
+                  />
+                  {loginForm.formState.errors.username && (
+                    <p className="mt-1 text-xs text-[var(--color-error)]">
+                      {loginForm.formState.errors.username.message}
+                    </p>
+                  )}
+                </div>
 
-              <div>
-                <label
-                  htmlFor="login-password"
-                  className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]"
-                >
-                  密码
-                </label>
-                <input
-                  id="login-password"
-                  type="password"
-                  {...loginForm.register('password')}
-                  className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors"
-                  autoComplete="current-password"
-                  placeholder="输入密码"
-                />
-                {loginForm.formState.errors.password && (
-                  <p className="mt-1 text-xs text-[var(--color-error)]">
-                    {loginForm.formState.errors.password.message}
-                  </p>
-                )}
-              </div>
+                <div>
+                  <label
+                    htmlFor="login-password"
+                    className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]"
+                  >
+                    密码
+                  </label>
+                  <input
+                    id="login-password"
+                    type="password"
+                    {...loginForm.register("password")}
+                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors"
+                    autoComplete="current-password"
+                    placeholder="输入密码"
+                  />
+                  {loginForm.formState.errors.password && (
+                    <p className="mt-1 text-xs text-[var(--color-error)]">
+                      {loginForm.formState.errors.password.message}
+                    </p>
+                  )}
+                </div>
 
-              <button
-                type="submit"
-                disabled={isPending}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2 disabled:opacity-60"
-              >
-                {isPending ? <Spinner size="sm" /> : '登录'}
-              </button>
-            </motion.form>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2 disabled:opacity-60"
+                >
+                  {isPending ? <Spinner size="sm" /> : "登录"}
+                </button>
+              </motion.form>
             ) : (
               <motion.form
                 key="register"
@@ -270,105 +280,107 @@ export function LoginPage() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-                onSubmit={registerForm.handleSubmit((data) => registerMutation.mutate(data))}
+                onSubmit={registerForm.handleSubmit((data) =>
+                  registerMutation.mutate(data),
+                )}
                 className="space-y-4"
               >
-              <div>
-                <label
-                  htmlFor="reg-username"
-                  className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]"
-                >
-                  用户名
-                </label>
-                <input
-                  id="reg-username"
-                  {...registerForm.register('username')}
-                  className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors"
-                  autoComplete="username"
-                  placeholder="输入用户名"
-                />
-                {registerForm.formState.errors.username && (
-                  <p className="mt-1 text-xs text-[var(--color-error)]">
-                    {registerForm.formState.errors.username.message}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label
-                  htmlFor="reg-display"
-                  className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]"
-                >
-                  显示名
-                </label>
-                <input
-                  id="reg-display"
-                  {...registerForm.register('displayName')}
-                  className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors"
-                  autoComplete="name"
-                  placeholder="你的名字"
-                />
-                {registerForm.formState.errors.displayName && (
-                  <p className="mt-1 text-xs text-[var(--color-error)]">
-                    {registerForm.formState.errors.displayName.message}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label
-                  htmlFor="reg-password"
-                  className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]"
-                >
-                  密码
-                </label>
-                <input
-                  id="reg-password"
-                  type="password"
-                  {...registerForm.register('password')}
-                  className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors"
-                  autoComplete="new-password"
-                  placeholder="至少 6 位"
-                />
-                {registerForm.formState.errors.password && (
-                  <p className="mt-1 text-xs text-[var(--color-error)]">
-                    {registerForm.formState.errors.password.message}
-                  </p>
-                )}
-              </div>
-
-              {/* Avatar picker */}
-              <div>
-                <p className="mb-2 text-xs font-medium text-[var(--color-text-secondary)]">
-                  选择头像
-                </p>
-                <div className="grid grid-cols-6 gap-2">
-                  {presetAvatars.map((avatar) => (
-                    <button
-                      key={avatar.id}
-                      type="button"
-                      onClick={() => setSelectedAvatar(avatar.id)}
-                      className={`flex h-10 w-10 items-center justify-center rounded-xl text-lg transition-all ${
-                        selectedAvatar === avatar.id
-                          ? 'ring-2 ring-[var(--color-accent)] bg-[var(--color-accent-soft)] scale-110'
-                          : 'bg-[var(--color-bg)] hover:bg-[var(--color-accent-soft)]'
-                      }`}
-                      title={avatar.label}
-                    >
-                      {avatar.emoji}
-                    </button>
-                  ))}
+                <div>
+                  <label
+                    htmlFor="reg-username"
+                    className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]"
+                  >
+                    用户名
+                  </label>
+                  <input
+                    id="reg-username"
+                    {...registerForm.register("username")}
+                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors"
+                    autoComplete="username"
+                    placeholder="输入用户名"
+                  />
+                  {registerForm.formState.errors.username && (
+                    <p className="mt-1 text-xs text-[var(--color-error)]">
+                      {registerForm.formState.errors.username.message}
+                    </p>
+                  )}
                 </div>
-              </div>
 
-              <button
-                type="submit"
-                disabled={isPending}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2 disabled:opacity-60"
-              >
-                {isPending ? <Spinner size="sm" /> : '注册'}
-              </button>
-            </motion.form>
+                <div>
+                  <label
+                    htmlFor="reg-display"
+                    className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]"
+                  >
+                    显示名
+                  </label>
+                  <input
+                    id="reg-display"
+                    {...registerForm.register("displayName")}
+                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors"
+                    autoComplete="name"
+                    placeholder="你的名字"
+                  />
+                  {registerForm.formState.errors.displayName && (
+                    <p className="mt-1 text-xs text-[var(--color-error)]">
+                      {registerForm.formState.errors.displayName.message}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="reg-password"
+                    className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]"
+                  >
+                    密码
+                  </label>
+                  <input
+                    id="reg-password"
+                    type="password"
+                    {...registerForm.register("password")}
+                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors"
+                    autoComplete="new-password"
+                    placeholder="至少 6 位"
+                  />
+                  {registerForm.formState.errors.password && (
+                    <p className="mt-1 text-xs text-[var(--color-error)]">
+                      {registerForm.formState.errors.password.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Avatar picker */}
+                <div>
+                  <p className="mb-2 text-xs font-medium text-[var(--color-text-secondary)]">
+                    选择头像
+                  </p>
+                  <div className="grid grid-cols-6 gap-2">
+                    {presetAvatars.map((avatar) => (
+                      <button
+                        key={avatar.id}
+                        type="button"
+                        onClick={() => setSelectedAvatar(avatar.id)}
+                        className={`flex h-10 w-10 items-center justify-center rounded-xl text-lg transition-all ${
+                          selectedAvatar === avatar.id
+                            ? "ring-2 ring-[var(--color-accent)] bg-[var(--color-accent-soft)] scale-110"
+                            : "bg-[var(--color-bg)] hover:bg-[var(--color-accent-soft)]"
+                        }`}
+                        title={avatar.label}
+                      >
+                        {avatar.emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2 disabled:opacity-60"
+                >
+                  {isPending ? <Spinner size="sm" /> : "注册"}
+                </button>
+              </motion.form>
             )}
           </AnimatePresence>
         </div>
@@ -380,13 +392,21 @@ export function LoginPage() {
           type="button"
           onClick={() => {
             useAuthStore.getState().login(
-              'dev-bypass-token',
-              'dev-bypass-refresh',
-              { id: 'dev', username: 'dev', display_name: 'Dev User', role: 'admin', created_at: new Date().toISOString() } as any,
+              "dev-bypass-token",
+              "dev-bypass-refresh",
+              {
+                id: "dev",
+                username: "dev",
+                display_name: "Dev User",
+                role: "admin",
+                created_at: new Date().toISOString(),
+                preferences: {},
+                face_enrolled: false,
+              } satisfies UserProfile,
               { local: true },
             );
             useSonettoConfigStore.getState().markSetupComplete();
-            window.location.href = '/';
+            window.location.href = "/";
           }}
           className="fixed bottom-4 right-4 z-50 rounded-full border border-stone-300 bg-white/90 px-4 py-2 text-xs font-medium text-stone-600 shadow-sm backdrop-blur-sm transition-colors hover:bg-stone-50 dark:border-stone-600 dark:bg-stone-800/90 dark:text-stone-300 dark:hover:bg-stone-700"
           title="不需要 server, 直接进首页 (dev only)"

@@ -1,11 +1,10 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { isOfflineError } from "@/lib/api/error-helpers";
-import { api } from '@/lib/api/client';
-import { useLocalResource } from '@/lib/storage/useLocalResource';
-import { useAuthStore } from '@/stores/auth';
-import type { Feed, Schedule } from '@/types/contracts';
-import { formatRelativeTime, formatCountdown } from '@/lib/utils';
-import { CardSkeleton, CardError, CardEmpty } from '@javis/ui-kit';
+import { api } from "@/lib/api/client";
+import { useAuthStore } from "@/stores/auth";
+import type { Feed, Schedule } from "@/types/contracts";
+import { formatRelativeTime, formatCountdown } from "@/lib/utils";
+import { CardSkeleton, CardError, CardEmpty } from "@javis/ui-kit";
 import {
   Rss,
   Calendar,
@@ -16,9 +15,9 @@ import {
   Users,
   Globe,
   ChevronDown,
-} from 'lucide-react';
+} from "lucide-react";
 
-type PermissionLevel = 'owner' | 'all' | 'public';
+type PermissionLevel = "owner" | "all" | "public";
 
 interface PermissionInfo {
   level: PermissionLevel;
@@ -29,28 +28,28 @@ interface PermissionInfo {
 
 const permissionMap: Record<PermissionLevel, PermissionInfo> = {
   owner: {
-    level: 'owner',
-    label: '仅创建者可改',
+    level: "owner",
+    label: "仅创建者可改",
     icon: Shield,
-    description: '只有创建该内容的成员可以编辑',
+    description: "只有创建该内容的成员可以编辑",
   },
   all: {
-    level: 'all',
-    label: '全员可改',
+    level: "all",
+    label: "全员可改",
     icon: Users,
-    description: '所有工作室成员都可以编辑',
+    description: "所有工作室成员都可以编辑",
   },
   public: {
-    level: 'public',
-    label: '公开可见',
+    level: "public",
+    label: "公开可见",
     icon: Globe,
-    description: '所有人可见，仅管理员可编辑',
+    description: "所有人可见，仅管理员可编辑",
   },
 };
 
 export function SharedPage() {
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === "admin";
   const queryClient = useQueryClient();
 
   const {
@@ -60,8 +59,8 @@ export function SharedPage() {
     error: feedsErr,
     refetch: refetchFeeds,
   } = useQuery({
-    queryKey: ['feeds', 'shared'],
-    queryFn: () => api.get<Feed[]>('/feeds?scope=shared'),
+    queryKey: ["feeds", "shared"],
+    queryFn: () => api.get<Feed[]>("/feeds?scope=shared"),
   });
 
   const {
@@ -71,24 +70,20 @@ export function SharedPage() {
     error: schedErr,
     refetch: refetchSched,
   } = useQuery({
-    queryKey: ['schedules', 'shared'],
-    queryFn: () => api.get<Schedule[]>('/schedules?scope=shared'),
+    queryKey: ["schedules", "shared"],
+    queryFn: () => api.get<Schedule[]>("/schedules?scope=shared"),
   });
 
-  const isLoading = feedsLoading || schedLoading;
+  const deleteFeedMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/feeds/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["feeds", "shared"] });
+      queryClient.invalidateQueries({ queryKey: ["feeds", "local"] });
+    },
+  });
+
   const isError = feedsError || schedError;
   const firstError = feedsErr ?? schedErr;
-
-  if (isLoading) {
-    return (
-      <div className="mx-auto max-w-4xl space-y-6">
-        <h2 className="text-lg font-semibold text-text-primary">共享信息源</h2>
-        <CardSkeleton variant="grid" count={2} />
-        <CardSkeleton variant="list" count={3} />
-        <CardSkeleton variant="grid" count={3} />
-      </div>
-    );
-  }
 
   if (isError) {
     return (
@@ -96,47 +91,41 @@ export function SharedPage() {
         <CardError
           offline={isOfflineError(firstError)}
           message={firstError?.message}
-          onRetry={() => { refetchFeeds(); refetchSched(); }}
+          onRetry={() => {
+            refetchFeeds();
+            refetchSched();
+          }}
         />
       </div>
     );
   }
 
-  // 本地优先 — Shared feed delete 写 storage (Tauri fs / IDB), online 时 push server (S1a endpoint)
-  // TODO: Shared 端的高可用(HA) 还没接, mutation 暂保留 useLocalResource.feeds.remove, 后续 HA 接入后这里再 review
-  const localSharedFeeds = useLocalResource<Feed>({
-    table: 'feeds',
-    queryKey: ['feeds', 'shared', 'local'],
-    serverList: () => api.get<Feed[]>('/feeds?scope=shared'),
-    serverRemove: (id) => api.delete(`/feeds/${id}`),
-  });
-
-  const deleteFeedMutation = useMutation({
-    mutationFn: (id: string) => localSharedFeeds.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['feeds'] }),
-  });
-
   // Derive permissions: admin gets all-edit, members get contextual
   const feedPermissions: Record<string, PermissionLevel> = {};
   feeds?.forEach((f) => {
-    if (isAdmin) feedPermissions[f.id] = 'all';
-    else if (f.user_id === user?.id) feedPermissions[f.id] = 'owner';
-    else feedPermissions[f.id] = 'public';
+    if (isAdmin) feedPermissions[f.id] = "all";
+    else if (f.user_id === user?.id) feedPermissions[f.id] = "owner";
+    else feedPermissions[f.id] = "public";
   });
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <h2 className="text-lg font-semibold text-text-primary">共享信息源</h2>
 
-      {/* Permission legend */}
+      {/* Permission legend — always visible (结构骨架), 不受 loading 影响 */}
       <div className="card space-y-3">
         <h3 className="text-sm font-medium text-text-primary">编辑权限</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {Object.values(permissionMap).map((perm) => (
-            <div key={perm.level} className="flex items-start gap-2 rounded-lg bg-surface p-3">
+            <div
+              key={perm.level}
+              className="flex items-start gap-2 rounded-lg bg-surface p-3"
+            >
               <perm.icon size={16} className="text-accent shrink-0 mt-0.5" />
               <div>
-                <p className="text-xs font-medium text-text-primary">{perm.label}</p>
+                <p className="text-xs font-medium text-text-primary">
+                  {perm.label}
+                </p>
                 <p className="text-xs text-text-muted">{perm.description}</p>
               </div>
             </div>
@@ -144,7 +133,7 @@ export function SharedPage() {
         </div>
       </div>
 
-      {/* Announcement area */}
+      {/* Announcement area — always visible */}
       <div className="card border-accent/30 bg-accent-soft/30">
         <div className="flex items-center gap-2 text-accent">
           <Pin size={14} />
@@ -165,25 +154,37 @@ export function SharedPage() {
             筛选
           </button>
         </div>
-        {schedules && schedules.length > 0 ? (
+        {schedLoading ? (
+          <CardSkeleton variant="list" count={3} />
+        ) : schedules && schedules.length > 0 ? (
           <div className="space-y-2">
             {schedules.map((s) => {
-              const perm =
-                isAdmin ? 'all' : s.user_id === user?.id ? 'owner' : 'public';
+              const perm = isAdmin
+                ? "all"
+                : s.user_id === user?.id
+                  ? "owner"
+                  : "public";
               const pInfo = permissionMap[perm as PermissionLevel];
               return (
-                <div key={s.id} className="card group flex items-center justify-between">
+                <div
+                  key={s.id}
+                  className="card group flex items-center justify-between"
+                >
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-text-primary">{s.title}</span>
-                      {s.source === 'agent' && (
+                      <span className="text-sm text-text-primary">
+                        {s.title}
+                      </span>
+                      {s.source === "agent" && (
                         <span className="rounded bg-surface px-1.5 py-0.5 text-2xs text-text-muted">
                           Arona
                         </span>
                       )}
                     </div>
                     {s.body && (
-                      <p className="mt-1 text-xs text-text-secondary line-clamp-1">{s.body}</p>
+                      <p className="mt-1 text-xs text-text-secondary line-clamp-1">
+                        {s.body}
+                      </p>
                     )}
                   </div>
                   <div className="flex items-center gap-3">
@@ -195,7 +196,7 @@ export function SharedPage() {
                       <span className="text-xs text-text-muted hidden sm:inline">
                         {pInfo.label}
                       </span>
-                      {perm !== 'public' && (
+                      {perm !== "public" && (
                         <div className="flex gap-1">
                           <button
                             className="rounded p-0.5 text-text-muted hover:text-accent"
@@ -203,7 +204,10 @@ export function SharedPage() {
                           >
                             <Pencil size={12} />
                           </button>
-                          <button className="rounded p-0.5 text-text-muted hover:text-red-500" aria-label="删除">
+                          <button
+                            className="rounded p-0.5 text-text-muted hover:text-red-500"
+                            aria-label="删除"
+                          >
                             <Trash2 size={12} />
                           </button>
                         </div>
@@ -225,21 +229,26 @@ export function SharedPage() {
           <Rss size={16} />
           <span className="text-xs font-medium">共享订阅</span>
         </div>
-        {feeds && feeds.length > 0 ? (
+        {feedsLoading ? (
+          <CardSkeleton variant="grid" count={3} />
+        ) : feeds && feeds.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {feeds.map((feed) => {
-              const perm = feedPermissions[feed.id] ?? 'public';
+              const perm = feedPermissions[feed.id] ?? "public";
               const pInfo = permissionMap[perm];
               return (
-                <div key={feed.id} className="card group relative overflow-hidden">
+                <div
+                  key={feed.id}
+                  className="card group relative overflow-hidden"
+                >
                   {/* Permission indicator strip */}
                   <div
                     className={`absolute left-0 top-0 h-full w-1 ${
-                      perm === 'all'
-                        ? 'bg-accent'
-                        : perm === 'owner'
-                          ? 'bg-zinc-300'
-                          : 'bg-border'
+                      perm === "all"
+                        ? "bg-accent"
+                        : perm === "owner"
+                          ? "bg-zinc-300"
+                          : "bg-border"
                     }`}
                   />
                   <div className="pl-2">
@@ -247,12 +256,16 @@ export function SharedPage() {
                       {feed.title}
                     </h3>
                     <div className="mt-1 flex items-center gap-2">
-                      <p className="text-xs text-text-muted">{formatRelativeTime(feed.created_at)}</p>
+                      <p className="text-xs text-text-muted">
+                        {formatRelativeTime(feed.created_at)}
+                      </p>
                       <pInfo.icon size={12} className="text-text-muted" />
                     </div>
                     <div className="mt-2 flex items-center gap-2">
-                      <span className="text-xs text-text-muted">{pInfo.label}</span>
-                      {perm !== 'public' && (
+                      <span className="text-xs text-text-muted">
+                        {pInfo.label}
+                      </span>
+                      {perm !== "public" && (
                         <button
                           onClick={() => deleteFeedMutation.mutate(feed.id)}
                           className="rounded p-0.5 text-text-muted opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all"

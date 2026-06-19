@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState } from "react";
 import { isOfflineError } from "@/lib/api/error-helpers";
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { useDelayedPending } from '@/hooks/useDelayedPending';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { useDelayedPending } from "@/hooks/useDelayedPending";
 import {
   Cpu,
   MemoryStick,
@@ -21,23 +21,39 @@ import {
   Send,
   Megaphone,
   MailCheck,
-} from 'lucide-react';
-import { api } from '@/lib/api/client';
-import { Tabs, Badge, Skeleton, CardError, Button } from '@javis/ui-kit';
-import { useAuthStore } from '@/stores/auth';
-import { cn } from '@/lib/utils';
-import { StaggerList, StaggerItem, FadeIn } from '@/components/motion';
-import { motion } from 'framer-motion';
-import { motion as m } from '@/lib/motion';
+} from "lucide-react";
+import { api } from "@/lib/api/client";
+import { Tabs, Badge, Skeleton, CardError, Button } from "@javis/ui-kit";
+import { useAuthStore } from "@/stores/auth";
+import { cn } from "@/lib/utils";
+import { StaggerList, StaggerItem, FadeIn } from "@/components/motion";
+import { motion } from "framer-motion";
+import { motion as m } from "@/lib/motion";
 
 // ─── System resources ────────────────────────────────────────────
 
 interface SystemResources {
   cpu: { percent: number; count: number; load_avg: number[] | null };
   memory: { total: number; used: number; percent: number; available: number };
-  disk: { total: number; used: number; free: number; percent: number; path: string };
-  network: { bytes_sent: number; bytes_recv: number; packets_sent: number; packets_recv: number };
-  top_processes: Array<{ pid: number; name: string; username: string; rss: number }>;
+  disk: {
+    total: number;
+    used: number;
+    free: number;
+    percent: number;
+    path: string;
+  };
+  network: {
+    bytes_sent: number;
+    bytes_recv: number;
+    packets_sent: number;
+    packets_recv: number;
+  };
+  top_processes: Array<{
+    pid: number;
+    name: string;
+    username: string;
+    rss: number;
+  }>;
   boot_time: number;
 }
 
@@ -49,11 +65,23 @@ function formatBytes(b: number): string {
   return `${b} B`;
 }
 
-function ResourceBar({ percent, label, used, total }: { percent: number; label: string; used: string; total: string }) {
+function ResourceBar({
+  percent,
+  label,
+  used,
+  total,
+}: {
+  percent: number;
+  label: string;
+  used: string;
+  total: string;
+}) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-xs">
-        <span className="font-medium text-[var(--color-text-primary)]">{label}</span>
+        <span className="font-medium text-[var(--color-text-primary)]">
+          {label}
+        </span>
         <span className="text-[var(--color-text-muted)]">
           {used} / {total} ({percent.toFixed(1)}%)
         </span>
@@ -61,8 +89,12 @@ function ResourceBar({ percent, label, used, total }: { percent: number; label: 
       <div className="h-2 overflow-hidden rounded-full bg-[var(--color-bg)]">
         <div
           className={cn(
-            'h-full rounded-full transition-all',
-            percent > 80 ? 'bg-[var(--color-warn)]' : percent > 60 ? 'bg-[var(--color-accent)]' : 'bg-[var(--color-accent-soft)]',
+            "h-full rounded-full transition-all",
+            percent > 80
+              ? "bg-[var(--color-warn)]"
+              : percent > 60
+                ? "bg-[var(--color-accent)]"
+                : "bg-[var(--color-accent-soft)]",
           )}
           style={{ width: `${Math.min(percent, 100)}%` }}
         />
@@ -73,14 +105,28 @@ function ResourceBar({ percent, label, used, total }: { percent: number; label: 
 
 function SystemTab() {
   const { data, isPending, isError, error, refetch } = useQuery({
-    queryKey: ['admin-system'],
-    queryFn: () => api.get<SystemResources>('/admin/system'),
+    queryKey: ["admin-system"],
+    queryFn: () => api.get<SystemResources>("/admin/system"),
     refetchInterval: 5000,
   });
   const loading = useDelayedPending(isPending);
 
-  if (loading && !data) return <div className="space-y-3">{[1, 2, 3, 4].map((i) => <Skeleton key={i} variant="rect" height={64} />)}</div>;
-  if (isError) return <CardError offline={isOfflineError(error)} message={error?.message} onRetry={() => refetch()} />;
+  if (loading && !data)
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} variant="rect" height={64} />
+        ))}
+      </div>
+    );
+  if (isError)
+    return (
+      <CardError
+        offline={isOfflineError(error)}
+        message={error?.message}
+        onRetry={() => refetch()}
+      />
+    );
   if (!data) return null;
 
   return (
@@ -92,7 +138,8 @@ function SystemTab() {
             <span className="text-sm font-semibold">CPU</span>
             <span className="ml-auto text-xs text-[var(--color-text-muted)]">
               {data.cpu.count} 核
-              {data.cpu.load_avg && ` · load ${data.cpu.load_avg[0].toFixed(2)}`}
+              {data.cpu.load_avg &&
+                ` · load ${data.cpu.load_avg[0].toFixed(2)}`}
             </span>
           </div>
           <ResourceBar
@@ -123,7 +170,9 @@ function SystemTab() {
         <div className="mb-3 flex items-center gap-2">
           <HardDrive size={14} className="text-[var(--color-accent)]" />
           <span className="text-sm font-semibold">磁盘</span>
-          <span className="ml-auto text-xs text-[var(--color-text-muted)]">{data.disk.path}</span>
+          <span className="ml-auto text-xs text-[var(--color-text-muted)]">
+            {data.disk.path}
+          </span>
         </div>
         <ResourceBar
           label="使用率"
@@ -141,19 +190,27 @@ function SystemTab() {
         <div className="grid grid-cols-2 gap-3 text-xs md:grid-cols-4">
           <div>
             <div className="text-[var(--color-text-muted)]">↑ 发送</div>
-            <div className="font-mono text-sm">{formatBytes(data.network.bytes_sent)}</div>
+            <div className="font-mono text-sm">
+              {formatBytes(data.network.bytes_sent)}
+            </div>
           </div>
           <div>
             <div className="text-[var(--color-text-muted)]">↓ 接收</div>
-            <div className="font-mono text-sm">{formatBytes(data.network.bytes_recv)}</div>
+            <div className="font-mono text-sm">
+              {formatBytes(data.network.bytes_recv)}
+            </div>
           </div>
           <div>
             <div className="text-[var(--color-text-muted)]">包发送</div>
-            <div className="font-mono text-sm">{data.network.packets_sent.toLocaleString()}</div>
+            <div className="font-mono text-sm">
+              {data.network.packets_sent.toLocaleString()}
+            </div>
           </div>
           <div>
             <div className="text-[var(--color-text-muted)]">包接收</div>
-            <div className="font-mono text-sm">{data.network.packets_recv.toLocaleString()}</div>
+            <div className="font-mono text-sm">
+              {data.network.packets_recv.toLocaleString()}
+            </div>
           </div>
         </div>
       </div>
@@ -178,7 +235,13 @@ function SystemTab() {
               animate="show"
               variants={{
                 hidden: { opacity: 1 },
-                show: { opacity: 1, transition: { staggerChildren: m.stagger.list, delayChildren: 0.1 } },
+                show: {
+                  opacity: 1,
+                  transition: {
+                    staggerChildren: m.stagger.list,
+                    delayChildren: 0.1,
+                  },
+                },
               }}
             >
               {data.top_processes.map((p) => (
@@ -187,13 +250,24 @@ function SystemTab() {
                   className="border-t border-[var(--color-border)] transition-colors duration-fast hover:bg-[var(--color-bg)]"
                   variants={{
                     hidden: { opacity: 0, x: -8 },
-                    show: { opacity: 1, x: 0, transition: { duration: m.duration.base / 1000, ease: m.easing.out } },
+                    show: {
+                      opacity: 1,
+                      x: 0,
+                      transition: {
+                        duration: m.duration.base / 1000,
+                        ease: m.easing.out,
+                      },
+                    },
                   }}
                 >
                   <td className="px-3 py-1.5 font-mono">{p.pid}</td>
                   <td className="px-3 py-1.5">{p.name}</td>
-                  <td className="px-3 py-1.5 text-[var(--color-text-muted)]">{p.username}</td>
-                  <td className="px-3 py-1.5 text-right font-mono">{formatBytes(p.rss)}</td>
+                  <td className="px-3 py-1.5 text-[var(--color-text-muted)]">
+                    {p.username}
+                  </td>
+                  <td className="px-3 py-1.5 text-right font-mono">
+                    {formatBytes(p.rss)}
+                  </td>
                 </motion.tr>
               ))}
             </motion.tbody>
@@ -211,7 +285,7 @@ interface AdminUser {
   username: string;
   display_name: string;
   email: string | null;
-  role: 'admin' | 'member';
+  role: "admin" | "member";
   created_at: string;
   last_login_at: string | null;
   online: boolean;
@@ -220,37 +294,56 @@ interface AdminUser {
   hermes_rss_bytes: number;
 }
 
+interface NotifyResult {
+  ok: boolean;
+  to?: string;
+  error?: string;
+}
+
 function UsersTab() {
   const qc = useQueryClient();
   const me = useAuthStore((s) => s.user);
   const [editing, setEditing] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<{ display_name: string; role: 'admin' | 'member' }>({ display_name: '', role: 'member' });
+  const [editForm, setEditForm] = useState<{
+    display_name: string;
+    role: "admin" | "member";
+  }>({ display_name: "", role: "member" });
 
   const { data, isPending, isError, error, refetch } = useQuery({
-    queryKey: ['admin-users'],
-    queryFn: () => api.get<AdminUser[]>('/admin/users'),
+    queryKey: ["admin-users"],
+    queryFn: () => api.get<AdminUser[]>("/admin/users"),
     refetchInterval: 10000,
   });
   const loading = useDelayedPending(isPending);
 
-  // TODO: Admin mutation 走 server-only (管理操作无 IDB 优先语义), 暂时保留 api.* 直连
-  // 后续: 1-7 收官后, admin 写操作可能走「先 IDB cache + 后台 push」pattern, 但本期不阻塞
+  // Administrative writes are intentionally server-only; local optimistic state
+  // must not imply that a privileged operation succeeded.
   const updateMutation = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: { display_name?: string; role?: 'admin' | 'member' } }) =>
-      api.patch(`/users/${id}`, body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: { display_name?: string; role?: "admin" | "member" };
+    }) => api.patch(`/users/${id}`, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
   });
 
-  // TODO: Admin mutation 走 server-only, 暂时保留 api.* 直连
   const killSessionMutation = useMutation({
     mutationFn: (id: string) => api.post(`/admin/users/${id}/kill-session`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
   });
 
-  // TODO: Admin mutation 走 server-only, 暂时保留 api.* 直连
   const notifyUserMutation = useMutation({
-    mutationFn: ({ id, subject, body }: { id: string; subject: string; body: string }) =>
-      api.post(`/admin/notify/user/${id}`, { subject, body }),
+    mutationFn: ({
+      id,
+      subject,
+      body,
+    }: {
+      id: string;
+      subject: string;
+      body: string;
+    }) => api.post<NotifyResult>(`/admin/notify/user/${id}`, { subject, body }),
   });
 
   const startEdit = (u: AdminUser) => {
@@ -263,8 +356,22 @@ function UsersTab() {
     setEditing(null);
   };
 
-  if (loading && !data) return <div className="space-y-2">{[1, 2, 3].map((i) => <Skeleton key={i} variant="rect" height={56} />)}</div>;
-  if (isError) return <CardError offline={isOfflineError(error)} message={error?.message} onRetry={() => refetch()} />;
+  if (loading && !data)
+    return (
+      <div className="space-y-2">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} variant="rect" height={56} />
+        ))}
+      </div>
+    );
+  if (isError)
+    return (
+      <CardError
+        offline={isOfflineError(error)}
+        message={error?.message}
+        onRetry={() => refetch()}
+      />
+    );
   if (!data) return null;
 
   const onlineCount = data.filter((u) => u.online).length;
@@ -289,7 +396,7 @@ function UsersTab() {
               <th className="px-4 py-2 text-left font-medium">用户</th>
               <th className="px-4 py-2 text-left font-medium">角色</th>
               <th className="px-4 py-2 text-left font-medium">在线</th>
-              <th className="px-4 py-2 text-left font-medium">Hermes</th>
+              <th className="px-4 py-2 text-left font-medium">Agent</th>
               <th className="px-4 py-2 text-left font-medium">最后登录</th>
               <th className="px-4 py-2 text-right font-medium">操作</th>
             </tr>
@@ -299,7 +406,13 @@ function UsersTab() {
             animate="show"
             variants={{
               hidden: { opacity: 1 },
-              show: { opacity: 1, transition: { staggerChildren: m.stagger.list, delayChildren: 0.05 } },
+              show: {
+                opacity: 1,
+                transition: {
+                  staggerChildren: m.stagger.list,
+                  delayChildren: 0.05,
+                },
+              },
             }}
           >
             {data.map((u) => (
@@ -308,22 +421,40 @@ function UsersTab() {
                 className="border-t border-[var(--color-border)] transition-colors duration-fast hover:bg-[var(--color-bg)]"
                 variants={{
                   hidden: { opacity: 0, y: 6 },
-                  show: { opacity: 1, y: 0, transition: { duration: m.duration.base / 1000, ease: m.easing.out } },
+                  show: {
+                    opacity: 1,
+                    y: 0,
+                    transition: {
+                      duration: m.duration.base / 1000,
+                      ease: m.easing.out,
+                    },
+                  },
                 }}
               >
                 <td className="px-4 py-2.5">
                   {editing === u.id ? (
                     <input
                       value={editForm.display_name}
-                      onChange={(e) => setEditForm({ ...editForm, display_name: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({
+                          ...editForm,
+                          display_name: e.target.value,
+                        })
+                      }
                       className="rounded border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-sm"
                     />
                   ) : (
                     <div>
-                      <div className="font-medium text-[var(--color-text-primary)]">{u.display_name}</div>
-                      <div className="text-[10px] text-[var(--color-text-muted)]">@{u.username}</div>
+                      <div className="font-medium text-[var(--color-text-primary)]">
+                        {u.display_name}
+                      </div>
+                      <div className="text-[10px] text-[var(--color-text-muted)]">
+                        @{u.username}
+                      </div>
                       {u.email && (
-                        <div className="text-[10px] text-[var(--color-accent)]">📧 {u.email}</div>
+                        <div className="text-[10px] text-[var(--color-accent)]">
+                          📧 {u.email}
+                        </div>
                       )}
                     </div>
                   )}
@@ -332,15 +463,22 @@ function UsersTab() {
                   {editing === u.id ? (
                     <select
                       value={editForm.role}
-                      onChange={(e) => setEditForm({ ...editForm, role: e.target.value as 'admin' | 'member' })}
+                      onChange={(e) =>
+                        setEditForm({
+                          ...editForm,
+                          role: e.target.value as "admin" | "member",
+                        })
+                      }
                       className="rounded border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1 text-xs"
                     >
                       <option value="member">member</option>
                       <option value="admin">admin</option>
                     </select>
                   ) : (
-                    <Badge variant={u.role === 'admin' ? 'accent' : 'default'}>
-                      {u.role === 'admin' && <ShieldCheck size={10} className="mr-0.5" />}
+                    <Badge variant={u.role === "admin" ? "accent" : "default"}>
+                      {u.role === "admin" && (
+                        <ShieldCheck size={10} className="mr-0.5" />
+                      )}
                       {u.role}
                     </Badge>
                   )}
@@ -373,11 +511,15 @@ function UsersTab() {
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-xs text-[var(--color-text-muted)]">
-                  {u.last_login_at ? new Date(u.last_login_at).toLocaleString('zh-CN') : '从未'}
+                  {u.last_login_at
+                    ? new Date(u.last_login_at).toLocaleString("zh-CN")
+                    : "从未"}
                 </td>
                 <td className="px-4 py-2.5 text-right">
                   {me?.id === u.id ? (
-                    <span className="text-[10px] text-[var(--color-text-muted)]">你自己</span>
+                    <span className="text-[10px] text-[var(--color-text-muted)]">
+                      你自己
+                    </span>
                   ) : editing === u.id ? (
                     <div className="inline-flex gap-1">
                       <button
@@ -407,21 +549,32 @@ function UsersTab() {
                       {u.email && (
                         <button
                           onClick={() => {
-                            const subject = window.prompt('邮件主题', `📢 来自 ${useAuthStore.getState().user?.display_name || 'admin'}`);
+                            const subject = window.prompt(
+                              "邮件主题",
+                              `📢 来自 ${useAuthStore.getState().user?.display_name || "admin"}`,
+                            );
                             if (!subject) return;
-                            const body = window.prompt('邮件内容', '这是一封来自什亭之匣 AI 管理面板的通知。');
+                            const body = window.prompt(
+                              "邮件内容",
+                              "这是一封来自什亭之匣 AI 管理面板的通知。",
+                            );
                             if (!body) return;
                             notifyUserMutation.mutate(
                               { id: u.id, subject, body },
                               {
-                                onSuccess: (res: any) => {
+                                onSuccess: (res) => {
                                   if (res?.ok) {
                                     window.alert(`✅ 已发送给 ${u.email}`);
                                   } else {
-                                    window.alert(`❌ 发送失败: ${res?.error || '未知错误'}`);
+                                    window.alert(
+                                      `❌ 发送失败: ${res?.error || "未知错误"}`,
+                                    );
                                   }
                                 },
-                                onError: (e: any) => window.alert(`❌ 发送失败: ${e?.message || e}`),
+                                onError: (error) =>
+                                  window.alert(
+                                    `❌ 发送失败: ${error instanceof Error ? error.message : String(error)}`,
+                                  ),
                               },
                             );
                           }}
@@ -465,7 +618,7 @@ function UsersTab() {
 // ─── Notifications tab ──────────────────────────────────────
 
 interface NotifyStatus {
-  backend?: 'smtp' | 'graph';
+  backend?: "smtp" | "graph";
   host?: string;
   port?: number;
   user?: string;
@@ -479,39 +632,68 @@ interface NotifyStatus {
   token_cached?: boolean;
 }
 
+interface DeadLetterItem {
+  ts: string;
+  to: string;
+  subject: string;
+  reason?: string;
+}
+
+interface TestNotifyResult {
+  ok: boolean;
+  to?: string;
+}
+
+interface BroadcastResult {
+  ok: number;
+  failed: number;
+  skipped: number;
+}
+
 function NotificationsTab() {
   const qc = useQueryClient();
-  const [testTo, setTestTo] = useState('345988168@qq.com');
-  const [testSubject, setTestSubject] = useState('🧪 什亭之匣 AI · 测试邮件');
-  const [testBody, setTestBody] = useState('这是一封来自什亭之匣 AI 的测试邮件 — SMTP 通道正常 ✅');
-  const [bcSubject, setBcSubject] = useState('📢 什亭之匣 AI · 群发通知');
-  const [bcBody, setBcBody] = useState('这是一封群发测试邮件。如果你看到这封邮件，说明 broadcast 端点全通。');
+  const [testTo, setTestTo] = useState("345988168@qq.com");
+  const [testSubject, setTestSubject] = useState("🧪 什亭之匣 AI · 测试邮件");
+  const [testBody, setTestBody] = useState(
+    "这是一封来自什亭之匣 AI 的测试邮件 — SMTP 通道正常 ✅",
+  );
+  const [bcSubject, setBcSubject] = useState("📢 什亭之匣 AI · 群发通知");
+  const [bcBody, setBcBody] = useState(
+    "这是一封群发测试邮件。如果你看到这封邮件，说明 broadcast 端点全通。",
+  );
 
   const { data: status } = useQuery({
-    queryKey: ['admin-notify-status'],
-    queryFn: () => api.get<NotifyStatus>('/admin/notify/status'),
+    queryKey: ["admin-notify-status"],
+    queryFn: () => api.get<NotifyStatus>("/admin/notify/status"),
   });
 
   const { data: dlq } = useQuery({
-    queryKey: ['admin-notify-dlq'],
-    queryFn: () => api.get<{ count: number; items: any[] }>('/admin/notify/dlq'),
+    queryKey: ["admin-notify-dlq"],
+    queryFn: () =>
+      api.get<{ count: number; items: DeadLetterItem[] }>("/admin/notify/dlq"),
     refetchInterval: 15000,
   });
 
-  // TODO: Admin mutation 走 server-only (通知 / DLQ 是 server-side 资源), 暂时保留 api.* 直连
+  // Notification and dead-letter operations are authoritative server resources.
   const testMutation = useMutation({
-    mutationFn: () => api.post('/admin/notify/test', { to: testTo, subject: testSubject, body: testBody }),
-    onSuccess: (res: any) => {
-      if (res?.ok) qc.invalidateQueries({ queryKey: ['admin-notify-dlq'] });
-      // mark used to satisfy noUnusedParameters
-      void res;
+    mutationFn: () =>
+      api.post<TestNotifyResult>("/admin/notify/test", {
+        to: testTo,
+        subject: testSubject,
+        body: testBody,
+      }),
+    onSuccess: (res) => {
+      if (res?.ok) qc.invalidateQueries({ queryKey: ["admin-notify-dlq"] });
     },
   });
 
-  // TODO: Admin mutation 走 server-only, 暂时保留 api.* 直连
   const broadcastMutation = useMutation({
-    mutationFn: () => api.post('/admin/notify/broadcast', { subject: bcSubject, body: bcBody }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-notify-dlq'] }),
+    mutationFn: () =>
+      api.post<BroadcastResult>("/admin/notify/broadcast", {
+        subject: bcSubject,
+        body: bcBody,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-notify-dlq"] }),
   });
 
   return (
@@ -524,28 +706,72 @@ function NotificationsTab() {
         </div>
         {status ? (
           <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs md:grid-cols-3">
-            <div><span className="text-[var(--color-text-muted)]">后端：</span><Badge variant="accent">{status.backend}</Badge></div>
-            {status.host && <div><span className="text-[var(--color-text-muted)]">SMTP：</span><code>{status.host}:{status.port}</code></div>}
-            {status.user && <div><span className="text-[var(--color-text-muted)]">发件：</span><code>{status.user}</code></div>}
+            <div>
+              <span className="text-[var(--color-text-muted)]">后端：</span>
+              <Badge variant="accent">{status.backend}</Badge>
+            </div>
+            {status.host && (
+              <div>
+                <span className="text-[var(--color-text-muted)]">SMTP：</span>
+                <code>
+                  {status.host}:{status.port}
+                </code>
+              </div>
+            )}
+            {status.user && (
+              <div>
+                <span className="text-[var(--color-text-muted)]">发件：</span>
+                <code>{status.user}</code>
+              </div>
+            )}
             {status.pass_set !== undefined && (
               <div>
                 <span className="text-[var(--color-text-muted)]">密码：</span>
-                {status.pass_set ? <span className="text-emerald-500">已设 ✓</span> : <span className="text-[var(--color-warn)]">未设</span>}
+                {status.pass_set ? (
+                  <span className="text-emerald-500">已设 ✓</span>
+                ) : (
+                  <span className="text-[var(--color-warn)]">未设</span>
+                )}
               </div>
             )}
-            {status.ssl !== undefined && <div><span className="text-[var(--color-text-muted)]">SSL：</span>{String(status.ssl)}</div>}
-            {status.from_name && <div><span className="text-[var(--color-text-muted)]">发件人：</span>{status.from_name}</div>}
-            {status.mode && <div><span className="text-[var(--color-text-muted)]">模式：</span><Badge>{status.mode}</Badge></div>}
+            {status.ssl !== undefined && (
+              <div>
+                <span className="text-[var(--color-text-muted)]">SSL：</span>
+                {String(status.ssl)}
+              </div>
+            )}
+            {status.from_name && (
+              <div>
+                <span className="text-[var(--color-text-muted)]">发件人：</span>
+                {status.from_name}
+              </div>
+            )}
+            {status.mode && (
+              <div>
+                <span className="text-[var(--color-text-muted)]">模式：</span>
+                <Badge>{status.mode}</Badge>
+              </div>
+            )}
             {status.client_id_set !== undefined && (
               <div>
-                <span className="text-[var(--color-text-muted)]">client_id：</span>
-                {status.client_id_set ? <span className="text-emerald-500">已设 ✓</span> : <span className="text-[var(--color-warn)]">未设</span>}
+                <span className="text-[var(--color-text-muted)]">
+                  client_id：
+                </span>
+                {status.client_id_set ? (
+                  <span className="text-emerald-500">已设 ✓</span>
+                ) : (
+                  <span className="text-[var(--color-warn)]">未设</span>
+                )}
               </div>
             )}
             {status.token_cached !== undefined && (
               <div>
                 <span className="text-[var(--color-text-muted)]">token：</span>
-                {status.token_cached ? <span className="text-emerald-500">已缓存 ✓</span> : <span className="text-[var(--color-warn)]">需登录</span>}
+                {status.token_cached ? (
+                  <span className="text-emerald-500">已缓存 ✓</span>
+                ) : (
+                  <span className="text-[var(--color-warn)]">需登录</span>
+                )}
               </div>
             )}
           </div>
@@ -588,12 +814,25 @@ function NotificationsTab() {
               onClick={() => testMutation.mutate()}
               disabled={testMutation.isPending || !testTo}
             >
-              {testMutation.isPending ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Send size={14} className="mr-1" />}
+              {testMutation.isPending ? (
+                <Loader2 size={14} className="mr-1 animate-spin" />
+              ) : (
+                <Send size={14} className="mr-1" />
+              )}
               发送测试
             </Button>
-            {testMutation.isSuccess && (testMutation.data as any)?.ok !== undefined && (
-              <span className={'text-xs ' + ((testMutation.data as any).ok ? 'text-emerald-500' : 'text-[var(--color-warn)]')}>
-                {(testMutation.data as any).ok ? `✅ 已发送给 ${(testMutation.data as any).to}` : `❌ 失败`}
+            {testMutation.isSuccess && testMutation.data?.ok !== undefined && (
+              <span
+                className={
+                  "text-xs " +
+                  (testMutation.data.ok
+                    ? "text-emerald-500"
+                    : "text-[var(--color-warn)]")
+                }
+              >
+                {testMutation.data.ok
+                  ? `✅ 已发送给 ${testMutation.data.to}`
+                  : `❌ 失败`}
               </span>
             )}
           </div>
@@ -605,7 +844,9 @@ function NotificationsTab() {
         <div className="mb-3 flex items-center gap-2">
           <Megaphone size={14} className="text-[var(--color-accent)]" />
           <span className="text-sm font-semibold">📢 群发通知</span>
-          <span className="ml-auto text-[10px] text-[var(--color-text-muted)]">发送给所有设置了 email 的用户</span>
+          <span className="ml-auto text-[10px] text-[var(--color-text-muted)]">
+            发送给所有设置了 email 的用户
+          </span>
         </div>
         <div className="space-y-2">
           <input
@@ -631,14 +872,18 @@ function NotificationsTab() {
               }}
               disabled={broadcastMutation.isPending}
             >
-              {broadcastMutation.isPending ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Megaphone size={14} className="mr-1" />}
+              {broadcastMutation.isPending ? (
+                <Loader2 size={14} className="mr-1 animate-spin" />
+              ) : (
+                <Megaphone size={14} className="mr-1" />
+              )}
               群发
             </Button>
-            {broadcastMutation.isSuccess && (broadcastMutation.data as any) && (
+            {broadcastMutation.isSuccess && broadcastMutation.data && (
               <span className="text-xs">
-                ✅ {(broadcastMutation.data as any).ok} 成功 ·
-                ❌ {(broadcastMutation.data as any).failed} 失败 ·
-                跳过 {(broadcastMutation.data as any).skipped}
+                ✅ {broadcastMutation.data.ok} 成功 · ❌{" "}
+                {broadcastMutation.data.failed} 失败 · 跳过{" "}
+                {broadcastMutation.data.skipped}
               </span>
             )}
           </div>
@@ -650,16 +895,22 @@ function NotificationsTab() {
         <div className="rounded-2xl border border-[var(--color-warn)]/30 bg-[var(--color-warn)]/5 p-4">
           <div className="mb-2 flex items-center gap-2 text-xs">
             <X size={12} className="text-[var(--color-warn)]" />
-            <span className="font-semibold text-[var(--color-warn)]">死信队列（{dlq.count} 条）</span>
+            <span className="font-semibold text-[var(--color-warn)]">
+              死信队列（{dlq.count} 条）
+            </span>
           </div>
           <StaggerList className="space-y-1">
-            {dlq.items.slice(-5).reverse().map((it, i) => (
-              <StaggerItem key={i}>
-                <div className="rounded bg-[var(--color-bg)] px-2 py-1 text-[10px] font-mono text-[var(--color-text-muted)]">
-                  <span className="text-[var(--color-warn)]">[{it.ts}]</span> {it.to} · {it.subject} · {it.reason?.slice(0, 80)}
-                </div>
-              </StaggerItem>
-            ))}
+            {dlq.items
+              .slice(-5)
+              .reverse()
+              .map((it, i) => (
+                <StaggerItem key={i}>
+                  <div className="rounded bg-[var(--color-bg)] px-2 py-1 text-[10px] font-mono text-[var(--color-text-muted)]">
+                    <span className="text-[var(--color-warn)]">[{it.ts}]</span>{" "}
+                    {it.to} · {it.subject} · {it.reason?.slice(0, 80)}
+                  </div>
+                </StaggerItem>
+              ))}
           </StaggerList>
         </div>
       )}
@@ -667,25 +918,29 @@ function NotificationsTab() {
   );
 }
 
-
 // ─── Page ────────────────────────────────────────────────
 
 export function AdminPage() {
   const user = useAuthStore((s) => s.user);
   const navigate = useNavigate();
-  const [tab, setTab] = useState<'system' | 'users' | 'notifications'>('system');
+  const [tab, setTab] = useState<"system" | "users" | "notifications">(
+    "system",
+  );
 
   // Route guard: must be admin
-  if (user && user.role !== 'admin') {
+  if (user && user.role !== "admin") {
     return (
       <div className="studio-page mx-auto max-w-md p-12">
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-glass)] p-8 text-center backdrop-blur-xl">
-          <ShieldCheck size={32} className="mx-auto mb-3 text-[var(--color-warn)]" />
+          <ShieldCheck
+            size={32}
+            className="mx-auto mb-3 text-[var(--color-warn)]"
+          />
           <h2 className="text-lg font-semibold">需要管理员权限</h2>
           <p className="mt-2 text-sm text-[var(--color-text-muted)]">
             当前账号（{user.display_name}）是 {user.role}，不是管理员。
           </p>
-          <Button size="sm" className="mt-4" onClick={() => navigate('/')}>
+          <Button size="sm" className="mt-4" onClick={() => navigate("/")}>
             返回首页
           </Button>
         </div>
@@ -698,7 +953,9 @@ export function AdminPage() {
       <FadeIn>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-stone-400">Admin</p>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-stone-400">
+              Admin
+            </p>
             <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[var(--color-text-primary)]">
               管理面板
             </h2>
@@ -709,7 +966,11 @@ export function AdminPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.6, rotate: -20 }}
             animate={{ opacity: 1, scale: 1, rotate: 0 }}
-            transition={{ duration: m.duration.scenic / 1000, ease: m.easing.spring, delay: 0.1 }}
+            transition={{
+              duration: m.duration.scenic / 1000,
+              ease: m.easing.spring,
+              delay: 0.1,
+            }}
           >
             <ShieldCheck size={28} className="text-[var(--color-accent)]" />
           </motion.div>
@@ -718,15 +979,21 @@ export function AdminPage() {
 
       <Tabs
         tabs={[
-          { id: 'system', label: '系统资源' },
-          { id: 'users', label: '用户列表' },
-          { id: 'notifications', label: '邮件通知' },
+          { id: "system", label: "系统资源" },
+          { id: "users", label: "用户列表" },
+          { id: "notifications", label: "邮件通知" },
         ]}
         activeTab={tab}
         onTabChange={(t) => setTab(t as typeof tab)}
       />
 
-      {tab === 'system' ? <SystemTab /> : tab === 'users' ? <UsersTab /> : <NotificationsTab />}
+      {tab === "system" ? (
+        <SystemTab />
+      ) : tab === "users" ? (
+        <UsersTab />
+      ) : (
+        <NotificationsTab />
+      )}
     </div>
   );
 }

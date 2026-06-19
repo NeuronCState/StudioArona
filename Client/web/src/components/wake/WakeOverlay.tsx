@@ -1,12 +1,12 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import { useSessionStore } from '@/stores/session';
+import { motion, AnimatePresence } from "framer-motion";
+import { useSessionStore } from "@/stores/session";
 
 export function WakeOverlay() {
   const wakeState = useSessionStore((s) => s.wakeState);
 
   return (
     <AnimatePresence>
-      {wakeState === 'waking' && (
+      {wakeState === "waking" && (
         <motion.div
           key="wake-overlay"
           className="fixed inset-0 z-40 flex items-center justify-center bg-surface"
@@ -19,7 +19,9 @@ export function WakeOverlay() {
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent">
               <span className="text-2xl font-bold text-white">J</span>
             </div>
-            <p className="text-sm text-text-secondary animate-pulse">正在唤醒...</p>
+            <p className="text-sm text-text-secondary animate-pulse">
+              正在唤醒...
+            </p>
           </div>
         </motion.div>
       )}

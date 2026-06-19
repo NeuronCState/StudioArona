@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Pencil, Trash2, Check, X } from 'lucide-react';
-import { api } from '@/lib/api/client';
-import { useSessionStore, type SessionSummary } from '@/stores/session';
-import { cn } from '@/lib/utils';
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Pencil, Trash2, Check, X } from "lucide-react";
+import { api } from "@/lib/api/client";
+import { useSessionStore, type SessionSummary } from "@/stores/session";
+import { cn } from "@/lib/utils";
 
 function groupSessions(sessions: SessionSummary[]) {
   const now = Date.now();
@@ -25,20 +25,21 @@ function groupSessions(sessions: SessionSummary[]) {
 }
 
 const groupLabels: Record<string, string> = {
-  today: '今天',
-  yesterday: '昨天',
-  thisWeek: '本周',
-  older: '更早',
+  today: "今天",
+  yesterday: "昨天",
+  thisWeek: "本周",
+  older: "更早",
 };
 
 export function SessionList() {
-  const { currentSessionId, setCurrentSessionId, sessions, setSessions } = useSessionStore();
+  const { currentSessionId, setCurrentSessionId, sessions, setSessions } =
+    useSessionStore();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState('');
+  const [editTitle, setEditTitle] = useState("");
 
   const { data: fetchedSessions } = useQuery({
-    queryKey: ['chat-sessions'],
-    queryFn: () => api.get<SessionSummary[]>('/chat/sessions'),
+    queryKey: ["chat-sessions"],
+    queryFn: () => api.get<SessionSummary[]>("/chat/sessions"),
   });
 
   // Sync fetched sessions to store
@@ -58,7 +59,9 @@ export function SessionList() {
     setEditingId(null);
   };
 
-  const grouped = groupSessions(sessions.length > 0 ? sessions : fetchedSessions ?? []);
+  const grouped = groupSessions(
+    sessions.length > 0 ? sessions : (fetchedSessions ?? []),
+  );
 
   return (
     <div className="flex-1 overflow-y-auto px-2 py-1">
@@ -79,14 +82,20 @@ export function SessionList() {
                       className="flex-1 rounded border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-xs text-[var(--color-text-primary)]"
                       autoFocus
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleRename(s.id);
-                        if (e.key === 'Escape') setEditingId(null);
+                        if (e.key === "Enter") handleRename(s.id);
+                        if (e.key === "Escape") setEditingId(null);
                       }}
                     />
-                    <button onClick={() => handleRename(s.id)} className="p-0.5 text-[var(--color-success)]">
+                    <button
+                      onClick={() => handleRename(s.id)}
+                      className="p-0.5 text-[var(--color-success)]"
+                    >
                       <Check size={12} />
                     </button>
-                    <button onClick={() => setEditingId(null)} className="p-0.5 text-[var(--color-text-muted)]">
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="p-0.5 text-[var(--color-text-muted)]"
+                    >
                       <X size={12} />
                     </button>
                   </div>
@@ -94,10 +103,10 @@ export function SessionList() {
                   <button
                     onClick={() => setCurrentSessionId(s.id)}
                     className={cn(
-                      'flex w-full items-center rounded-lg px-3 py-1.5 text-left text-sm transition-colors',
+                      "flex w-full items-center rounded-lg px-3 py-1.5 text-left text-sm transition-colors",
                       currentSessionId === s.id
-                        ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent)]'
-                        : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)]',
+                        ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]"
+                        : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)]",
                     )}
                   >
                     <span className="truncate flex-1">{s.title}</span>

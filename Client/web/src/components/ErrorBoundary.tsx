@@ -1,5 +1,5 @@
-import { AlertTriangle, RefreshCw } from 'lucide-react';
-import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { AlertTriangle, RefreshCw } from "lucide-react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -17,7 +17,10 @@ interface ErrorBoundaryState {
  * "出错了" card instead of the default browser "Internal Server Error" /
  * blank page. Replaces the missing v3 error boundary.
  */
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary extends Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   state: ErrorBoundaryState = { error: null };
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
@@ -26,8 +29,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     // Best-effort logging; routes through console so dev tools see it.
-    // eslint-disable-next-line no-console
-    console.error(`[ErrorBoundary${this.props.scope ? `:${this.props.scope}` : ''}]`, error, info);
+    console.error(
+      `[ErrorBoundary${this.props.scope ? `:${this.props.scope}` : ""}]`,
+      error,
+      info,
+    );
   }
 
   private handleReset = (): void => {
@@ -42,21 +48,26 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     const { error } = this.state;
     if (!error) return this.props.children;
 
-    const message = error.message || '未知错误';
-    const isOffline = /offline|fetch|network|server|ECONNREFUSED|aborted/i.test(message);
+    const message = error.message || "未知错误";
+    const isOffline = /offline|fetch|network|server|ECONNREFUSED|aborted/i.test(
+      message,
+    );
 
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 p-8 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/30">
-          <AlertTriangle size={32} className="text-amber-600 dark:text-amber-400" />
+          <AlertTriangle
+            size={32}
+            className="text-amber-600 dark:text-amber-400"
+          />
         </div>
         <div className="space-y-1">
           <p className="text-lg font-medium text-stone-800 dark:text-stone-200">
-            {isOffline ? '无法连接到 server' : '页面出错了'}
+            {isOffline ? "无法连接到 server" : "页面出错了"}
           </p>
           <p className="max-w-md text-sm text-stone-500 dark:text-stone-400">
             {isOffline
-              ? 'server 没启动, 或网络不通。本地数据仍可访问, 但同步功能暂停。'
+              ? "server 没启动, 或网络不通。本地数据仍可访问, 但同步功能暂停。"
               : message}
           </p>
         </div>

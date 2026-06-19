@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { listContainer as containerVariants } from '@/lib/motion';
-import { AgentMessageItem } from './AgentMessage';
-import type { AgentMessage as ChatMessage } from './useAgentChat';
+import { useEffect, useRef } from "react";
+import { motion } from "framer-motion";
+import { listContainer as containerVariants } from "@/lib/motion";
+import { AgentMessageItem } from "./AgentMessage";
+import type { AgentMessage as ChatMessage } from "./useAgentChat";
 
 interface AgentMessageListProps {
   messages: ChatMessage[];
@@ -48,7 +48,7 @@ export function AgentMessageList({
         <EmptyState agentName={agentName} />
       ) : (
         <motion.div
-          variants={containerVariants('list')}
+          variants={containerVariants("list")}
           initial="hidden"
           animate="show"
           className="flex flex-col gap-4"

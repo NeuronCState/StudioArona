@@ -8,19 +8,24 @@
  *
  * staggerKey: 'list' (40ms) | 'page' (80ms)
  */
-import { motion } from 'framer-motion'
-import { listContainer, listItem, motion as m } from '../../lib/motion'
-import type { ReactNode } from 'react'
+import { motion } from "framer-motion";
+import { listContainer, listItem } from "../../lib/motion";
+import type { ReactNode } from "react";
 
 interface StaggerListProps {
-  children: ReactNode
-  staggerKey?: keyof typeof m.stagger
-  className?: string
-  as?: 'div' | 'ul' | 'ol'
+  children: ReactNode;
+  staggerKey?: "list" | "page";
+  className?: string;
+  as?: "div" | "ul" | "ol";
 }
 
-export function StaggerList({ children, staggerKey = 'list', className, as = 'div' }: StaggerListProps) {
-  const MotionTag = motion[as]
+export function StaggerList({
+  children,
+  staggerKey = "list",
+  className,
+  as = "div",
+}: StaggerListProps) {
+  const MotionTag = motion[as];
   return (
     <MotionTag
       className={className}
@@ -30,22 +35,22 @@ export function StaggerList({ children, staggerKey = 'list', className, as = 'di
     >
       {children}
     </MotionTag>
-  )
+  );
 }
 
 export function StaggerItem({
   children,
   className,
-  as = 'div',
+  as = "div",
 }: {
-  children: ReactNode
-  className?: string
-  as?: 'div' | 'li'
+  children: ReactNode;
+  className?: string;
+  as?: "div" | "li";
 }) {
-  const MotionTag = motion[as]
+  const MotionTag = motion[as];
   return (
     <MotionTag className={className} variants={listItem}>
       {children}
     </MotionTag>
-  )
+  );
 }

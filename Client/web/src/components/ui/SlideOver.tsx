@@ -1,6 +1,6 @@
-import { useEffect, useRef, type ReactNode } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { useEffect, useRef, type ReactNode } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
 
 interface SlideOverProps {
   open: boolean;
@@ -16,10 +16,10 @@ export function SlideOver({ open, onClose, title, children }: SlideOverProps) {
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === "Escape") onClose();
     };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
   // Trap focus inside panel when open
@@ -49,10 +49,10 @@ export function SlideOver({ open, onClose, title, children }: SlideOverProps) {
           <motion.div
             ref={panelRef}
             key="panel"
-            initial={{ x: '100%' }}
+            initial={{ x: "100%" }}
             animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
             className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col bg-[var(--color-surface)] shadow-xl"
           >
             {/* Header */}
@@ -69,9 +69,7 @@ export function SlideOver({ open, onClose, title, children }: SlideOverProps) {
               </button>
             </div>
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-5">
-              {children}
-            </div>
+            <div className="flex-1 overflow-y-auto p-5">{children}</div>
           </motion.div>
         </>
       )}

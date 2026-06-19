@@ -1,4 +1,4 @@
-import type { WSEvent } from '@/types/ws-events';
+import type { WSEvent } from "@/types/ws-events";
 
 type Handler = (event: WSEvent) => void;
 type Unsubscribe = () => void;
@@ -9,7 +9,7 @@ type Unsubscribe = () => void;
 
 function supportsSharedWorker(): boolean {
   try {
-    return typeof SharedWorker !== 'undefined';
+    return typeof SharedWorker !== "undefined";
   } catch {
     return false;
   }
@@ -30,14 +30,14 @@ class SharedWorkerTransport {
 
     try {
       this.worker = new SharedWorker(
-        new URL('@/workers/ws-shared-worker.ts', import.meta.url),
-        { type: 'module', name: 'javis-ws-shared' },
+        new URL("@/workers/ws-shared-worker.ts", import.meta.url),
+        { type: "module", name: "javis-ws-shared" },
       );
       this.port = this.worker.port;
 
       this.port.onmessage = (e: MessageEvent) => {
         const data = e.data as { type: string; event?: WSEvent };
-        if (data.type === 'event' && data.event) {
+        if (data.type === "event" && data.event) {
           this.handlers.forEach((h) => h(data.event!));
         }
       };
@@ -46,7 +46,7 @@ class SharedWorkerTransport {
       this.started = true;
     } catch {
       // SharedWorker construction failed — caller should fall back to direct WS
-      throw new Error('SharedWorker unavailable');
+      throw new Error("SharedWorker unavailable");
     }
   }
 
@@ -65,7 +65,7 @@ class SharedWorkerTransport {
 
   send(event: WSEvent): void {
     if (this.port) {
-      this.port.postMessage({ type: 'send', payload: event });
+      this.port.postMessage({ type: "send", payload: event });
     }
   }
 
@@ -88,7 +88,7 @@ class DirectWSTransport {
   connect(): void {
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     try {
       this.ws = new WebSocket(`${protocol}//${window.location.host}/ws/events`);
     } catch {

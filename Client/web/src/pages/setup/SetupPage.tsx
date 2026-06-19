@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Bot, Plus, Trash2, ArrowRight, Check } from 'lucide-react';
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { Bot, Plus, Trash2, ArrowRight, Check } from "lucide-react";
 import {
   useSonettoConfigStore,
   SONETTO_PRESETS,
   type SonettoProviderConfig,
-} from '@/stores/sonetto-config';
+} from "@/stores/sonetto-config";
 
 export function SetupPage() {
   const {
@@ -18,11 +18,11 @@ export function SetupPage() {
   } = useSonettoConfigStore();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<SonettoProviderConfig>({
-    id: '',
-    provider_type: 'openai',
-    label: '自定义',
-    api_key: '',
-    base_url: '',
+    id: "",
+    provider_type: "openai",
+    label: "自定义",
+    api_key: "",
+    base_url: "",
     models: [],
     context_window: 32000,
   });
@@ -31,7 +31,7 @@ export function SetupPage() {
     if (!form.base_url) return;
     const id = `custom-${Date.now()}`;
     addProvider({ ...form, id, label: form.label || form.base_url });
-    setForm({ ...form, id: '', api_key: '' });
+    setForm({ ...form, id: "", api_key: "" });
     setEditing(false);
   };
 
@@ -60,13 +60,16 @@ export function SetupPage() {
             配置 AI 服务
           </h1>
           <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-            连接到你的 LLM 供应商, SonettoHere 整端当 agent 框架 (LangGraph ReAct + 30+ tool)
+            连接到你的 LLM 供应商, SonettoHere 整端当 agent 框架 (LangGraph
+            ReAct + 30+ tool)
           </p>
         </div>
 
         {/* Presets */}
         <div className="mb-6">
-          <p className="mb-3 text-xs font-medium text-[var(--color-text-muted)]">快速添加</p>
+          <p className="mb-3 text-xs font-medium text-[var(--color-text-muted)]">
+            快速添加
+          </p>
           <div className="grid grid-cols-2 gap-2">
             {SONETTO_PRESETS.map((preset) => (
               <button
@@ -75,7 +78,9 @@ export function SetupPage() {
                 className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-left text-sm transition-colors hover:border-[var(--color-accent)]/50 hover:bg-[var(--color-accent-soft)]"
               >
                 <div className="font-medium">{preset.label}</div>
-                <div className="truncate text-xs text-stone-500">{preset.config.base_url}</div>
+                <div className="truncate text-xs text-stone-500">
+                  {preset.config.base_url}
+                </div>
               </button>
             ))}
           </div>
@@ -84,7 +89,9 @@ export function SetupPage() {
         {/* Added providers */}
         {providers.length > 0 && (
           <div className="mb-6">
-            <p className="mb-3 text-xs font-medium text-[var(--color-text-muted)]">已添加的供应商</p>
+            <p className="mb-3 text-xs font-medium text-[var(--color-text-muted)]">
+              已添加的供应商
+            </p>
             <div className="space-y-2">
               {providers.map((p) => (
                 <motion.div
@@ -98,18 +105,18 @@ export function SetupPage() {
                       {p.label}
                     </p>
                     <p className="truncate text-xs text-[var(--color-text-muted)]">
-                      {p.base_url} · {p.models.join(', ')}
+                      {p.base_url} · {p.models.join(", ")}
                     </p>
                   </div>
                   <button
                     onClick={() => setActiveProvider(p.id)}
                     className={`rounded-lg px-2 py-1 text-xs transition-colors ${
                       p.id === activeProviderId
-                        ? 'bg-[var(--color-accent)] text-white'
-                        : 'bg-[var(--color-bg)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
+                        ? "bg-[var(--color-accent)] text-white"
+                        : "bg-[var(--color-bg)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
                     }`}
                   >
-                    {p.id === activeProviderId ? '当前' : '使用'}
+                    {p.id === activeProviderId ? "当前" : "使用"}
                   </button>
                   <button
                     onClick={() => removeProvider(p.id)}
@@ -127,11 +134,13 @@ export function SetupPage() {
         {editing ? (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
+            animate={{ opacity: 1, height: "auto" }}
             className="mb-6 space-y-3 rounded-xl border border-[var(--color-accent)]/30 bg-[var(--color-surface)] p-4"
           >
             <div>
-              <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">标签</label>
+              <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">
+                标签
+              </label>
               <input
                 value={form.label}
                 onChange={(e) => setForm({ ...form, label: e.target.value })}
@@ -140,7 +149,9 @@ export function SetupPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">Base URL</label>
+              <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">
+                Base URL
+              </label>
               <input
                 value={form.base_url}
                 onChange={(e) => setForm({ ...form, base_url: e.target.value })}
@@ -149,7 +160,9 @@ export function SetupPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">API Key</label>
+              <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">
+                API Key
+              </label>
               <input
                 value={form.api_key}
                 onChange={(e) => setForm({ ...form, api_key: e.target.value })}
@@ -159,13 +172,18 @@ export function SetupPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">模型 (逗号分隔)</label>
+              <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">
+                模型 (逗号分隔)
+              </label>
               <input
-                value={form.models.join(',')}
+                value={form.models.join(",")}
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    models: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+                    models: e.target.value
+                      .split(",")
+                      .map((s) => s.trim())
+                      .filter(Boolean),
                   })
                 }
                 placeholder="gpt-4o-mini, gpt-4o"

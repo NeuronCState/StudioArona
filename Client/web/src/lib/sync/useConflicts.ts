@@ -1,8 +1,8 @@
 /**
  * useConflicts — React hook 包 ConflictStore, 给组件订阅 conflicts list + resolve
  */
-import { useCallback } from 'react';
-import { useConflictStore, type Conflict, conflictKey } from './ConflictStore';
+import { useCallback } from "react";
+import { useConflictStore, type Conflict, conflictKey } from "./ConflictStore";
 
 export function useConflicts() {
   const conflicts = useConflictStore((s) => s.conflicts);
@@ -10,7 +10,7 @@ export function useConflicts() {
 
   const list: Conflict[] = Object.values(conflicts);
   const resolve = useCallback(
-    (table: Conflict['table'], docId: string) => {
+    (table: Conflict["table"], docId: string) => {
       resolveConflict(conflictKey(table, docId));
     },
     [resolveConflict],

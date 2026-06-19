@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useSessionStore } from '@/stores/session';
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useSessionStore } from "@/stores/session";
 
 export function LeaveCountdown() {
   const wakeState = useSessionStore((s) => s.wakeState);
@@ -9,14 +9,14 @@ export function LeaveCountdown() {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    if (wakeState !== 'leaving' || dismissed) return;
+    if (wakeState !== "leaving" || dismissed) return;
 
     setCount(5);
     const timer = setInterval(() => {
       setCount((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          setWakeState('idle');
+          setWakeState("idle");
           return 0;
         }
         return prev - 1;
@@ -28,10 +28,10 @@ export function LeaveCountdown() {
 
   const handleKeep = () => {
     setDismissed(true);
-    setWakeState('active');
+    setWakeState("active");
   };
 
-  if (wakeState !== 'leaving' || dismissed) return null;
+  if (wakeState !== "leaving" || dismissed) return null;
 
   return (
     <AnimatePresence>
@@ -46,7 +46,9 @@ export function LeaveCountdown() {
           initial={{ scale: 0.9 }}
           animate={{ scale: 1 }}
         >
-          <div className="text-4xl font-bold font-mono text-accent">{count}</div>
+          <div className="text-4xl font-bold font-mono text-accent">
+            {count}
+          </div>
           <p className="text-sm text-text-secondary">无人，即将清空对话</p>
           <button onClick={handleKeep} className="btn-primary">
             我还在，保留

@@ -13,7 +13,7 @@
 
 const WS_URL = ((): string => {
   // The worker runs in a WorkerGlobalScope — self.location gives the origin.
-  const proto = self.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const proto = self.location.protocol === "https:" ? "wss:" : "ws:";
   return `${proto}//${self.location.host}/ws/events`;
 })();
 
@@ -36,7 +36,10 @@ function broadcast(data: unknown): void {
 }
 
 function connect(): void {
-  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+  if (
+    ws &&
+    (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)
+  ) {
     return;
   }
 
@@ -54,7 +57,7 @@ function connect(): void {
   ws.onmessage = (e: MessageEvent) => {
     try {
       const event = JSON.parse(e.data as string);
-      broadcast({ type: 'event', event });
+      broadcast({ type: "event", event });
     } catch {
       // Ignore malformed messages
     }
@@ -94,7 +97,9 @@ function disconnect(): void {
 // The tsconfig includes "DOM" but not "WebWorker", so self is typed as
 // Window & typeof globalThis.  Cast to the worker scope we actually run in.
 interface SharedWorkerGlobalScope extends WorkerGlobalScope {
-  onconnect: ((this: SharedWorkerGlobalScope, ev: MessageEvent) => unknown) | null;
+  onconnect:
+    | ((this: SharedWorkerGlobalScope, ev: MessageEvent) => unknown)
+    | null;
 }
 const workerSelf = self as unknown as SharedWorkerGlobalScope;
 
@@ -113,7 +118,7 @@ workerSelf.onconnect = (e: MessageEvent) => {
     const data = msg.data as { type: string; payload?: unknown };
 
     switch (data.type) {
-      case 'send': {
+      case "send": {
         if (ws?.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify(data.payload));
         }
@@ -125,7 +130,7 @@ workerSelf.onconnect = (e: MessageEvent) => {
 
   // Close handler: remove port and disconnect WS if no tabs remain
   port.addEventListener(
-    'close',
+    "close",
     () => {
       ports.delete(port);
       if (ports.size === 0) {

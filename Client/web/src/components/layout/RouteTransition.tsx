@@ -1,5 +1,5 @@
-import { useLocation } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import { useLocation } from "react-router-dom";
+import type { ReactNode } from "react";
 
 /**
  * Lightweight route transition using key-based remount + CSS animation.

@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ScheduleTimeline } from './ScheduleTimeline';
+import type { Meta, StoryObj } from "@storybook/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ScheduleTimeline } from "./ScheduleTimeline";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
@@ -17,20 +17,20 @@ function withProviders(Story: React.ComponentType) {
 }
 
 const meta: Meta<typeof ScheduleTimeline> = {
-  title: 'Features/ScheduleTimeline',
+  title: "Features/ScheduleTimeline",
   component: ScheduleTimeline,
   decorators: [withProviders],
-  parameters: { layout: 'padded' },
-  tags: ['autodocs'],
+  parameters: { layout: "padded" },
+  tags: ["autodocs"],
 };
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Personal: Story = {
-  args: { scope: 'personal' },
+  args: { scope: "personal" },
 };
 
 export const Shared: Story = {
-  args: { scope: 'shared' },
+  args: { scope: "shared" },
 };

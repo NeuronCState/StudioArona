@@ -1,11 +1,11 @@
-import { X } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useUIStore, type ToastLevel } from '@/stores/ui';
+import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useUIStore, type ToastLevel } from "@/stores/ui";
 
 const levelStyles: Record<ToastLevel, string> = {
-  info: 'border-blue-200 bg-blue-50 text-blue-900',
-  warn: 'border-amber-200 bg-amber-50 text-amber-900',
-  error: 'border-red-200 bg-red-50 text-red-900',
+  info: "border-blue-200 bg-blue-50 text-blue-900",
+  warn: "border-amber-200 bg-amber-50 text-amber-900",
+  error: "border-red-200 bg-red-50 text-red-900",
 };
 
 export function ToastContainer() {
@@ -20,7 +20,7 @@ export function ToastContainer() {
         <div
           key={toast.id}
           className={cn(
-            'flex items-center gap-3 rounded-lg border px-4 py-3 text-sm shadow-md animate-slide-up',
+            "flex items-center gap-3 rounded-lg border px-4 py-3 text-sm shadow-md animate-slide-up",
             levelStyles[toast.level],
           )}
         >

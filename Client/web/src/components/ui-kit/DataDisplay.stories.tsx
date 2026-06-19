@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { Badge, Tag, Avatar, Spinner, Skeleton } from '@javis/ui-kit';
+import type { Meta, StoryObj } from "@storybook/react";
+import { Badge, Tag, Avatar, Spinner, Skeleton } from "@javis/ui-kit";
 
-export default { title: 'UI Kit/Data Display' } as Meta;
+export default { title: "UI Kit/Data Display" } as Meta;
 
 export const Badges: StoryObj = {
   render: () => (
@@ -20,7 +20,9 @@ export const Tags: StoryObj = {
     <div className="flex gap-2">
       <Tag variant="default">Default</Tag>
       <Tag variant="accent">Accent</Tag>
-      <Tag variant="success" onRemove={() => {}}>Removable</Tag>
+      <Tag variant="success" onRemove={() => {}}>
+        Removable
+      </Tag>
       <Tag variant="warning">Warning</Tag>
       <Tag variant="error">Error</Tag>
     </div>
@@ -30,11 +32,26 @@ export const Tags: StoryObj = {
 export const Avatars: StoryObj = {
   render: () => (
     <div className="flex items-end gap-4">
-      <div className="flex flex-col items-center gap-1"><Avatar alt="User" size="sm" /><span className="text-2xs">sm</span></div>
-      <div className="flex flex-col items-center gap-1"><Avatar alt="Zhang San" size="md" /><span className="text-2xs">md</span></div>
-      <div className="flex flex-col items-center gap-1"><Avatar alt="Li Si" size="lg" /><span className="text-2xs">lg</span></div>
-      <div className="flex flex-col items-center gap-1"><Avatar alt="Wang Wu" size="xl" /><span className="text-2xs">xl</span></div>
-      <div className="flex flex-col items-center gap-1"><Avatar alt="Arona Studio" size="lg" src="https://i.pravatar.cc/80" /><span className="text-2xs">image</span></div>
+      <div className="flex flex-col items-center gap-1">
+        <Avatar alt="User" size="sm" />
+        <span className="text-2xs">sm</span>
+      </div>
+      <div className="flex flex-col items-center gap-1">
+        <Avatar alt="Zhang San" size="md" />
+        <span className="text-2xs">md</span>
+      </div>
+      <div className="flex flex-col items-center gap-1">
+        <Avatar alt="Li Si" size="lg" />
+        <span className="text-2xs">lg</span>
+      </div>
+      <div className="flex flex-col items-center gap-1">
+        <Avatar alt="Wang Wu" size="xl" />
+        <span className="text-2xs">xl</span>
+      </div>
+      <div className="flex flex-col items-center gap-1">
+        <Avatar alt="Arona Studio" size="lg" src="https://i.pravatar.cc/80" />
+        <span className="text-2xs">image</span>
+      </div>
     </div>
   ),
 };

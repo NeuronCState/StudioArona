@@ -10,12 +10,15 @@ export function LineChartSimple({
   data,
   width = 400,
   height = 100,
-  color = 'var(--color-accent)',
+  color = "var(--color-accent)",
   label,
 }: LineChartSimpleProps) {
   if (data.length < 2) {
     return (
-      <div className="flex items-center justify-center text-xs text-text-muted" style={{ height }}>
+      <div
+        className="flex items-center justify-center text-xs text-text-muted"
+        style={{ height }}
+      >
         数据不足
       </div>
     );
@@ -29,10 +32,11 @@ export function LineChartSimple({
   const points = data
     .map((d, i) => {
       const x = padding + (i / (data.length - 1)) * (width - padding * 2);
-      const y = height - padding - ((d.y - minY) / range) * (height - padding * 2);
+      const y =
+        height - padding - ((d.y - minY) / range) * (height - padding * 2);
       return `${x},${y}`;
     })
-    .join(' ');
+    .join(" ");
 
   const areaPoints = `0,${height} ${points} ${width},${height}`;
 
@@ -54,9 +58,18 @@ export function LineChartSimple({
         {/* Data points */}
         {data.map((d, i) => {
           const x = padding + (i / (data.length - 1)) * (width - padding * 2);
-          const y = height - padding - ((d.y - minY) / range) * (height - padding * 2);
+          const y =
+            height - padding - ((d.y - minY) / range) * (height - padding * 2);
           return (
-            <circle key={i} cx={x} cy={y} r={3} fill={color} stroke="white" strokeWidth={1.5} />
+            <circle
+              key={i}
+              cx={x}
+              cy={y}
+              r={3}
+              fill={color}
+              stroke="white"
+              strokeWidth={1.5}
+            />
           );
         })}
       </svg>

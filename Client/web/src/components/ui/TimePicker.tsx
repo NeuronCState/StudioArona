@@ -8,41 +8,49 @@
  * - AM/PM 切换
  * - dark theme 配色
  */
-import { useState, useEffect } from 'react';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { ChevronUp, ChevronDown } from "lucide-react";
 
 interface TimePickerProps {
   /** 当前时间, "HH:MM" 24h */
   value: string;
   onChange: (next: string) => void;
-  variant?: 'dark' | 'light';
+  variant?: "dark" | "light";
 }
 
 function parseTime(s: string): { h: number; m: number } {
-  const [h, m] = (s || '09:00').split(':').map((x) => parseInt(x, 10) || 0);
+  const [h, m] = (s || "09:00").split(":").map((x) => parseInt(x, 10) || 0);
   return { h: Math.max(0, Math.min(23, h)), m: Math.max(0, Math.min(59, m)) };
 }
 
 function formatTime(h: number, m: number): string {
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-export function TimePicker({ value, onChange, variant = 'dark' }: TimePickerProps) {
+export function TimePicker({
+  value,
+  onChange,
+  variant = "dark",
+}: TimePickerProps) {
   const { h, m } = parseTime(value);
-  const isDark = variant === 'dark';
-  const colorText = isDark ? 'text-stone-100' : 'text-stone-900';
-  const colorMuted = isDark ? 'text-stone-500' : 'text-stone-400';
-  const colorHover = isDark ? 'hover:bg-stone-800' : 'hover:bg-stone-100';
-  const colorBtn = isDark ? 'text-stone-300 hover:text-stone-100' : 'text-stone-600 hover:text-stone-900';
+  const isDark = variant === "dark";
+  const colorText = isDark ? "text-stone-100" : "text-stone-900";
+  const colorMuted = isDark ? "text-stone-500" : "text-stone-400";
+  const colorHover = isDark ? "hover:bg-stone-800" : "hover:bg-stone-100";
+  const colorBtn = isDark
+    ? "text-stone-300 hover:text-stone-100"
+    : "text-stone-600 hover:text-stone-900";
 
-  const setH = (next: number) => onChange(formatTime(Math.max(0, Math.min(23, next)), m));
-  const setM = (next: number) => onChange(formatTime(h, Math.max(0, Math.min(59, next))));
+  const setH = (next: number) =>
+    onChange(formatTime(Math.max(0, Math.min(23, next)), m));
+  const setM = (next: number) =>
+    onChange(formatTime(h, Math.max(0, Math.min(59, next))));
 
   // 大数字输入
-  const [hText, setHText] = useState(String(h).padStart(2, '0'));
-  const [mText, setMText] = useState(String(m).padStart(2, '0'));
-  useEffect(() => setHText(String(h).padStart(2, '0')), [h]);
-  useEffect(() => setMText(String(m).padStart(2, '0')), [m]);
+  const [hText, setHText] = useState(String(h).padStart(2, "0"));
+  const [mText, setMText] = useState(String(m).padStart(2, "0"));
+  useEffect(() => setHText(String(h).padStart(2, "0")), [h]);
+  useEffect(() => setMText(String(m).padStart(2, "0")), [m]);
 
   return (
     <div className="flex items-center gap-3">
@@ -55,7 +63,9 @@ export function TimePicker({ value, onChange, variant = 'dark' }: TimePickerProp
           if (!isNaN(n)) setH(n);
         }}
         onStep={(delta) => {
-          setHText(String(Math.max(0, Math.min(23, h + delta))).padStart(2, '0'));
+          setHText(
+            String(Math.max(0, Math.min(23, h + delta))).padStart(2, "0"),
+          );
           setH(h + delta);
         }}
         colorText={colorText}
@@ -73,7 +83,9 @@ export function TimePicker({ value, onChange, variant = 'dark' }: TimePickerProp
           if (!isNaN(n)) setM(n);
         }}
         onStep={(delta) => {
-          setMText(String(Math.max(0, Math.min(59, m + delta))).padStart(2, '0'));
+          setMText(
+            String(Math.max(0, Math.min(59, m + delta))).padStart(2, "0"),
+          );
           setM(m + delta);
         }}
         colorText={colorText}
@@ -119,16 +131,16 @@ function TimeUnit({
         inputMode="numeric"
         value={value}
         onChange={(e) => {
-          const t = e.target.value.replace(/\D/g, '').slice(0, 2);
+          const t = e.target.value.replace(/\D/g, "").slice(0, 2);
           onChangeText(t);
         }}
         onBlur={(e) => {
           // 补零
-          const t = e.target.value.padStart(2, '0').slice(0, 2);
+          const t = e.target.value.padStart(2, "0").slice(0, 2);
           onChangeText(t);
         }}
         className={`w-14 border-x-0 border-y border-transparent bg-transparent text-center text-3xl font-light tabular-nums focus:outline-none ${colorText} ${
-          isDark ? 'focus:border-amber-500' : 'focus:border-amber-600'
+          isDark ? "focus:border-amber-500" : "focus:border-amber-600"
         }`}
       />
       <button

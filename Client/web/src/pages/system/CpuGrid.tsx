@@ -1,4 +1,4 @@
-import type { CPUCore } from '@/types/contracts';
+import type { CPUCore } from "@/types/contracts";
 
 interface CpuGridProps {
   cores: CPUCore[];

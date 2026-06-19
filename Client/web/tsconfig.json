@@ -19,8 +19,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@javis/ui-kit": ["../packages/ui-kit/src/index.ts"],
-      "@javis/contracts/*": ["../packages/contracts/*"]
+      "@javis/ui-kit": ["../packages/ui-kit/src/index.ts"]
     }
   },
   "include": ["src", "vite-env.d.ts"],

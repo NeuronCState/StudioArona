@@ -12,25 +12,25 @@
  * - 同步过来: serverId = uuid
  * - 冲突: syncedAt 跟 serverUpdatedAt 不一致, 弹 manual merge
  */
-import Dexie, { type Table } from 'dexie';
+import Dexie, { type Table } from "dexie";
 
 /* ===== Schedule ===== */
 export interface LocalSchedule {
-  id: string;                  // 本地 id (uuid)
-  serverId?: string;           // server 端 id
+  id: string; // 本地 id (uuid)
+  serverId?: string; // server 端 id
   title: string;
   description?: string;
-  startAt: number;             // unix ms
+  startAt: number; // unix ms
   endAt: number;
   location?: string;
-  visibility: 'private' | 'team' | 'public';
+  visibility: "private" | "team" | "public";
   reminderMinutes?: number;
   notified: boolean;
   createdAt: number;
   updatedAt: number;
-  syncedAt?: number;           // 上次 sync 成功时间
-  dirty: boolean;              // 本地改了, 待 push
-  deleted?: boolean;           // 软删 (sync 时清 server)
+  syncedAt?: number; // 上次 sync 成功时间
+  dirty: boolean; // 本地改了, 待 push
+  deleted?: boolean; // 软删 (sync 时清 server)
 }
 
 /* ===== Feed / RSS ===== */
@@ -40,7 +40,7 @@ export interface LocalFeed {
   url: string;
   title?: string;
   source?: string;
-  priority: 'low' | 'normal' | 'high';
+  priority: "low" | "normal" | "high";
   enabled: boolean;
   lastFetchedAt?: number;
   createdAt: number;
@@ -52,7 +52,7 @@ export interface LocalFeed {
 
 export interface LocalFeedItem {
   id: string;
-  feedId: string;              // → LocalFeed.id
+  feedId: string; // → LocalFeed.id
   serverId?: string;
   title: string;
   link?: string;
@@ -90,10 +90,10 @@ export interface LocalSkill {
   serverId?: string;
   name: string;
   description?: string;
-  source: 'local' | 'marketplace' | 'github';
-  marketplaceId?: string;      // SkillsMP 源 ID
+  source: "local" | "marketplace" | "github";
+  marketplaceId?: string; // SkillsMP 源 ID
   githubUrl?: string;
-  contentPath?: string;        // 本地 skill 文件路径
+  contentPath?: string; // 本地 skill 文件路径
   installed: boolean;
   enabled: boolean;
   metadata: Record<string, unknown>;
@@ -106,21 +106,21 @@ export interface LocalSkill {
 
 /* ===== Weather cache ===== */
 export interface LocalWeather {
-  id: string;                  // = city
+  id: string; // = city
   city: string;
   temperature: number;
   condition: string;
   humidity: number;
-  windSpeed: string;           // 形如 "17 km/h S" 跟 WeatherTile 兼容
+  windSpeed: string; // 形如 "17 km/h S" 跟 WeatherTile 兼容
   windDirection: string;
   feelsLike: number;
-  uvIndex: string;             // 形如 "5 (Moderate)" 跟 WeatherTile 兼容
+  uvIndex: string; // 形如 "5 (Moderate)" 跟 WeatherTile 兼容
   updatedAt: number;
 }
 
 /* ===== System metrics cache ===== */
 export interface LocalSystemMetrics {
-  id: string;                  // = 'singleton'
+  id: string; // = 'singleton'
   cpu: number;
   memory: number;
   disk: number;
@@ -142,16 +142,17 @@ export class StudioAronaDB extends Dexie {
   systemMetrics!: Table<LocalSystemMetrics, string>;
 
   constructor() {
-    super('studioarona');
+    super("studioarona");
     this.version(1).stores({
       // index 字段: 主键 id, 索引字段
-      schedules: 'id, serverId, startAt, dirty, syncedAt, deleted',
-      feeds: 'id, serverId, url, dirty, syncedAt, deleted',
-      feedItems: 'id, feedId, publishedAt, readAt, starred, dirty, deleted',
-      memories: 'id, serverId, category, importance, dirty, syncedAt, deleted',
-      skills: 'id, serverId, source, installed, enabled, dirty, syncedAt, deleted',
-      weather: 'id, city, updatedAt',
-      systemMetrics: 'id, updatedAt',
+      schedules: "id, serverId, startAt, dirty, syncedAt, deleted",
+      feeds: "id, serverId, url, dirty, syncedAt, deleted",
+      feedItems: "id, feedId, publishedAt, readAt, starred, dirty, deleted",
+      memories: "id, serverId, category, importance, dirty, syncedAt, deleted",
+      skills:
+        "id, serverId, source, installed, enabled, dirty, syncedAt, deleted",
+      weather: "id, city, updatedAt",
+      systemMetrics: "id, updatedAt",
     });
   }
 }
@@ -162,23 +163,27 @@ export const db = new StudioAronaDB();
 
 /** 生成 uuid (用 crypto.randomUUID, 浏览器 + Tauri 都支持) */
 export function uuid(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
   }
   // fallback (老浏览器)
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 }
 
 /** 标记 dirty (本地改了, 待 push) */
-export function markDirty<T extends { dirty?: boolean; updatedAt: number }>(item: T): T {
+export function markDirty<T extends { dirty?: boolean; updatedAt: number }>(
+  item: T,
+): T {
   return { ...item, dirty: true, updatedAt: Date.now() };
 }
 
 /** 软删 */
-export function softDelete<T extends { deleted?: boolean; updatedAt: number }>(item: T): T {
+export function softDelete<T extends { deleted?: boolean; updatedAt: number }>(
+  item: T,
+): T {
   return { ...item, deleted: true, updatedAt: Date.now() };
 }

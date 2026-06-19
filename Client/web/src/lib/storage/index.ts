@@ -8,23 +8,36 @@
  * API 形态: 跟 Dexie 的 put/get/del/listAll/clear 一致,
  * 内部根据 `isTauri()` 自动 dispatch 到 fs 或 IDB
  */
-import { isTauri } from './platform';
-import * as idb from './idb-storage';
-import * as fs from './fs-storage';
+import { isTauri } from "./platform";
+import * as idb from "./idb-storage";
+import * as fs from "./fs-storage";
 
-export type Table = 'schedules' | 'feeds' | 'feedItems' | 'memories' | 'skills' | 'weather' | 'system';
+export type Table =
+  | "schedules"
+  | "feeds"
+  | "feedItems"
+  | "memories"
+  | "skills"
+  | "weather"
+  | "system";
 
 const useFs = isTauri();
 // console.info(`[storage] backend: ${useFs ? 'fs' : 'idb'}`);
 
 /* ===== Generic CRUD ===== */
 
-export async function put(table: Table, doc: Record<string, unknown>): Promise<void> {
+export async function put(
+  table: Table,
+  doc: Record<string, unknown>,
+): Promise<void> {
   if (useFs) return fs.put(table, doc);
   return idb.put(table, doc);
 }
 
-export async function get<T = unknown>(table: Table, id: string): Promise<T | undefined> {
+export async function get<T = unknown>(
+  table: Table,
+  id: string,
+): Promise<T | undefined> {
   if (useFs) return fs.get<T>(table, id);
   return idb.get<T>(table, id);
 }
@@ -52,7 +65,7 @@ export async function needsMigration(): Promise<boolean> {
   const fsHasData = await fs.hasAnyData();
   if (fsHasData) return false;
   // 看 IDB 是否有数据
-  const idbSchedules = await idb.listAll<Record<string, unknown>>('schedules');
+  const idbSchedules = await idb.listAll<Record<string, unknown>>("schedules");
   return idbSchedules.length > 0;
 }
 
@@ -60,7 +73,13 @@ export async function needsMigration(): Promise<boolean> {
 export async function migrateFromIdb(): Promise<{ migrated: number }> {
   if (!useFs) return { migrated: 0 };
   let migrated = 0;
-  const tables: Table[] = ['schedules', 'feeds', 'feedItems', 'memories', 'skills'];
+  const tables: Table[] = [
+    "schedules",
+    "feeds",
+    "feedItems",
+    "memories",
+    "skills",
+  ];
   for (const t of tables) {
     const rows = await idb.listAll<Record<string, unknown>>(t);
     for (const row of rows) {
@@ -73,8 +92,8 @@ export async function migrateFromIdb(): Promise<{ migrated: number }> {
 }
 
 /* ===== Info ===== */
-export function backendType(): 'tauri-fs' | 'indexeddb' {
-  return useFs ? 'tauri-fs' : 'indexeddb';
+export function backendType(): "tauri-fs" | "indexeddb" {
+  return useFs ? "tauri-fs" : "indexeddb";
 }
 
-export const DATA_ROOT = 'studioarona';
+export const DATA_ROOT = "studioarona";

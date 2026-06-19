@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useThemeStore } from './useTheme';
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { useThemeStore } from "./useTheme";
 
-Object.defineProperty(window, 'matchMedia', {
+Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: vi.fn().mockImplementation((query: string) => ({
     matches: false,
@@ -15,41 +15,41 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-describe('useThemeStore', () => {
+describe("useThemeStore", () => {
   beforeEach(() => {
-    useThemeStore.setState({ theme: 'system' });
-    document.documentElement.removeAttribute('data-theme');
+    useThemeStore.setState({ theme: "system" });
+    document.documentElement.removeAttribute("data-theme");
   });
 
-  it('defaults to system theme', () => {
+  it("defaults to system theme", () => {
     const { theme } = useThemeStore.getState();
-    expect(theme).toBe('system');
+    expect(theme).toBe("system");
   });
 
-  it('setTheme dark sets data-theme attribute', () => {
-    useThemeStore.getState().setTheme('dark');
-    expect(useThemeStore.getState().theme).toBe('dark');
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+  it("setTheme dark sets data-theme attribute", () => {
+    useThemeStore.getState().setTheme("dark");
+    expect(useThemeStore.getState().theme).toBe("dark");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
   });
 
-  it('setTheme light sets data-theme to light', () => {
-    document.documentElement.setAttribute('data-theme', 'dark');
-    useThemeStore.getState().setTheme('light');
-    expect(useThemeStore.getState().theme).toBe('light');
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+  it("setTheme light sets data-theme to light", () => {
+    document.documentElement.setAttribute("data-theme", "dark");
+    useThemeStore.getState().setTheme("light");
+    expect(useThemeStore.getState().theme).toBe("light");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
   });
 
-  it('toggle cycles through themes', () => {
+  it("toggle cycles through themes", () => {
     useThemeStore.getState().toggle();
     let state = useThemeStore.getState();
-    expect(state.theme).toBe('dark');
+    expect(state.theme).toBe("dark");
 
     state.toggle();
     state = useThemeStore.getState();
-    expect(state.theme).toBe('light');
+    expect(state.theme).toBe("light");
 
     state.toggle();
     state = useThemeStore.getState();
-    expect(state.theme).toBe('system');
+    expect(state.theme).toBe("system");
   });
 });

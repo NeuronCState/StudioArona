@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import type { ComponentType } from "react";
 
 type ComponentRegistry = Map<string, ComponentType<Record<string, unknown>>>;
 
@@ -11,11 +11,19 @@ export function registerComponent(
   registry.set(name, Component);
 }
 
-export function getComponent(name: string): ComponentType<Record<string, unknown>> | undefined {
+export function getComponent(
+  name: string,
+): ComponentType<Record<string, unknown>> | undefined {
   return registry.get(name);
 }
 
-export function DynamicRender({ name, props }: { name: string; props: Record<string, unknown> }) {
+export function DynamicRender({
+  name,
+  props,
+}: {
+  name: string;
+  props: Record<string, unknown>;
+}) {
   const Comp = registry.get(name);
   if (!Comp) {
     return (

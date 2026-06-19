@@ -1,16 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { VmsPage } from './VmsPage';
-import { useAuthStore } from '@/stores/auth';
-import { useSessionStore } from '@/stores/session';
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { VmsPage } from "./VmsPage";
+import { useAuthStore } from "@/stores/auth";
+import { useSessionStore } from "@/stores/session";
+import { useConnectionStore } from "@/stores/connection";
 
 // xterm requires DOM APIs (ResizeObserver, canvas measurement) not fully
 // supported in jsdom. Stub Terminal and FitAddon so VmDetail renders
 // without crashing when it mounts the embedded terminal.
-vi.mock('xterm', () => ({
+vi.mock("@xterm/xterm", () => ({
   Terminal: vi.fn().mockImplementation(() => ({
     open: vi.fn(),
     loadAddon: vi.fn(),
@@ -22,7 +23,7 @@ vi.mock('xterm', () => ({
   })),
 }));
 
-vi.mock('@xterm/addon-fit', () => ({
+vi.mock("@xterm/addon-fit", () => ({
   FitAddon: vi.fn().mockImplementation(() => ({
     fit: vi.fn(),
   })),
@@ -35,87 +36,96 @@ const queryClient = new QueryClient({
 function renderWithProviders(ui: React.ReactElement) {
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>{ui}</MemoryRouter>
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        {ui}
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-describe('VmsPage', () => {
+describe("VmsPage", () => {
   beforeEach(() => {
     useAuthStore.setState({
-      accessToken: 'test-token',
+      accessToken: "test-token",
       user: {
-        id: 'u_zhang',
-        username: 'zhang',
-        display_name: '张旭宁',
-        role: 'admin',
+        id: "u_zhang",
+        username: "zhang",
+        display_name: "张旭宁",
+        role: "admin",
         preferences: {},
         face_enrolled: true,
-        created_at: '2026-01-15T08:00:00Z',
+        created_at: "2026-01-15T08:00:00Z",
       },
       isAuthenticated: true,
     });
-    useSessionStore.setState({ wakeState: 'idle', currentSessionId: null });
+    useSessionStore.setState({ wakeState: "idle", currentSessionId: null });
+    useConnectionStore.setState({ serverStatus: "online", userMode: "online" });
   });
 
   afterEach(() => {
     queryClient.clear();
   });
 
-  it('renders VM list', async () => {
+  it("renders VM list", async () => {
     renderWithProviders(<VmsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('li-dev')).toBeVisible();
+      expect(screen.getByText("li-dev")).toBeVisible();
     });
-    expect(screen.getByText('wang-cuda')).toBeVisible();
+    expect(screen.getByText("wang-cuda")).toBeVisible();
   });
 
-  it('shows create form', async () => {
+  it("shows create form", async () => {
     const user = userEvent.setup();
     renderWithProviders(<VmsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('li-dev')).toBeVisible();
+      expect(screen.getByText("li-dev")).toBeVisible();
     });
 
-    await user.click(screen.getByText('申请 VM'));
+    await user.click(screen.getByText("申请 VM"));
 
-    expect(screen.getByText('申请虚拟机')).toBeVisible();
+    // Drawer 用 framer-motion Portal, jsdom 不跑动画, opacity 仍是 0 → 改用 toBeInTheDocument
+    await waitFor(() => {
+      expect(screen.getByText("申请虚拟机")).toBeInTheDocument();
+    });
   });
 
-  it('creates a new VM', async () => {
+  it("creates a new VM", async () => {
     const user = userEvent.setup();
     renderWithProviders(<VmsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('li-dev')).toBeVisible();
+      expect(screen.getByText("li-dev")).toBeVisible();
     });
 
-    await user.click(screen.getByText('申请 VM'));
+    await user.click(screen.getByText("申请 VM"));
 
-    const nameInput = screen.getByPlaceholderText('my-vm');
-    await user.type(nameInput, 'test-vm');
+    const nameInput = screen.getByPlaceholderText("my-vm");
+    await user.type(nameInput, "test-vm");
 
-    await user.click(screen.getByText('提交'));
+    await user.click(screen.getByText("提交"));
 
     await waitFor(() => {
-      expect(screen.getByText('test-vm')).toBeVisible();
+      expect(screen.getByText("test-vm")).toBeVisible();
     });
   });
 
-  it('click VM card opens detail', async () => {
+  it("click VM card opens detail", async () => {
     const user = userEvent.setup();
     renderWithProviders(<VmsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('li-dev')).toBeVisible();
+      expect(screen.getByText("li-dev")).toBeVisible();
     });
 
-    await user.click(screen.getByText('li-dev'));
+    await user.click(screen.getByText("li-dev"));
 
+    // SlideOver 用 framer-motion, jsdom 不跑动画
     await waitFor(() => {
-      expect(screen.getByText(/SSH: localhost:2222/)).toBeVisible();
+      expect(screen.getByText(/SSH: localhost:2222/)).toBeInTheDocument();
     });
   });
 });

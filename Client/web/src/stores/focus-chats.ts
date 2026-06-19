@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 /**
  * Focus mode chat list — 专注模式下的对话历史
@@ -71,10 +71,14 @@ export const useFocusChatsStore = create<FocusChatsState>()(
         set((state) => {
           const next = state.chats.filter((c) => c.id !== id);
           const nextActive =
-            state.activeChatId === id ? (next.length > 0 ? next[0].id : null) : state.activeChatId;
+            state.activeChatId === id
+              ? next.length > 0
+                ? next[0].id
+                : null
+              : state.activeChatId;
           return { chats: next, activeChatId: nextActive };
         }),
     }),
-    { name: 'studio-arona-focus-chats' },
+    { name: "studio-arona-focus-chats" },
   ),
 );

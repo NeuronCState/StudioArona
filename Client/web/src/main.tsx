@@ -1,21 +1,26 @@
-import { QueryClientProvider } from '@tanstack/react-query';
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
-import App from './App';
-import { ErrorBoundary } from './components/ErrorBoundary';
-import { useConnectionStatus } from './hooks/useConnectionStatus';
-import { createQueryClient } from './lib/query-client';
-import './styles/globals.css';
-import './styles/studio-globals.css';
-import './registry';
+import { QueryClientProvider } from "@tanstack/react-query";
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+import App from "./App";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { useConnectionStatus } from "./hooks/useConnectionStatus";
+import { createQueryClient } from "./lib/query-client";
+import "./styles/globals.css";
+import "./styles/studio-globals.css";
+import "./registry";
 
 async function enableMocking() {
-  // MSW is only enabled when VITE_USE_MSW=1 is set explicitly.
-  // In production (or dev without the flag) all requests go to the real backend.
-  if (import.meta.env.VITE_USE_MSW === '1') {
-    const { worker } = await import('./mocks/browser');
-    return worker.start({ onUnhandledRequest: 'bypass' });
+  // MSW 启用条件 (任一满足即开):
+  //   1. VITE_USE_MSW=1 — dev 调试强制 mock
+  //   2. ?devbypass=1 — 离线浏览 / 截图模式, 没 server, 必须走 mock
+  //      (技能商店、通知 SSE 这种纯前端 demo 场景直接走 mock 即可)
+  const urlParams = new URLSearchParams(window.location.search);
+  const devBypass = urlParams.get("devbypass") === "1";
+  const useMsw = import.meta.env.VITE_USE_MSW === "1";
+  if (useMsw || devBypass) {
+    const { worker } = await import("./mocks/browser");
+    return worker.start({ onUnhandledRequest: "bypass" });
   }
 }
 
@@ -44,7 +49,7 @@ function RootWithConnection() {
 }
 
 function renderApp() {
-  ReactDOM.createRoot(document.getElementById('root')!).render(
+  ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
       <RootWithConnection />
     </React.StrictMode>,

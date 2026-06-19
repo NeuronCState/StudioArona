@@ -40,14 +40,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 WEB_DIR = ROOT / "web"
 OCR_DIR = ROOT / "services" / "ocr"
-SONETTO_SRC_PARENT = ROOT / ".sonetto-run"
-SONETTO_SRC_LINK = SONETTO_SRC_PARENT / "src"
-SONETTO_REQUIREMENTS = Path("/Users/zhangxuanning/Downloads/SonettoHere-main/requirements.txt")
+SONETTO_DIR = ROOT / "services" / "sonetto"
 VENV_DIR = ROOT / ".venv-sonetto"
 LOG_DIR = ROOT / ".run-logs"
 LOG_DIR.mkdir(exist_ok=True)
 
-UV_BIN = Path.home() / ".local" / "bin" / "uv"
 PY_BIN = Path.home() / ".local" / "bin" / "python3.12"
 PY_VERSION = "3.12"  # 统一项目 Python 版本 (SonettoHere requires-python >= 3.11)
 
@@ -77,9 +74,24 @@ def ensure_venv() -> None:
         log(f"venv exists: {VENV_DIR}")
         return
 
-    if not UV_BIN.exists():
-        log(f"ERROR: uv not found at {UV_BIN}, install: curl -LsSf https://astral.sh/uv/install.sh | sh")
+    uv_bin = next(
+        (
+            candidate
+            for candidate in (
+                shutil.which("uv"),
+                Path.home() / ".local" / "bin" / "uv",
+                Path.home() / ".cargo" / "bin" / "uv",
+                Path("/opt/homebrew/bin/uv"),
+                Path("/usr/local/bin/uv"),
+            )
+            if candidate and Path(candidate).exists()
+        ),
+        None,
+    )
+    if uv_bin is None:
+        log("ERROR: uv not found; install: curl -LsSf https://astral.sh/uv/install.sh | sh")
         sys.exit(1)
+    uv_bin = Path(uv_bin)
 
     if not PY_BIN.exists():
         log(f"Python {PY_VERSION} not at {PY_BIN}, fallback to uv auto-select (run: uv python install {PY_VERSION})")
@@ -88,35 +100,32 @@ def ensure_venv() -> None:
         py_arg = str(PY_BIN)
 
     log(f"creating venv (Python {PY_VERSION}) ...")
-    subprocess.run([str(UV_BIN), "venv", "--python", py_arg, str(VENV_DIR)], check=True)
+    subprocess.run([str(uv_bin), "venv", "--python", py_arg, str(VENV_DIR)], check=True)
 
     log("installing SonettoHere deps (~30s) ...")
-    if not SONETTO_REQUIREMENTS.exists():
-        log(f"ERROR: SonettoHere requirements.txt not found at {SONETTO_REQUIREMENTS}")
-        log("Clone from GitHub: gh repo clone Miso2233/SonettoHere ~/Downloads/SonettoHere-main")
+    requirements = [SONETTO_DIR / "requirements.txt", OCR_DIR / "requirements.txt"]
+    missing = [path for path in requirements if not path.exists()]
+    if missing:
+        log(f"ERROR: bundled requirements not found: {', '.join(map(str, missing))}")
         sys.exit(1)
     subprocess.run([
-        str(UV_BIN), "pip", "install", "--python", str(VENV_DIR / "bin" / "python3"),
+        str(uv_bin), "pip", "install", "--python", str(VENV_DIR / "bin" / "python3"),
         "-i", "https://pypi.tuna.tsinghua.edu.cn/simple/",
-        "-r", str(SONETTO_REQUIREMENTS),
-    ], check=True)
-
-    log("installing OCR extra deps (Quartz macOS PDF->image) ...")
-    subprocess.run([
-        str(UV_BIN), "pip", "install", "--python", str(VENV_DIR / "bin" / "python3"),
-        "-i", "https://pypi.tuna.tsinghua.edu.cn/simple/",
-        "pyobjc-framework-Quartz",
+        "-r", str(requirements[0]),
+        "-r", str(requirements[1]),
     ], check=True)
 
     log("venv ready")
 
 
-def ensure_sonetto_symlink() -> None:
-    if SONETTO_SRC_LINK.exists():
-        return
-    SONETTO_SRC_PARENT.mkdir(parents=True, exist_ok=True)
-    SONETTO_SRC_LINK.symlink_to(SONETTO_REQUIREMENTS.parent)
-    log(f"SonettoHere src symlink: {SONETTO_SRC_LINK} -> {SONETTO_REQUIREMENTS.parent}")
+def ensure_sonetto_source() -> None:
+    required = [SONETTO_DIR / "requirements.txt", SONETTO_DIR / "api" / "server.py"]
+    missing = [path for path in required if not path.exists()]
+    if missing:
+        log("ERROR: bundled SonettoHere runtime is incomplete")
+        for path in missing:
+            log(f"  missing: {path}")
+        sys.exit(1)
 
 
 def ensure_ocr_vendor() -> None:
@@ -145,8 +154,8 @@ def spawn_sonetto() -> tuple[subprocess.Popen, Path]:
     p = subprocess.Popen(
         [str(VENV_DIR / "bin" / "python"), "-m", "uvicorn", "api.server:create_app",
          "--factory", "--host", "127.0.0.1", "--port", "8081"],
-        cwd=SONETTO_SRC_PARENT,
-        env={**os.environ, "PYTHONPATH": "src", "PYTHONUNBUFFERED": "1"},
+        cwd=SONETTO_DIR,
+        env={**os.environ, "PYTHONPATH": str(SONETTO_DIR), "PYTHONUNBUFFERED": "1"},
         stdout=open(log_path, "ab"),
         stderr=subprocess.STDOUT,
         start_new_session=True,
@@ -184,15 +193,17 @@ def spawn_vite() -> None:
 
 
 def wait_health(url: str, label: str, timeout: int = 30) -> None:
-    for _ in range(timeout):
+    deadline = time.monotonic() + timeout
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    while time.monotonic() < deadline:
         try:
-            r = urllib.request.urlopen(url, timeout=2)
-            if r.status == 200:
-                log(f"{label} healthy ({url})")
-                return
+            with opener.open(url, timeout=1) as r:
+                if r.status == 200:
+                    log(f"{label} healthy ({url})")
+                    return
         except Exception:
             pass
-        time.sleep(1)
+        time.sleep(0.5)
     log(f"{label} not ready in {timeout}s, continuing (check logs)")
 
 
@@ -230,9 +241,9 @@ def main() -> None:
 
     log(f"platform: {get_platform()}")
 
-    # 1. venv + symlink (SonettoHere shared venv)
+    # 1. Bundled SonettoHere runtime + shared Python venv
+    ensure_sonetto_source()
     ensure_venv()
-    ensure_sonetto_symlink()
 
     # 2. OCR resources (not the OCR process itself, just downloads)
     if args.download_ocr:
@@ -249,13 +260,13 @@ def main() -> None:
     # 3. spawn SonettoHere
     if not args.no_sonetto:
         spawn_sonetto()
-        wait_health("http://127.0.0.1:8081/api/health", "SonettoHere")
+        wait_health("http://127.0.0.1:8081/openapi.json", "SonettoHere", timeout=90)
 
     # 4. spawn OCR (Web dev mode; Tauri desktop mode spawns itself, not relying on this)
     if not args.no_ocr:
         try:
             spawn_ocr()
-            wait_health("http://127.0.0.1:8083/health", "OCR")
+            wait_health("http://127.0.0.1:8083/health", "OCR", timeout=60)
         except Exception as e:
             log(f"OCR spawn failed: {e} (Tauri desktop mode can ignore this)")
 

@@ -1,35 +1,37 @@
-import { useState } from 'react';
-import { ExternalLink, Copy, Check, HardDrive } from 'lucide-react';
-import { useAuthStore } from '@/stores/auth';
-import { useConnectionStore } from '@/stores/connection';
-import { StudioServiceOffline } from '@/components/studio/StudioServiceOffline';
+import { useState } from "react";
+import { ExternalLink, Copy, Check, HardDrive } from "lucide-react";
+import { useAuthStore } from "@/stores/auth";
+import { useConnectionStore } from "@/stores/connection";
+import { StudioServiceOffline } from "@/components/studio/StudioServiceOffline";
 
-const NAS_URL = 'http://192.168.198.129:5666';
+const NAS_URL = "http://192.168.198.129:5666";
 
 export function NasPage() {
   const user = useAuthStore((s) => s.user);
   const [copied, setCopied] = useState(false);
 
   // 离线时显示占位, 不让用户对 NAS 跳转链接困惑
-  if (useConnectionStore.getState().effectiveMode() !== 'online') {
+  if (useConnectionStore.getState().effectiveMode() !== "online") {
     return <StudioServiceOffline service="nas" />;
   }
 
   const handleOpenNas = () => {
     // Use the auto-login endpoint — opens NAS with credential injection
-    window.open('/api/nas/go', '_blank');
+    window.open("/api/nas/go", "_blank");
   };
 
   const handleOpenNasDirect = () => {
-    window.open(NAS_URL, '_blank');
+    window.open(NAS_URL, "_blank");
   };
 
   const handleCopyUser = async () => {
     try {
-      await navigator.clipboard.writeText(user?.username || '');
+      await navigator.clipboard.writeText(user?.username || "");
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   };
 
   return (
@@ -53,7 +55,7 @@ export function NasPage() {
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-text-secondary">用户名</span>
-            <span className="font-mono text-text">{user?.username || '—'}</span>
+            <span className="font-mono text-text">{user?.username || "—"}</span>
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-text-secondary">密码</span>
@@ -84,8 +86,12 @@ export function NasPage() {
             onClick={handleCopyUser}
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 py-3 text-sm text-text-secondary transition-colors hover:bg-surface-raised"
           >
-            {copied ? <Check size={16} className="text-accent" /> : <Copy size={16} />}
-            {copied ? '已复制' : '复制用户名'}
+            {copied ? (
+              <Check size={16} className="text-accent" />
+            ) : (
+              <Copy size={16} />
+            )}
+            {copied ? "已复制" : "复制用户名"}
           </button>
         </div>
       </div>

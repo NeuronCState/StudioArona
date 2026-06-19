@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use sysinfo::{Disks, Networks, System};
 
-use crate::AppState;
+use crate::{auth, AppState};
 
 const METRICS_CACHE_TTL: Duration = Duration::from_secs(5);
 
@@ -24,6 +24,12 @@ type WeatherCacheMap = HashMap<String, (Instant, Value)>;
 #[derive(Clone)]
 pub struct WeatherCache {
     inner: Arc<Mutex<WeatherCacheMap>>,
+}
+
+impl Default for WeatherCache {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl WeatherCache {
@@ -62,7 +68,10 @@ pub fn init_weather_cache() {
 /// Shared cache handle. Always safe — returns a working cache even if
 /// `init_weather_cache` was never called (e.g. in tests).
 fn shared_cache() -> WeatherCache {
-    WEATHER_CACHE.get().cloned().unwrap_or_else(WeatherCache::new)
+    WEATHER_CACHE
+        .get()
+        .cloned()
+        .unwrap_or_else(WeatherCache::new)
 }
 
 /// One-shot flag for "no upstream available" warnings. We log a warning at most
@@ -107,7 +116,8 @@ const SHENYANG_LON: f64 = 123.4315;
 /// 固定城市: 沈阳 (lat 41.8057, lon 123.4315).
 /// 上游优先级:
 ///   1. openweathermap (如果 `WEATHER_API_KEY` 配了) — 失败继续
-///   2. wttr.in (no key, free, public) — 失败 → 返 stale cache 或空 payload
+/// 2. wttr.in (no key, free, public) — 失败 → 返 stale cache 或空 payload
+///
 /// 5 分钟 in-process 缓存.
 pub async fn get_weather(
     State(_state): State<AppState>,
@@ -122,13 +132,19 @@ pub async fn get_weather(
     }
 
     let cache = shared_cache();
-    let cache_key = if city == "沈阳" { "shenyang".to_string() } else { city.clone() };
+    let cache_key = if city == "沈阳" {
+        "shenyang".to_string()
+    } else {
+        city.clone()
+    };
     if let Some(cached) = cache.get_fresh(&cache_key) {
         return Ok(Json(cached));
     }
 
     // 1) OpenWeatherMap (optional, only if key set)
-    let key = std::env::var("WEATHER_API_KEY").ok().filter(|s| !s.is_empty());
+    let key = std::env::var("WEATHER_API_KEY")
+        .ok()
+        .filter(|s| !s.is_empty());
     if let Some(k) = &key {
         match fetch_openweather(k, &city).await {
             Ok(v) => {
@@ -298,7 +314,10 @@ async fn fetch_openweather(api_key: &str, city: &str) -> anyhow::Result<Value> {
     //     wind: {speed, deg}, name: "...", coord: {lat, lon} }
     let main = body.get("main").cloned().unwrap_or(json!({}));
     let temp = main.get("temp").and_then(|v| v.as_f64()).unwrap_or(0.0);
-    let feels_like = main.get("feels_like").and_then(|v| v.as_f64()).unwrap_or(temp);
+    let feels_like = main
+        .get("feels_like")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(temp);
     let humidity = main.get("humidity").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let wind_speed = body
         .get("wind")
@@ -361,7 +380,9 @@ fn urlencoding_simple(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
         match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
             // UTF-8 bytes: percent-encode raw
             _ => {
                 out.push('%');
@@ -446,7 +467,7 @@ fn collect_metrics_blocking() -> Value {
 
     // Memory
     let mem_total = sys.total_memory(); // bytes
-    let mem_used = sys.used_memory();   // bytes (total - available)
+    let mem_used = sys.used_memory(); // bytes (total - available)
 
     // Disks — sum across physical filesystems. We do *not* divide by 1024.0 inside the
     // disk object since the spec wants bytes (callers can format).
@@ -505,16 +526,32 @@ fn collect_metrics_blocking() -> Value {
 }
 
 /// GET /api/system/metrics — 给 SystemPage 用
+/// 本机系统指标, 仅 owner/admin 可见 (任何 user 都能看到本机 CPU/内存/磁盘有信息泄露风险)
 pub async fn get_system_metrics(
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let (_, _, role) =
+        auth::extract_user_id(&headers, &state.config.jwt_secret).map_err(|(s, v)| (s, Json(v)))?;
+    if !matches!(role.as_str(), "owner" | "admin") {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(json!({"error": "system metrics require owner/admin role"})),
+        ));
+    }
+
     let _ = &state.db;
 
     // 从 vms 表统计实际状态 (简单聚合)
     let vms: Vec<(String,)> = sqlx::query_as("SELECT status::text FROM vms")
         .fetch_all(&state.db)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": e.to_string()})),
+            )
+        })?;
 
     let total = vms.len();
     let running = vms.iter().filter(|(s,)| s == "running").count();
