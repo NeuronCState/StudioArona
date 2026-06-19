@@ -5,6 +5,8 @@ import {
   Cloud,
   CloudSnow,
   CloudLightning,
+  Locate,
+  LocateFixed,
 } from "lucide-react";
 import { useT } from "@/lib/i18n";
 
@@ -17,6 +19,10 @@ interface WeatherTileProps {
   windDirection?: string;
   feelsLike: number;
   uvIndex?: string;
+  /** 用户点 "重新定位" 按钮时的回调 */
+  onRelocate?: () => void;
+  /** 是否正在重新申请定位 */
+  isRelocating?: boolean;
 }
 
 const iconMap: Record<string, typeof Sun> = {
@@ -29,10 +35,13 @@ const iconMap: Record<string, typeof Sun> = {
 };
 
 export function WeatherTile({
+  city,
   temperature,
   condition,
   humidity,
   feelsLike,
+  onRelocate,
+  isRelocating,
 }: WeatherTileProps) {
   const t = useT();
   const key = condition.toLowerCase().includes("rain")
@@ -92,7 +101,25 @@ export function WeatherTile({
           </div>
         </div>
 
-        <p className="mt-1.5 text-center text-[11px] text-stone-400">沈阳</p>
+        <p className="mt-1.5 flex items-center justify-center gap-1.5 text-center text-[11px] text-stone-400">
+          <span>{city ?? "—"}</span>
+          {onRelocate ? (
+            <button
+              type="button"
+              onClick={onRelocate}
+              disabled={isRelocating}
+              title="重新申请定位"
+              aria-label="重新申请定位"
+              className="inline-flex h-4 w-4 items-center justify-center rounded text-stone-400 transition hover:bg-stone-100 hover:text-stone-600 disabled:opacity-50"
+            >
+              {isRelocating ? (
+                <LocateFixed size={11} className="animate-pulse" />
+              ) : (
+                <Locate size={11} />
+              )}
+            </button>
+          ) : null}
+        </p>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { motion as m } from "@/lib/motion";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 /**
  * FocusToggle — 收回指示条
@@ -21,32 +22,42 @@ export interface FocusToggleProps {
 }
 
 export function FocusToggle({ visible, open, onToggle }: FocusToggleProps) {
-  if (!visible) return null;
+  const reducedMotion = useReducedMotion();
 
   return (
-    <div className="focus-toggle-wrapper">
-      <motion.button
-        type="button"
-        onClick={onToggle}
-        aria-label={open ? "收起专注侧栏" : "展开专注侧栏"}
-        aria-expanded={open}
-        initial={{ opacity: 0, x: -8 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -8 }}
-        transition={{ duration: m.duration.fast / 1000, ease: m.easing.out }}
-        whileHover={{ width: 12 }}
-        whileTap={{ scale: 0.92 }}
-        className="focus-toggle"
-      >
-        <motion.span
-          className="focus-toggle-icon"
-          animate={{ x: open ? 1 : -1 }}
-          transition={{ duration: 0.2 }}
-          aria-hidden="true"
+    <AnimatePresence initial={false}>
+      {visible && (
+        <motion.div
+          key="focus-toggle"
+          className="focus-toggle-wrapper"
+          initial={reducedMotion ? false : { opacity: 0, x: -8, y: "-50%" }}
+          animate={{ opacity: 1, x: 0, y: "-50%" }}
+          exit={{ opacity: 0, x: -8, y: "-50%" }}
+          transition={{
+            duration: reducedMotion ? 0 : m.duration.fast / 1000,
+            ease: m.easing.out,
+          }}
         >
-          {open ? <ChevronLeft size={10} /> : <ChevronRight size={10} />}
-        </motion.span>
-      </motion.button>
-    </div>
+          <motion.button
+            type="button"
+            onClick={onToggle}
+            aria-label={open ? "收起专注侧栏" : "展开专注侧栏"}
+            aria-expanded={open}
+            whileHover={reducedMotion ? undefined : { width: 12 }}
+            whileTap={reducedMotion ? undefined : { scale: 0.92 }}
+            className="focus-toggle"
+          >
+            <motion.span
+              className="focus-toggle-icon"
+              animate={{ x: reducedMotion ? 0 : open ? 1 : -1 }}
+              transition={{ duration: reducedMotion ? 0 : 0.2 }}
+              aria-hidden="true"
+            >
+              {open ? <ChevronLeft size={10} /> : <ChevronRight size={10} />}
+            </motion.span>
+          </motion.button>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

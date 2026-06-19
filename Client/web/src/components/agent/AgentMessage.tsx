@@ -90,7 +90,9 @@ export function AgentMessageItem({
             className={`flex flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}
           >
             {isUser ? (
-              <div className={userBubble}>{message.content}</div>
+              message.content ? (
+                <div className={userBubble}>{message.content}</div>
+              ) : null
             ) : (
               <>
                 {/* AI 思考过程折叠面板 */}

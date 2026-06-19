@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { isOfflineError } from "@/lib/api/error-helpers";
 import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,6 +15,8 @@ import {
 } from "@/lib/resources/schedules";
 import { feedResourceConfig } from "@/lib/resources/feeds";
 import { useDashboardWeather } from "@/lib/resources/weather";
+import { useGeolocation } from "@/hooks/useGeolocation";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { CardSkeleton, CardError } from "@javis/ui-kit";
 import { ScheduleTile } from "./tiles/ScheduleTile";
 import { WeatherTile } from "./tiles/WeatherTile";
@@ -25,13 +27,29 @@ import { onUIAction } from "@/lib/ui-actions";
 import type { UIAction } from "@/types/ui-actions";
 import { FocusSidebar } from "@/components/studio/FocusSidebar";
 import { FocusToggle } from "@/components/studio/FocusToggle";
+import { AgentPanel } from "@/components/agent/AgentPanel";
 import { useFocusModeStore } from "@/stores/focus-mode";
+import { useFocusChatsStore } from "@/stores/focus-chats";
 import { useLocaleStore } from "@/stores/locale";
 import { useT } from "@/lib/i18n";
 
 type StudioMode = "dashboard" | "chat";
 
 type TransitionPhase = "idle" | "dashboard-to-chat" | "chat-to-dashboard";
+
+interface FocusOrigin {
+  x: number | string;
+  y: number | string;
+  width: number;
+  height: number;
+}
+
+const DEFAULT_FOCUS_ORIGIN: FocusOrigin = {
+  x: "calc(50vw + 40px)",
+  y: "calc(50vh - 80px)",
+  width: 160,
+  height: 160,
+};
 
 function adaptSchedule(schedules: ScheduleDocument[]) {
   return schedules.slice(0, 6).map((s) => {
@@ -77,6 +95,7 @@ function getGreeting(t: (key: string) => string): string {
 
 export function StudioHomePage() {
   const t = useT();
+  const reducedMotion = useReducedMotion();
   const locale = useLocaleStore((s) => s.locale);
   const user = useAuthStore((s) => s.user);
   const focusMode = useFocusModeStore((s) => s.focusMode);
@@ -84,22 +103,52 @@ export function StudioHomePage() {
   const setFocusMode = useFocusModeStore((s) => s.setFocusMode);
   const setFocusSidebarOpen = useFocusModeStore((s) => s.setFocusSidebarOpen);
   const toggleFocusSidebar = useFocusModeStore((s) => s.toggleFocusSidebar);
+  const activeChatId = useFocusChatsStore((s) => s.activeChatId);
+  const ensureActiveChat = useFocusChatsStore((s) => s.ensureActiveChat);
   const [mode] = useState<StudioMode>("dashboard");
   const [phase] = useState<TransitionPhase>("idle");
+  const centerButtonRef = useRef<HTMLButtonElement>(null);
+  const [focusOrigin, setFocusOrigin] = useState<FocusOrigin>(DEFAULT_FOCUS_ORIGIN);
+  const captureFocusOrigin = useCallback(() => {
+    const rect = centerButtonRef.current?.getBoundingClientRect();
+    if (!rect) return false;
+    setFocusOrigin({
+      x: rect.left,
+      y: rect.top,
+      width: rect.width,
+      height: rect.height,
+    });
+    return true;
+  }, []);
   // 中心按钮 → focusMode = true + 自动拉起 FocusSidebar
   const enterFocus = useCallback(() => {
+    captureFocusOrigin();
+    ensureActiveChat();
     setFocusMode(true);
     setFocusSidebarOpen(true);
-  }, [setFocusMode, setFocusSidebarOpen]);
-  // Esc 退出 (同时清 messages 让中央提示在下次重新显示, 但保留 chat 内容供后续展示)
-  const exitFocus = useCallback(() => setFocusMode(false), [setFocusMode]);
+  }, [captureFocusOrigin, ensureActiveChat, setFocusMode, setFocusSidebarOpen]);
+  // Esc / 关闭按钮退出，保留会话内容供下次继续。
+  const exitFocus = useCallback(() => {
+    if (!captureFocusOrigin()) {
+      setFocusMode(false);
+      return;
+    }
+    // 先把最新按钮位置提交给退出动画，下一帧再卸载 focus stage。
+    window.requestAnimationFrame(() => setFocusMode(false));
+  }, [captureFocusOrigin, setFocusMode]);
 
   // 4 磁贴: 本地优先 (IDB 缓存), 连接 server 时后台 sync
+  // 天气: 主动拿一次浏览器定位, 不管返回什么都直接当当前位置用, 不再有假数据兜底
+  const {
+    coords,
+    refresh: refreshLocation,
+    isFetching: isLocating,
+  } = useGeolocation();
   const {
     data: weather,
     isLoading: weatherLoading,
     error: weatherErr,
-  } = useDashboardWeather();
+  } = useDashboardWeather(coords);
   const weatherError = weatherErr instanceof Error ? weatherErr.message : null;
 
   // VM 走 server, 离线时显示"未连接" (工作室服务需要 server)
@@ -249,6 +298,8 @@ export function StudioHomePage() {
                   windDirection={weather.windDirection}
                   feelsLike={weather.feelsLike}
                   uvIndex={weather.uvIndex}
+                  onRelocate={refreshLocation}
+                  isRelocating={isLocating}
                 />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
@@ -304,6 +355,7 @@ export function StudioHomePage() {
           {/* Center action button — focus mode 起始点
             focus 期间不 unmount, pointer-events 锁掉, 让 z:20 矩形盖住 (不淡出) */}
           <button
+            ref={centerButtonRef}
             className="center-voice-btn"
             aria-label={t("home.studio.centerButton.aria")}
             type="button"
@@ -330,13 +382,17 @@ export function StudioHomePage() {
                 <motion.div
                   key="focus-stage"
                   className="focus-stage"
-                  initial={{
-                    width: 160,
-                    height: 160,
-                    x: "calc(50vw + 40px)", // 按钮中心(50vw+120) - 半宽(80) = 50vw+40
-                    y: "calc(50vh - 80px)",
-                    borderRadius: 9999,
-                  }}
+                  initial={
+                    reducedMotion
+                      ? false
+                      : {
+                          width: focusOrigin.width,
+                          height: focusOrigin.height,
+                          x: focusOrigin.x,
+                          y: focusOrigin.y,
+                          borderRadius: 9999,
+                        }
+                  }
                   animate={{
                     width: "calc(100vw - 240px)",
                     height: "100vh",
@@ -345,14 +401,14 @@ export function StudioHomePage() {
                     borderRadius: 0,
                   }}
                   exit={{
-                    width: 160,
-                    height: 160,
-                    x: "calc(50vw + 40px)",
-                    y: "calc(50vh - 80px)",
+                    width: focusOrigin.width,
+                    height: focusOrigin.height,
+                    x: focusOrigin.x,
+                    y: focusOrigin.y,
                     borderRadius: 9999,
                   }}
                   transition={{
-                    duration: 0.55,
+                    duration: reducedMotion ? 0 : 0.55,
                     ease: [0.16, 1, 0.3, 1],
                   }}
                   style={{ background: "var(--color-bg)" }}
@@ -386,6 +442,12 @@ export function StudioHomePage() {
         />,
         document.body,
       )}
+
+      {activeChatId &&
+        createPortal(
+          <AgentPanel open={focusMode} onClose={exitFocus} sessionId={activeChatId} />,
+          document.body,
+        )}
     </>
   );
 }

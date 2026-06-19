@@ -15,7 +15,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSonettoConfigStore } from "@/stores/sonetto-config";
-import { useAuthStore } from "@/stores/auth";
+import { useFocusChatsStore } from "@/stores/focus-chats";
 
 // ============================================================
 // Types — SonettoHere 事件 schema
@@ -29,6 +29,8 @@ export interface AgentAttachment {
   size: number;
   mimeType: string;
   kind?: "file" | "folder";
+  /** Folder uploads preserve this path relative to the selected root. */
+  relativePath?: string;
   /** 内部 file ref (Web 端用) */
   file?: File;
 }
@@ -70,16 +72,32 @@ interface SonettoEventPayload {
   percent?: number;
   model?: string;
   message?: string;
+  context_usage?: {
+    used?: number;
+    max?: number;
+    percent?: number;
+    model?: string;
+  };
+}
+
+interface WireAttachment {
+  name: string;
+  relative_path: string;
+  size: number;
+  mime_type: string;
+  content_base64: string;
 }
 
 export interface UseAgentChat {
   messages: AgentMessage[];
   isStreaming: boolean;
   lastError: string | null;
-  send: (text: string, items: AgentAttachment[]) => Promise<void>;
+  send: (text: string, items: AgentAttachment[]) => Promise<boolean>;
   cancel: () => void;
   clear: () => void;
+  dismissError: () => void;
   retry: (messageId: string) => Promise<void>;
+  retryConnection: () => Promise<void>;
   sonettoReady: boolean | null;
   sonettoBaseUrl: string;
 }
@@ -111,15 +129,67 @@ function humanizeNetworkError(err: unknown, baseUrl: string): string {
 
 const DEFAULT_SONETTO_BASE_URL = "http://127.0.0.1:8081";
 const PROBE_TIMEOUT_MS = 3000;
-const CENTER_BASE_URL =
-  import.meta.env.VITE_CENTER_BASE_URL || "http://127.0.0.1:8080";
+const EMPTY_MESSAGES: AgentMessage[] = [];
+const MAX_ATTACHMENT_COUNT = 100;
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+const MAX_ATTACHMENTS_SIZE = 10 * 1024 * 1024;
 
-export function useAgentChat(): UseAgentChat {
+async function encodeAttachments(
+  items: AgentAttachment[],
+): Promise<WireAttachment[]> {
+  if (items.length > MAX_ATTACHMENT_COUNT) {
+    throw new Error(`一次最多上传 ${MAX_ATTACHMENT_COUNT} 个文件`);
+  }
+  const totalSize = items.reduce((total, item) => total + item.size, 0);
+  if (totalSize > MAX_ATTACHMENTS_SIZE) {
+    throw new Error("附件总大小不能超过 10 MB");
+  }
+
+  return Promise.all(
+    items.map(async (item) => {
+      if (item.size > MAX_ATTACHMENT_SIZE) {
+        throw new Error(`${item.name} 超过单文件 10 MB 限制`);
+      }
+      if (!item.file) {
+        throw new Error(`${item.name} 的文件内容已失效，请重新拖入`);
+      }
+      const bytes = new Uint8Array(await item.file.arrayBuffer());
+      let binary = "";
+      const chunkSize = 0x8000;
+      for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+        binary += String.fromCharCode(
+          ...bytes.subarray(offset, offset + chunkSize),
+        );
+      }
+      return {
+        name: item.name,
+        relative_path:
+          item.relativePath || item.file.webkitRelativePath || item.name,
+        size: item.size,
+        mime_type: item.mimeType,
+        content_base64: window.btoa(binary),
+      };
+    }),
+  );
+}
+
+export function useAgentChat(sessionId: string): UseAgentChat {
   const { sonettoBaseUrl: storeBaseUrl, getActiveProvider } =
     useSonettoConfigStore();
   const sonettoBaseUrl = storeBaseUrl || DEFAULT_SONETTO_BASE_URL;
 
-  const [messages, setMessages] = useState<AgentMessage[]>([]);
+  const messages = useFocusChatsStore(
+    (state) => state.messagesByChat[sessionId] ?? EMPTY_MESSAGES,
+  );
+  const setStoredMessages = useFocusChatsStore((state) => state.setMessages);
+  const setMessages = useCallback(
+    (
+      update: AgentMessage[] | ((messages: AgentMessage[]) => AgentMessage[]),
+    ) => {
+      setStoredMessages(sessionId, update);
+    },
+    [sessionId, setStoredMessages],
+  );
   const [isStreaming, setIsStreaming] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const [sonettoReady, setSonettoReady] = useState<boolean | null>(null);
@@ -127,7 +197,6 @@ export function useAgentChat(): UseAgentChat {
   // Refs (avoid stale closures inside async callbacks)
   const cancelRef = useRef<{ cancelled: boolean }>({ cancelled: false });
   const wsRef = useRef<WebSocket | null>(null);
-  const sessionIdRef = useRef<string>(`session-${Date.now().toString(36)}`);
 
   // --------------------------------------------------------
   // Probe SonettoHere /api/health (类似旧 probeHermes)
@@ -160,27 +229,35 @@ export function useAgentChat(): UseAgentChat {
         prev.map((m) => (m.id === id ? { ...m, ...patch, pending: false } : m)),
       );
     },
-    [],
+    [setMessages],
   );
 
   // --------------------------------------------------------
   // Message mutation helpers
   // --------------------------------------------------------
-  const appendDelta = useCallback((id: string, delta: string) => {
-    setMessages((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, content: m.content + delta } : m)),
-    );
-  }, []);
+  const appendDelta = useCallback(
+    (id: string, delta: string) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === id ? { ...m, content: m.content + delta } : m,
+        ),
+      );
+    },
+    [setMessages],
+  );
 
-  const addToolCall = useCallback((messageId: string, tool: AgentToolCall) => {
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === messageId
-          ? { ...m, toolCalls: [...(m.toolCalls ?? []), tool] }
-          : m,
-      ),
-    );
-  }, []);
+  const addToolCall = useCallback(
+    (messageId: string, tool: AgentToolCall) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? { ...m, toolCalls: [...(m.toolCalls ?? []), tool] }
+            : m,
+        ),
+      );
+    },
+    [setMessages],
+  );
 
   // --------------------------------------------------------
   // Send: 走 SonettoHere WebSocket
@@ -188,7 +265,15 @@ export function useAgentChat(): UseAgentChat {
   const send = useCallback(
     async (text: string, items: AgentAttachment[]) => {
       const trimmed = text.trim();
-      if (!trimmed && items.length === 0) return;
+      if (!trimmed && items.length === 0) return false;
+
+      let wireAttachments: WireAttachment[] = [];
+      try {
+        wireAttachments = await encodeAttachments(items);
+      } catch (err) {
+        setLastError(err instanceof Error ? err.message : String(err));
+        return false;
+      }
 
       cancelRef.current.cancelled = false;
       const token = cancelRef.current;
@@ -220,11 +305,10 @@ export function useAgentChat(): UseAgentChat {
 
       // 3. Build WebSocket URL
       const wsBase = sonettoBaseUrl.replace(/^http/, "ws");
-      const url = `${wsBase}/ws/chat/${sessionIdRef.current}`;
+      const url = `${wsBase}/ws/chat/${encodeURIComponent(sessionId)}`;
 
       // 4. Get active provider (SonettoHere 用来选 model)
       const active = getActiveProvider();
-      const auth = useAuthStore.getState();
 
       // 5. Open WebSocket
       let ws: WebSocket;
@@ -236,7 +320,7 @@ export function useAgentChat(): UseAgentChat {
         setLastError(msg);
         setSonettoReady(false);
         setIsStreaming(false);
-        return;
+        return false;
       }
       wsRef.current = ws;
 
@@ -255,9 +339,7 @@ export function useAgentChat(): UseAgentChat {
               private: false,
               provider_id: active.id,
               model_name: active.models[0] || "",
-              center_access_token:
-                auth.tokenMode === "server" ? (auth.accessToken ?? "") : "",
-              center_base_url: CENTER_BASE_URL,
+              attachments: wireAttachments,
             },
           }),
         );
@@ -336,6 +418,33 @@ export function useAgentChat(): UseAgentChat {
               finalizeMessage(assistantId, { content: evt.payload.content });
             }
             break;
+          case "done": {
+            const usage = evt.payload?.context_usage;
+            if (usage) {
+              setMessages((prev) =>
+                prev.map((message) =>
+                  message.id === assistantId
+                    ? {
+                        ...message,
+                        contextUsage: {
+                          used: usage.used ?? 0,
+                          max: usage.max ?? 0,
+                          percent: usage.percent ?? 0,
+                          model: usage.model ?? "",
+                        },
+                        pending: false,
+                      }
+                    : message,
+                ),
+              );
+            } else {
+              finalizeMessage(assistantId, {});
+            }
+            setIsStreaming(false);
+            setSonettoReady(true);
+            ws.close(1000);
+            break;
+          }
           case "context_usage": {
             const u = evt.payload;
             if (u) {
@@ -400,9 +509,11 @@ export function useAgentChat(): UseAgentChat {
         }
         setIsStreaming(false);
       };
+      return true;
     },
     [
       sonettoBaseUrl,
+      sessionId,
       getActiveProvider,
       appendDelta,
       addToolCall,
@@ -415,16 +526,35 @@ export function useAgentChat(): UseAgentChat {
   // --------------------------------------------------------
   const cancel = useCallback(() => {
     cancelRef.current.cancelled = true;
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+    if (wsRef.current && wsRef.current.readyState < WebSocket.CLOSING) {
       try {
-        wsRef.current.send(JSON.stringify({ type: "cancel", payload: {} }));
+        if (wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: "cancel", payload: {} }));
+        }
+        wsRef.current.close();
       } catch {
         /* ignore */
       }
-      wsRef.current.close();
     }
+    setMessages((prev) =>
+      prev.map((message) =>
+        message.pending
+          ? {
+              ...message,
+              pending: false,
+              content: message.content || "已停止生成",
+            }
+          : message,
+      ),
+    );
     setIsStreaming(false);
-  }, []);
+  }, [setMessages]);
+
+  useEffect(() => {
+    setLastError(null);
+    setIsStreaming(false);
+    return cancel;
+  }, [cancel, sessionId]);
 
   // --------------------------------------------------------
   // Clear
@@ -433,20 +563,26 @@ export function useAgentChat(): UseAgentChat {
     cancel();
     setMessages([]);
     setLastError(null);
-  }, [cancel]);
+  }, [cancel, setMessages]);
+
+  const dismissError = useCallback(() => setLastError(null), []);
 
   // --------------------------------------------------------
   // Retry: 重发最后一条 user message
   // --------------------------------------------------------
   const retry = useCallback(
     async (messageId: string) => {
-      const idx = messages.findIndex((m) => m.id === messageId);
-      if (idx === -1) return;
-      const msg = messages[idx];
-      if (msg.role !== "user") return;
-      // 删掉该 user 后所有 assistant
-      setMessages((prev) => prev.slice(0, idx));
-      await send(msg.content, msg.attachments ?? []);
+      const failedIndex = messages.findIndex(
+        (message) => message.id === messageId,
+      );
+      if (failedIndex === -1) return;
+      let userIndex = failedIndex;
+      while (userIndex >= 0 && messages[userIndex].role !== "user")
+        userIndex -= 1;
+      if (userIndex < 0) return;
+      const userMessage = messages[userIndex];
+      setMessages((prev) => prev.slice(0, userIndex));
+      await send(userMessage.content, userMessage.attachments ?? []);
     },
     [messages, send],
   );
@@ -458,8 +594,20 @@ export function useAgentChat(): UseAgentChat {
     send,
     cancel,
     clear,
+    dismissError,
     retry,
+    retryConnection: probeSonetto,
     sonettoReady,
     sonettoBaseUrl,
   };
+}
+
+// ============================================================
+// Test helpers (保留兼容旧测试)
+// ============================================================
+export function __setHermesConfigForTests(_partial: unknown): void {
+  /* deprecated, no-op */
+}
+export function __resetHermesConfigForTests(): void {
+  /* deprecated, no-op */
 }

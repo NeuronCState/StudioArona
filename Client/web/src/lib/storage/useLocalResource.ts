@@ -24,7 +24,13 @@ export interface LocalResourceDocument {
 export interface LocalResourceConfig<T extends LocalResourceDocument> {
   table: storage.Table;
   queryKey: readonly unknown[];
-  serverList: () => Promise<T[]>;
+  /**
+   * Pull the authoritative remote list. If omitted, the resource is treated
+   * as fully local — no remote reconciliation, no pending-push drain, no
+   * background sync. Use this for client-only resources (e.g. the skills
+   * marketplace, which intentionally does not sync to the Server).
+   */
+  serverList?: () => Promise<T[]>;
   serverPush?: (doc: T) => Promise<T>;
   serverRemove?: (id: string) => Promise<void>;
   onPushError?: (doc: T, error: unknown) => void;
@@ -160,6 +166,10 @@ export function useLocalResource<T extends LocalResourceDocument>(
   const pullRemote = useCallback(
     async (localSnapshot?: T[]): Promise<T[]> => {
       const { table, serverList } = configRef.current;
+      // Local-only mode: no remote configured, skip reconciliation entirely.
+      if (!serverList) {
+        return localSnapshot ?? visible(await storage.listAll<T>(table));
+      }
       if (online) await pushPending(localSnapshot);
       const remote = await serverList();
       const versionBeforeMerge = mutationVersionRef.current;

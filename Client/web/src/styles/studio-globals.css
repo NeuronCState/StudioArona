@@ -1648,6 +1648,26 @@
     color 120ms ease;
 }
 
+.focus-chat-select {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.focus-chat-select:focus-visible {
+  outline: 2px solid var(--studio-accent, #d97706);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 .focus-chat-item:hover {
   background: var(--studio-bg, #fafaf9);
   color: var(--studio-text-primary, #1c1917);
@@ -1874,7 +1894,7 @@
   padding: 8px 0;
 }
 
-.focus-offline {
+.focus-empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1886,9 +1906,18 @@
   font-size: 11px;
 }
 
-.focus-offline-hint {
-  font-size: 10px;
-  opacity: 0.75;
+/* 红点 — server 未连接指示 (focus 侧栏 section header 用) */
+.focus-offline-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+[data-theme="dark"] .focus-offline-dot {
+  background: #f87171;
 }
 
 /* ========== Focus Toggle (收回指示条) ========== */

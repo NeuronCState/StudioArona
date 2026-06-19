@@ -10,63 +10,38 @@ import {
   Trophy,
   CalendarDays,
 } from "lucide-react";
-import { api } from "@/lib/api/client";
 import { useLocalResource } from "@/lib/storage/useLocalResource";
 import { Skeleton, EmptyState } from "@javis/ui-kit";
 import { useAuthStore } from "@/stores/auth";
+import {
+  getMarketCategories,
+  getMarketTrending,
+  getMarketInstalled,
+  searchMarketSkills,
+  type SearchOptions,
+} from "./marketplace-service";
+import type {
+  CategoryEntry,
+  MarketSkill,
+  SearchResponse,
+} from "./marketplace-catalog";
 import { CategoryTabs } from "./CategoryTabs";
 import { SkillMarketCard } from "./SkillMarketCard";
 import { StaggerList, StaggerItem } from "@/components/motion";
 import { motion as m } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-interface MarketSkill {
-  slug: string;
-  name: string;
-  description: string;
-  description_zh: string;
-  source: string;
-  source_url: string;
-  detail_url?: string;
-  author: string;
-  stars: number;
-  tags: string[];
-  category: string;
-  installed?: boolean;
-  updated_at?: number;
-}
-
 /** LocalMarketSkill — install 后存到 IDB 的形态, 加 id (useLocalResource 泛型约束要) */
 interface LocalMarketSkill extends MarketSkill {
   id: string;
-}
-
-interface SearchResponse {
-  skills: MarketSkill[];
-  total: number;
-  page: number;
-}
-
-interface CategoryEntry {
-  domain: string;
-  domain_name: string;
-  slug: string;
-  name: string;
-  count: number;
-  child_slugs: string[];
-  child_names: string[];
-}
-
-interface CategoriesResponse {
-  categories: CategoryEntry[];
-  total: number;
 }
 
 /**
  * client-side 分类过滤.
  * 选 domain (e.g. devops) → 用该 domain 子分类 slug+name + DOMAIN_KEYWORD_BOOST 关键词
  * 在 skill name/description/tags/author 文本里搜 (任一命中即视为该类).
- * 数据来源: backend /api/skills/marketplace/categories (MCP list_categories 24h cache).
+ * 数据来源: bundled catalog (marketplace-catalog.ts) — marketplace is 100%
+ * client-side per architecture principle, no server endpoints involved.
  */
 function matchCategory(
   skills: MarketSkill[],
@@ -109,45 +84,7 @@ const DOMAIN_ORDER = [
   "tools",
 ];
 
-/** 每个 domain 的默认搜索词 fallback 链 (skillsmp 实际不支持 category 过滤,
- *  只能 q. 选 category 时优先用该子分类的常见搜索词覆盖 input 让结果有内容).
- *  顺序: 第一个返非空结果就用 */
-const DOMAIN_SEARCH_FALLBACK: Record<string, string[]> = {
-  development: ["frontend", "backend", "mobile", "full-stack", "developer"],
-  devops: ["docker", "kubernetes", "terraform", "ansible", "helm"],
-  "data-ai": [
-    "machine-learning",
-    "data-analysis",
-    "llm",
-    "rag",
-    "data-engineering",
-  ],
-  design: [
-    "frontend-design",
-    "figma",
-    "tailwind",
-    "ui-design",
-    "design-system",
-  ],
-  databases: ["postgres", "sql", "mongodb", "nosql", "database"],
-  "testing-security": [
-    "testing",
-    "security-audit",
-    "jest",
-    "pytest",
-    "penetration",
-  ],
-  documentation: ["documentation", "readme", "technical-docs", "guide"],
-  "content-media": ["content-creation", "blog", "video", "seo", "media"],
-  business: [
-    "sales",
-    "marketing",
-    "finance",
-    "project-management",
-    "ecommerce",
-  ],
-  tools: ["cli", "git", "automation", "ide", "productivity"],
-};
+
 
 /** client-side 关键词兜底 (真 categories 的 child_names 太空, 加些展开词) */
 const DOMAIN_KEYWORD_BOOST: Record<string, string[]> = {
@@ -341,8 +278,7 @@ export function MarketplaceTab() {
   // 拉真实 categories (24h 后端缓存)
   const { data: categoriesData } = useQuery({
     queryKey: ["marketplace-categories"],
-    queryFn: () =>
-      api.get<CategoriesResponse>("/skills/marketplace/categories"),
+    queryFn: () => getMarketCategories(),
     staleTime: 24 * 60 * 60 * 1000, // 24h
     refetchOnWindowFocus: false,
   });
@@ -350,10 +286,7 @@ export function MarketplaceTab() {
   // 拉用户已装的 marketplace skill (用作 installed 标记, 让 card 显示"已安装")
   const { data: installedData } = useQuery({
     queryKey: ["marketplace-installed"],
-    queryFn: () =>
-      api.get<{ skills: MarketSkill[]; slugs: string[]; total: number }>(
-        "/skills/marketplace/installed",
-      ),
+    queryFn: () => getMarketInstalled(),
     staleTime: 30 * 1000, // 30s, install 后及时刷新
   });
 
@@ -370,10 +303,7 @@ export function MarketplaceTab() {
     refetch: refetchTrending,
   } = useQuery({
     queryKey: ["trending", trendingWindow],
-    queryFn: () =>
-      api.get<{ skills: MarketSkill[]; total: number; cached: boolean }>(
-        `/skills/marketplace/trending?window=${trendingWindow}&limit=30`,
-      ),
+    queryFn: () => getMarketTrending({ window: trendingWindow, limit: 30 }),
     enabled: viewMode === "trending",
     staleTime: 6 * 60 * 60 * 1000, // 6h (跟后端 cache 一致)
   });
@@ -386,19 +316,16 @@ export function MarketplaceTab() {
   } = useQuery({
     queryKey: ["marketplace", search, category, page],
     queryFn: () => {
-      let effectiveQ = search;
-      if (!effectiveQ && category) {
-        const fallbacks = DOMAIN_SEARCH_FALLBACK[category] ?? [];
-        effectiveQ = fallbacks[0] || category;
-      }
-      const params = new URLSearchParams({
-        q: effectiveQ || "skill",
-        page: String(page),
-        limit: "20",
+      // 直接用用户输入作为 q — 空 q 在 service 里走 "返回该 category 全部 skills" 分支,
+      // 不再 fallback 到 docker/k8s 等子关键词 (那是 skillsmp 不支持 category 时的 workaround).
+      const opts: SearchOptions = {
+        q: search || "skill",
+        page,
+        limit: 20,
         sortBy: "stars",
-      });
-      if (category) params.set("category", category);
-      return api.get<SearchResponse>(`/skills/marketplace/search?${params}`);
+      };
+      if (category) opts.category = category;
+      return searchMarketSkills(opts);
     },
     enabled: viewMode === "category" || viewMode === "search",
   });
@@ -442,27 +369,13 @@ export function MarketplaceTab() {
     installedSlugs,
   ]);
 
-  // 本地优先安装/卸载，重连后由统一资源层补同步。
+  // Marketplace is 100% client-side — installed skills live in browser IDB
+  // only, no Server round-trip on install/uninstall. `serverList` is omitted
+  // to signal "local-only" mode to `useLocalResource` (no remote reconcile,
+  // no pending-push drain).
   const localSkills = useLocalResource<LocalMarketSkill>({
     table: "skills",
     queryKey: ["skills", "marketplace", "local"],
-    serverList: () =>
-      api
-        .get<MarketSkill[]>("/skills/installed")
-        .then((skills) =>
-          skills.map((skill) => ({ ...skill, id: skill.slug })),
-        ),
-    serverPush: async (doc) => {
-      const r = await api.post<MarketSkill>("/skills/marketplace/install", {
-        slug: doc.slug,
-        source: doc.source,
-        source_url: doc.source_url,
-        detail_url: doc.detail_url || "",
-        name: doc.name,
-      });
-      return { ...r, id: doc.slug };
-    },
-    serverRemove: (slug) => api.delete(`/skills/${slug}`),
   });
 
   const installMutation = useMutation({

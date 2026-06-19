@@ -8,8 +8,9 @@ import {
   type DragEvent,
   type FormEvent,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
-import { Paperclip, FolderInput, ArrowUp, Square } from "lucide-react";
+import { ArrowUp, FolderInput, Paperclip, Square } from "lucide-react";
 import { motion } from "framer-motion";
 import { Spinner } from "@javis/ui-kit";
 import { motion as m } from "@/lib/motion";
@@ -21,18 +22,64 @@ import { useAutocomplete } from "./useAutocomplete";
 interface AgentInputProps {
   attachments: AgentAttachment[];
   isStreaming: boolean;
-  onSend: (text: string, attachments: AgentAttachment[]) => Promise<void>;
+  onSend: (text: string, attachments: AgentAttachment[]) => Promise<boolean>;
   onCancel: () => void;
   onAddAttachments: (items: AgentAttachment[]) => void;
   onRemoveAttachment: (id: string) => void;
   disabled?: boolean;
 }
 
-let _attId = 0;
+let attachmentCounter = 0;
 const nextAttachmentId = () =>
-  `att-${Date.now().toString(36)}-${(_attId++).toString(36)}`;
-
+  `att-${Date.now().toString(36)}-${(attachmentCounter++).toString(36)}`;
 const MAX_TEXTAREA_HEIGHT = 160;
+
+function makeAttachment(file: File, relativePath?: string): AgentAttachment {
+  return {
+    id: nextAttachmentId(),
+    name: file.name,
+    uri: "",
+    size: file.size,
+    mimeType: file.type || "application/octet-stream",
+    kind: relativePath?.includes("/") ? "folder" : "file",
+    relativePath: relativePath || file.webkitRelativePath || file.name,
+    file,
+  };
+}
+
+function readEntryFile(entry: FileSystemEntry): Promise<File> {
+  return new Promise((resolve, reject) =>
+    (entry as FileSystemFileEntry).file(resolve, reject),
+  );
+}
+
+async function readDirectoryEntries(
+  entry: FileSystemEntry,
+): Promise<FileSystemEntry[]> {
+  const reader = (entry as FileSystemDirectoryEntry).createReader();
+  const all: FileSystemEntry[] = [];
+  while (true) {
+    const batch = await new Promise<FileSystemEntry[]>((resolve, reject) =>
+      reader.readEntries(resolve, reject),
+    );
+    if (batch.length === 0) return all;
+    all.push(...batch);
+  }
+}
+
+async function expandEntry(
+  entry: FileSystemEntry,
+  parentPath = "",
+): Promise<AgentAttachment[]> {
+  const relativePath = parentPath ? `${parentPath}/${entry.name}` : entry.name;
+  if (entry.isFile)
+    return [makeAttachment(await readEntryFile(entry), relativePath)];
+  if (!entry.isDirectory) return [];
+  const children = await readDirectoryEntries(entry);
+  return (
+    await Promise.all(children.map((child) => expandEntry(child, relativePath)))
+  ).flat();
+}
 
 export function AgentInput({
   attachments,
@@ -49,8 +96,6 @@ export function AgentInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
-  // AutocompletePanel 候选列表 (SonettoHere LangGraph 内置 tool 名字)
-  // 阶段 1 还没接 tool 真实列表, 写一批最常用的占位
   const autocompleteItems: AutocompleteItem[] = [
     {
       id: "search",
@@ -124,12 +169,8 @@ export function AgentInput({
     },
   ];
   const handleAutocompleteInsert = useCallback((insertText: string) => {
-    setValue((v) => {
-      // 替换当前 `/filterText` 段
-      return v.replace(/\/[^\s/]*$/, "") + insertText;
-    });
-    // 重新 focus textarea
-    setTimeout(() => textareaRef.current?.focus(), 0);
+    setValue((current) => current.replace(/\/[^\s/]*$/, "") + insertText);
+    window.setTimeout(() => textareaRef.current?.focus(), 0);
   }, []);
   const ac = useAutocomplete(
     value,
@@ -137,115 +178,69 @@ export function AgentInput({
     handleAutocompleteInsert,
   );
 
-  // Reset textarea height whenever content changes.
   useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
+    const element = textareaRef.current;
+    if (!element) return;
+    element.style.height = "auto";
+    element.style.height = `${Math.min(element.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
   }, [value]);
 
-  const buildAttachments = useCallback(
-    (files: FileList | File[], kind: "file" | "folder") => {
-      const items: AgentAttachment[] = [];
-      for (const f of Array.from(files)) {
-        items.push({
-          id: nextAttachmentId(),
-          name: f.name,
-          uri: "",
-          size: f.size,
-          mimeType: f.type || "application/octet-stream",
-          kind,
-          file: f,
-        });
-      }
-      return items;
-    },
-    [],
-  );
-
-  const handleFiles = useCallback(
-    (files: FileList | null) => {
-      if (!files || files.length === 0) return;
-      onAddAttachments(buildAttachments(files, "file"));
-    },
-    [buildAttachments, onAddAttachments],
-  );
-
-  const handleFolder = useCallback(
-    (files: FileList | null) => {
-      if (!files || files.length === 0) return;
-      const items: AgentAttachment[] = Array.from(files).map((f) => ({
-        id: nextAttachmentId(),
-        name: f.name,
-        uri: "",
-        size: f.size,
-        mimeType: f.type || "application/octet-stream",
-        kind: "folder" as const,
-        file: f,
-      }));
-      onAddAttachments(items);
+  const addFiles = useCallback(
+    (files: FileList | File[]) => {
+      const items = Array.from(files).map((file) =>
+        makeAttachment(file, file.webkitRelativePath || file.name),
+      );
+      if (items.length > 0) onAddAttachments(items);
     },
     [onAddAttachments],
   );
 
   const handleSubmit = useCallback(
-    async (e?: FormEvent) => {
-      e?.preventDefault();
+    async (event?: FormEvent) => {
+      event?.preventDefault();
       if (disabled || isStreaming) return;
       const text = value.trim();
       if (!text && attachments.length === 0) return;
-      setValue("");
-      await onSend(text, attachments);
+      if (await onSend(text, attachments)) setValue("");
     },
     [attachments, disabled, isStreaming, onSend, value],
   );
 
   const handleKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      // 1. AutocompletePanel 优先拦截 Arrow/Enter/Tab/Escape
-      if (ac.handleKey(e)) return;
-      // 2. 普通 Enter → submit
-      if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
-        e.preventDefault();
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (ac.handleKey(event)) return;
+      if (
+        event.key === "Enter" &&
+        !event.shiftKey &&
+        !event.metaKey &&
+        !event.ctrlKey
+      ) {
+        event.preventDefault();
         void handleSubmit();
       }
     },
-    [handleSubmit, ac],
+    [ac, handleSubmit],
   );
-
-  // Drag & drop on the whole input region.
-  const handleDragOver = useCallback((e: DragEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer.types.includes("Files")) setDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: DragEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOver(false);
-  }, []);
 
   const handleDrop = useCallback(
-    (e: DragEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
+    async (event: DragEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
       setDragOver(false);
-      if (!e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
-      onAddAttachments(buildAttachments(e.dataTransfer.files, "file"));
+      const entries = Array.from(event.dataTransfer.items)
+        .map((item) => item.webkitGetAsEntry())
+        .filter((entry): entry is FileSystemEntry => Boolean(entry));
+      if (entries.length > 0) {
+        onAddAttachments(
+          (
+            await Promise.all(entries.map((entry) => expandEntry(entry)))
+          ).flat(),
+        );
+      } else {
+        addFiles(event.dataTransfer.files);
+      }
     },
-    [buildAttachments, onAddAttachments],
-  );
-
-  // Paste images / files directly into the textarea.
-  const handlePaste = useCallback(
-    (e: ClipboardEvent<HTMLTextAreaElement>) => {
-      if (!e.clipboardData?.files || e.clipboardData.files.length === 0) return;
-      e.preventDefault();
-      onAddAttachments(buildAttachments(e.clipboardData.files, "file"));
-    },
-    [buildAttachments, onAddAttachments],
+    [addFiles, onAddAttachments],
   );
 
   const hasContent = value.trim().length > 0 || attachments.length > 0;
@@ -260,72 +255,80 @@ export function AgentInput({
         delay: 0.05,
       }}
       onSubmit={handleSubmit}
-      className={`relative border-t border-[var(--color-border)] bg-[var(--color-surface)] px-3 pb-3 pt-2 transition-colors ${
-        dragOver
-          ? "ring-2 ring-inset ring-[var(--color-accent)]/40 bg-[var(--color-accent-soft)]/30"
-          : ""
-      }`}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
+      onDragOver={(event) => {
+        event.preventDefault();
+        if (event.dataTransfer.types.includes("Files")) setDragOver(true);
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          setDragOver(false);
+      }}
+      onDrop={(event) => void handleDrop(event)}
+      className={`relative border-t border-[var(--color-border)] bg-[var(--color-surface)] px-3 pb-3 pt-2 transition-colors ${dragOver ? "ring-2 ring-inset ring-[var(--color-accent)]/50" : ""}`}
     >
+      {dragOver && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[var(--color-surface)]/90 text-sm font-medium text-[var(--color-accent)]">
+          松开以上传文件或文件夹
+        </div>
+      )}
       {attachments.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1.5 px-1">
-          {attachments.map((a) => (
+        <div className="mb-2 flex max-h-24 flex-wrap gap-1.5 overflow-y-auto px-1">
+          {attachments.map((attachment) => (
             <AgentAttachmentChip
-              key={a.id}
-              attachment={a}
+              key={attachment.id}
+              attachment={attachment}
               onRemove={onRemoveAttachment}
             />
           ))}
         </div>
       )}
-
       <AutocompletePanel
         items={ac.filtered}
         visible={ac.open}
         position={ac.position}
         filterText={ac.filtered.length ? "" : ""}
         activeIndex={ac.activeIndex}
-        onSelect={(item) => {
-          handleAutocompleteInsert(item.insertText ?? `/${item.name} `);
-        }}
+        onSelect={(item) =>
+          handleAutocompleteInsert(item.insertText ?? `/${item.name} `)
+        }
         onActiveIndexChange={ac.setActiveIndex}
         onClose={ac.close}
       />
-
       <textarea
         ref={textareaRef}
         value={value}
-        onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
-          setValue(e.target.value)
+        onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
+          setValue(event.target.value)
         }
         onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
-        placeholder={isStreaming ? "生成中…" : "问问阿洛娜, 或拖文件进来"}
+        onPaste={(event: ClipboardEvent<HTMLTextAreaElement>) => {
+          if (event.clipboardData.files.length === 0) return;
+          event.preventDefault();
+          addFiles(event.clipboardData.files);
+        }}
+        placeholder={isStreaming ? "生成中…" : "问问阿洛娜，或拖入文件/文件夹"}
         disabled={disabled}
         rows={1}
         aria-label="Message input"
         className="block w-full resize-none rounded-md bg-transparent px-2 py-2 text-sm leading-relaxed text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none disabled:opacity-50"
         style={{ maxHeight: MAX_TEXTAREA_HEIGHT }}
       />
-
       <div className="flex items-center justify-between gap-2 px-1">
         <div className="flex items-center gap-0.5">
-          <IconBtn
-            label="Attach files"
+          <IconButton
+            label="添加文件"
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled}
           >
             <Paperclip size={16} aria-hidden="true" />
-          </IconBtn>
-          <IconBtn
-            label="Attach folder"
+          </IconButton>
+          <IconButton
+            label="添加文件夹"
             onClick={() => folderInputRef.current?.click()}
             disabled={disabled}
           >
             <FolderInput size={16} aria-hidden="true" />
-          </IconBtn>
+          </IconButton>
           {isStreaming && (
             <span className="ml-1 inline-flex items-center gap-1.5 text-[11px] text-[var(--color-text-muted)]">
               <Spinner size="sm" />
@@ -333,19 +336,12 @@ export function AgentInput({
             </span>
           )}
         </div>
-
         <button
           type={isStreaming ? "button" : "submit"}
           onClick={isStreaming ? onCancel : undefined}
           disabled={!isStreaming && !hasContent}
           aria-label={isStreaming ? "Stop generating" : "Send message"}
-          className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2 disabled:cursor-not-allowed ${
-            isStreaming
-              ? "bg-[var(--color-error)]/10 text-[var(--color-error)] hover:bg-[var(--color-error)]/20"
-              : hasContent && !disabled
-                ? "bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)]"
-                : "bg-[var(--color-bg)] text-[var(--color-text-muted)]"
-          }`}
+          className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] disabled:cursor-not-allowed ${isStreaming ? "bg-[var(--color-error)]/10 text-[var(--color-error)]" : hasContent && !disabled ? "bg-[var(--color-accent)] text-white" : "bg-[var(--color-bg)] text-[var(--color-text-muted)]"}`}
         >
           {isStreaming ? (
             <Square size={14} aria-hidden="true" />
@@ -354,35 +350,33 @@ export function AgentInput({
           )}
         </button>
       </div>
-
-      {/* Hidden inputs — webkitdirectory for folder picking */}
       <input
         ref={fileInputRef}
         type="file"
         multiple
         hidden
-        onChange={(e) => {
-          handleFiles(e.target.files);
-          e.target.value = "";
+        onChange={(event) => {
+          addFiles(event.target.files ?? []);
+          event.target.value = "";
         }}
       />
       <input
         ref={folderInputRef}
         type="file"
+        multiple
         hidden
-        // @ts-expect-error — non-standard but supported in Webkit + Chromium
+        // @ts-expect-error Chromium/WebKit directory picker extension.
         webkitdirectory=""
-        directory=""
-        onChange={(e) => {
-          handleFolder(e.target.files);
-          e.target.value = "";
+        onChange={(event) => {
+          addFiles(event.target.files ?? []);
+          event.target.value = "";
         }}
       />
     </motion.form>
   );
 }
 
-function IconBtn({
+function IconButton({
   label,
   onClick,
   disabled,
@@ -391,7 +385,7 @@ function IconBtn({
   label: string;
   onClick: () => void;
   disabled?: boolean;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <button
@@ -399,7 +393,7 @@ function IconBtn({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] disabled:opacity-40"
+      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] disabled:opacity-40"
     >
       {children}
     </button>

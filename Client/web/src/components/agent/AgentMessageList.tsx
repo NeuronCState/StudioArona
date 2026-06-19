@@ -78,7 +78,7 @@ function EmptyState({ agentName }: { agentName: string }) {
         和 {agentName} 聊聊
       </h2>
       <p className="max-w-xs text-xs text-[var(--color-text-muted)]">
-        拖文件 / 文件夹进窗口, 或者直接敲字。Esc 退出专注模式。
+        输入消息开始对话。按 Esc 退出专注模式。
       </p>
     </div>
   );

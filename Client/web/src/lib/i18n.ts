@@ -27,7 +27,6 @@ const zh: Record<string, string> = {
   "focus.schedule": "日程",
   "focus.feeds": "信息源 RSS",
   "focus.vms": "虚拟机",
-  "focus.serverOffline": "server 未连接\n连接后显示真实数据",
   "focus.toggle": "切换专注侧栏",
   "focus.toggleExpand": "展开专注侧栏",
   "focus.toggleCollapse": "收起专注侧栏",
@@ -124,7 +123,7 @@ const zh: Record<string, string> = {
 
   // Studio Home (StudioHomePage)
   "home.studio.weatherEmpty.title": "暂无天气数据",
-  "home.studio.weatherEmpty.hint": "连接 server 后获取",
+  "home.studio.weatherEmpty.hint": "无法获取当前位置天气",
   "home.studio.serverOffline.title": "未连接 server",
   "home.studio.serverOffline.hint": "工作室服务需连接后查看",
   "home.studio.centerButton.aria": "打开阿洛娜专注面板",
@@ -206,8 +205,6 @@ const en: Record<string, string> = {
   "focus.schedule": "Schedule",
   "focus.feeds": "Feeds (RSS)",
   "focus.vms": "Virtual Machines",
-  "focus.serverOffline":
-    "Server not connected.\nReal data will appear when reconnected.",
   "focus.toggle": "Toggle focus sidebar",
   "focus.toggleExpand": "Expand focus sidebar",
   "focus.toggleCollapse": "Collapse focus sidebar",
@@ -300,7 +297,7 @@ const en: Record<string, string> = {
 
   // Studio Home (StudioHomePage)
   "home.studio.weatherEmpty.title": "No weather data yet",
-  "home.studio.weatherEmpty.hint": "Connect to server to fetch",
+  "home.studio.weatherEmpty.hint": "Unable to fetch local weather",
   "home.studio.serverOffline.title": "Server not connected",
   "home.studio.serverOffline.hint": "Studio services require a connection",
   "home.studio.centerButton.aria": "Open Arona focus panel",

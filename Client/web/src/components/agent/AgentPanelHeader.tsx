@@ -1,14 +1,6 @@
-import {
-  Circle,
-  CircleAlert,
-  CircleCheck,
-  RefreshCw,
-  Sparkles,
-  X,
-} from "lucide-react";
-import { motion } from "framer-motion";
-import { motion as m } from "@/lib/motion";
-import { Avatar } from "@javis/ui-kit";
+import { Circle, CircleAlert, CircleCheck, RefreshCw, Sparkles, X } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { motion as m } from '@/lib/motion';
 
 interface AgentPanelHeaderProps {
   agentName: string;
@@ -35,17 +27,12 @@ export function AgentPanelHeader({
       className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3"
     >
       <div className="flex min-w-0 items-center gap-2.5">
-        <Avatar size="sm" alt={agentName} />
         <div className="min-w-0">
           <h2 className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
             {agentName}
           </h2>
           <p className="flex items-center gap-1 text-[10px] text-[var(--color-text-muted)]">
-            <Sparkles
-              size={10}
-              aria-hidden="true"
-              className="text-[var(--color-accent)]"
-            />
+            <Sparkles size={10} aria-hidden="true" className="text-[var(--color-accent)]" />
             <span>专注模式</span>
             <SonettoStatusChip
               ready={sonettoReady}
@@ -82,7 +69,7 @@ function SonettoStatusChip({
         className="ml-1 inline-flex items-center gap-1 rounded-full border border-[var(--color-border)] bg-[var(--color-bg)] px-1.5 py-px text-[9px] text-[var(--color-text-muted)]"
       >
         <Circle size={8} aria-hidden="true" className="animate-pulse" />
-        <span>检查 SonettoHere...</span>
+        <span>检查 SonettoHere…</span>
       </span>
     );
   }

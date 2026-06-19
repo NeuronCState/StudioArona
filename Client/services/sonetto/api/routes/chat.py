@@ -1,9 +1,14 @@
 """WebSocket 端点 — 流式 Agent 对话，含取消、用户交互和多轮上下文。"""
 
 import asyncio
+import base64
+import binascii
 import json
 import sys
+import tempfile
 import traceback
+import uuid
+from pathlib import Path, PurePosixPath
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
@@ -19,6 +24,66 @@ from tools.base import format_error
 from tools.studio.context import reset_center_context, set_center_context
 
 router = APIRouter()
+
+MAX_ATTACHMENT_COUNT = 100
+MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024
+MAX_ATTACHMENTS_SIZE = 10 * 1024 * 1024
+UPLOAD_ROOT = Path(tempfile.gettempdir()) / "studio-arona" / "uploads"
+
+
+def _safe_segment(value: str, fallback: str) -> str:
+    cleaned = "".join(c if c.isalnum() or c in "-_. " else "_" for c in value).strip(" .")
+    return cleaned[:120] or fallback
+
+
+def _materialize_attachments(raw_attachments, session_id: str) -> list[Path]:
+    """Decode one chat turn's attachments into an isolated temporary directory."""
+    if not raw_attachments:
+        return []
+    if not isinstance(raw_attachments, list) or len(raw_attachments) > MAX_ATTACHMENT_COUNT:
+        raise ValueError(f"一次最多上传 {MAX_ATTACHMENT_COUNT} 个文件")
+
+    session_dir = _safe_segment(session_id, "session")
+    turn_dir = UPLOAD_ROOT / session_dir / uuid.uuid4().hex
+    decoded: list[tuple[Path, bytes]] = []
+    total_size = 0
+
+    for index, item in enumerate(raw_attachments):
+        if not isinstance(item, dict):
+            raise ValueError("附件格式无效")
+        relative = str(item.get("relative_path") or item.get("name") or f"file-{index}")
+        relative_path = PurePosixPath(relative.replace("\\", "/"))
+        if relative_path.is_absolute() or any(part in ("", ".", "..") for part in relative_path.parts):
+            raise ValueError(f"附件路径无效: {relative}")
+        safe_parts = [
+            _safe_segment(part, f"item-{part_index}")
+            for part_index, part in enumerate(relative_path.parts)
+        ]
+        try:
+            content = base64.b64decode(item.get("content_base64", ""), validate=True)
+        except (binascii.Error, TypeError, ValueError) as exc:
+            raise ValueError(f"附件内容无效: {relative}") from exc
+        declared_size = item.get("size")
+        if declared_size != len(content):
+            raise ValueError(f"附件大小校验失败: {relative}")
+        if len(content) > MAX_ATTACHMENT_SIZE:
+            raise ValueError(f"{relative} 超过单文件 10 MB 限制")
+        total_size += len(content)
+        if total_size > MAX_ATTACHMENTS_SIZE:
+            raise ValueError("附件总大小不能超过 10 MB")
+        decoded.append((turn_dir.joinpath(*safe_parts), content))
+
+    for path, content in decoded:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    return [path.resolve() for path, _ in decoded]
+
+
+def _attachment_prompt(paths: list[Path]) -> str:
+    if not paths:
+        return ""
+    lines = "\n".join(f"- {path}" for path in paths)
+    return f"\n\n[用户上传的文件]\n以下文件已保存到本机，可按需使用文件工具读取：\n{lines}"
 
 
 def _get_provider_context(app_state) -> tuple[int, str]:
@@ -389,6 +454,14 @@ async def websocket_chat(ws: WebSocket, session_id: str):
 
                     payload = msg["payload"]
                     user_message = payload["message"].strip()
+                    try:
+                        attachment_paths = _materialize_attachments(
+                            payload.get("attachments"), session_id
+                        )
+                    except ValueError as exc:
+                        await ws.send_json({"type": "error", "payload": {"message": str(exc)}})
+                        continue
+                    user_message += _attachment_prompt(attachment_paths)
                     if not user_message:
                         continue
 
