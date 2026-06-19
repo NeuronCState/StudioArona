@@ -2,7 +2,7 @@ name: Release Client Installers
 
 # 全平台客户端安装包 — Tauri v2 desktop client
 # 触发: 打 tag (v*) 自动跑; 也能手动 dispatch 测一下
-# 产物: macOS (Apple Silicon + Intel) dmg + Windows msi + Linux deb/AppImage
+# 产物: macOS (Apple Silicon + Intel) dmg + Windows msi + Linux deb
 # 不含 Server 端 (Server 走 docker compose, 不打桌面包)
 on:
   push:
@@ -38,7 +38,7 @@ jobs:
           - label: linux-x64
             os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            bundle: deb,appimage
+            bundle: deb
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -60,7 +60,7 @@ jobs:
         with:
           workspaces: ./Client/tauri -> target
 
-      - name: Linux system deps (webkit2gtk-4.1 + gtk-3 + appimagetool)
+      - name: Linux system deps (webkit2gtk-4.1 + gtk-3)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
@@ -70,8 +70,6 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf
-          sudo wget -q https://github.com/AppImageCommunity/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /usr/local/bin/appimagetool
-          sudo chmod +x /usr/local/bin/appimagetool
 
       - name: Build client installers
         run: cd Client && pnpm install --frozen-lockfile && pnpm dlx @tauri-apps/cli@^2 build --target ${{ matrix.target }} --bundles ${{ matrix.bundle }} --ci --no-sign
@@ -85,7 +83,6 @@ jobs:
             Client/tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
             Client/tauri/target/${{ matrix.target }}/release/bundle/**/*.msi
             Client/tauri/target/${{ matrix.target }}/release/bundle/**/*.deb
-            Client/tauri/target/${{ matrix.target }}/release/bundle/**/*.AppImage
           if-no-files-found: error
           retention-days: 90
 
@@ -110,6 +107,5 @@ jobs:
             artifacts/**/*.dmg
             artifacts/**/*.msi
             artifacts/**/*.deb
-            artifacts/**/*.AppImage
           generate_release_notes: true
           fail_on_unmatched_files: true

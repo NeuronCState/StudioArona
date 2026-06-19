@@ -1,6 +1,6 @@
 [package]
 name = "studio-arona"
-version = "0.1.1"
+version = "0.1.2"
 description = "Studio Arona - Smart Bulletin Board System"
 authors = ["Studio Arona Team"]
 license = "MIT"
