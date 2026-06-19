@@ -366,18 +366,35 @@ async def _new_job_id() -> str:
 
 
 async def query_latest_from_hf() -> dict[str, Any]:
-    """调 hf-mirror 拉 PaddleOCR-VL GGUF 系列, 返回最新 + 列表."""
+    """调 hf-mirror 拉 PaddleOCR-VL GGUF 系列, 返回最新 + 列表.
+
+    error 字段语义:
+      - None: 成功且有数据 (前端可基于 latest 判断是否最新)
+      - 非空字符串: 任何形式的失败 (网络/超时/没数据), 前端应展示错误并提供重试
+    """
+    data: list | None = None
+    err: str = ""
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.get(HF_API_MODELS)
             r.raise_for_status()
             data = r.json()
     except Exception as e:
-        return {"latest": None, "all": [], "error": str(e)}
+        # httpx.ConnectError 等异常 str(e) 可能是空, 给个默认提示
+        err = (str(e) or "").strip() or "无法连接到 HuggingFace"
+
+    if data is None:
+        return {"latest": None, "all": [], "error": err}
 
     gguf = [m for m in data if "gguf" in m.get("tags", [])]
     gguf.sort(key=lambda m: m.get("createdAt", ""), reverse=True)
-    return {"latest": gguf[0] if gguf else None, "all": gguf, "error": None}
+    if not gguf:
+        return {
+            "latest": None,
+            "all": [],
+            "error": "HuggingFace 上未找到 PaddleOCR-VL-GGUF 模型",
+        }
+    return {"latest": gguf[0], "all": gguf, "error": None}
 
 
 def _parse_version_from_id(model_id: str) -> str | None:

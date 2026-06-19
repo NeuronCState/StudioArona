@@ -520,28 +520,34 @@ export function OCRPage() {
               ? "下载完成"
               : installJob && installJob.status === "failed"
                 ? "下载失败"
-                : !updateInfo?.installed
-                  ? "OCR 模型未安装"
-                  : updateInfo?.needs_update
-                    ? `发现新版本: ${updateInfo.latest_version}`
-                    : "OCR 模型已是最新"
+                : updateInfo?.error
+                  ? "检查更新失败"
+                  : !updateInfo?.installed
+                    ? "OCR 模型未安装"
+                    : updateInfo?.needs_update
+                      ? `发现新版本: ${updateInfo.latest_version}`
+                      : "OCR 模型已是最新"
         }
         description={
           !updateInfo
             ? "检查中 ..."
-            : !updateInfo.installed
-              ? `下载 PaddleOCR-VL-${updateInfo.latest_version} GGUF 模型 (~1.7G, 5-30 分钟)`
-              : updateInfo.needs_update
-                ? `当前 ${updateInfo.current_version} → ${updateInfo.latest_version} (≈1.7G)`
-                : `当前版本: ${updateInfo.current_version}`
+            : updateInfo.error
+              ? updateInfo.error
+              : !updateInfo.installed
+                ? `下载 PaddleOCR-VL-${updateInfo.latest_version} GGUF 模型 (~1.7G, 5-30 分钟)`
+                : updateInfo.needs_update
+                  ? `当前 ${updateInfo.current_version} → ${updateInfo.latest_version} (≈1.7G)`
+                  : `当前版本: ${updateInfo.current_version}`
         }
       >
         <InstallDialogBody
           updateInfo={updateInfo}
           installJob={installJob}
           installError={installError}
+          isRefreshing={isRefreshing}
           onInstall={startInstall}
           onClose={closeInstallDialog}
+          onRetry={() => void refreshUpdateInfo(true)}
         />
       </Dialog>
     </div>
@@ -599,16 +605,20 @@ interface InstallDialogBodyProps {
   updateInfo: OCRCheckUpdate | null;
   installJob: OCRInstallStatus | null;
   installError: string;
+  isRefreshing: boolean;
   onInstall: (version: string) => void;
   onClose: () => void;
+  onRetry: () => void;
 }
 
 function InstallDialogBody({
   updateInfo,
   installJob,
   installError,
+  isRefreshing,
   onInstall,
   onClose,
+  onRetry,
 }: InstallDialogBodyProps) {
   // 下载中: 显示日志 + 取消按钮
   if (
@@ -677,6 +687,67 @@ function InstallDialogBody({
             className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
           >
             关闭
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // HF 失败: 显示错误 + 重试按钮
+  if (updateInfo?.error) {
+    return (
+      <div className="space-y-3">
+        <div className="rounded-lg bg-amber-500/10 p-3 text-sm text-amber-600 dark:text-amber-400">
+          ⚠ 无法连到 HuggingFace
+          <div className="mt-1 text-xs text-[var(--color-text-muted)]">
+            {updateInfo.error}
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+          >
+            关闭
+          </button>
+          <button
+            onClick={onRetry}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+          >
+            {isRefreshing ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <RefreshCw size={12} />
+            )}
+            重试
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 真正"已是最新": 显示确认 + 可选重新下载 (应对模型文件损坏场景)
+  if (updateInfo?.installed && !updateInfo.needs_update) {
+    return (
+      <div className="space-y-3">
+        <div className="rounded-lg bg-green-500/10 p-3 text-sm text-green-600 dark:text-green-400">
+          ✓ PaddleOCR-VL-{updateInfo.current_version} 已是最新
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+          >
+            关闭
+          </button>
+          <button
+            onClick={() => onInstall(updateInfo.current_version!)}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+          >
+            <DownloadCloud size={12} />
+            重新下载
           </button>
         </div>
       </div>
