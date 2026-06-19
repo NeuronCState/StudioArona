@@ -2,7 +2,7 @@ name: Release Client Installers
 
 # 全平台客户端安装包 — Tauri v2 desktop client
 # 触发: 打 tag (v*) 自动跑; 也能手动 dispatch 测一下
-# 产物: macOS (Apple Silicon + Intel) dmg/app + Windows msi/nsis + Linux deb/AppImage
+# 产物: macOS (Apple Silicon + Intel) dmg + Windows msi + Linux deb/AppImage
 # 不含 Server 端 (Server 走 docker compose, 不打桌面包)
 on:
   push:
@@ -26,15 +26,15 @@ jobs:
           - label: macos-arm64
             os: macos-latest
             target: aarch64-apple-darwin
-            bundle: dmg,app
+            bundle: dmg
           - label: macos-x64
-            os: macos-13
+            os: macos-14
             target: x86_64-apple-darwin
-            bundle: dmg,app
+            bundle: dmg
           - label: windows-x64
             os: windows-latest
             target: x86_64-pc-windows-msvc
-            bundle: msi,nsis
+            bundle: msi
           - label: linux-x64
             os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
@@ -82,8 +82,11 @@ jobs:
         with:
           name: ${{ matrix.label }}-${{ github.sha }}
           path: |
-            Client/tauri/target/${{ matrix.target }}/release/bundle/**/*
-          if-no-files-found: warn
+            Client/tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
+            Client/tauri/target/${{ matrix.target }}/release/bundle/**/*.msi
+            Client/tauri/target/${{ matrix.target }}/release/bundle/**/*.deb
+            Client/tauri/target/${{ matrix.target }}/release/bundle/**/*.AppImage
+          if-no-files-found: error
           retention-days: 90
 
   release:
@@ -105,10 +108,8 @@ jobs:
         with:
           files: |
             artifacts/**/*.dmg
-            artifacts/**/*.app
             artifacts/**/*.msi
-            artifacts/**/*.exe
             artifacts/**/*.deb
             artifacts/**/*.AppImage
           generate_release_notes: true
-          fail_on_unmatched_files: false
+          fail_on_unmatched_files: true
