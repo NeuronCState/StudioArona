@@ -25,7 +25,6 @@
     "dev:ocr": "cd ../services/ocr && ../../.venv-sonetto/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8083 --reload"
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.4.0",
     "@javis/ui-kit": "workspace:*",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
@@ -45,7 +44,7 @@
     "pixi.js": "^7.4.3",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-hook-form": "^7.80.0",
+
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.0",
     "rehype-highlight": "^7.0.2",

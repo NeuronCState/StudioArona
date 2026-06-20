@@ -34,6 +34,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": {
+      "../services/sonetto/api": "services/sonetto/api",
+      "../services/sonetto/requirements.txt": "services/sonetto/requirements.txt",
+      "../services/sonetto/config": "services/sonetto/config",
+      "../services/ocr/main.py": "services/ocr/main.py",
+      "../services/ocr/requirements.txt": "services/ocr/requirements.txt"
+    },
     "externalBin": [],
     "macOS": {
       "minimumSystemVersion": "10.15"

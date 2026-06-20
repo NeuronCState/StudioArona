@@ -1,47 +1,18 @@
 /**
  * @file lib/schemas/index.ts
- * Barrel export for all Zod 4 schemas.
+ * Barrel export for Zod 4 schemas.
  *
  * Usage:
- *   import { loginSchema, vmSchema, apiResponse } from "@/lib/schemas";
- *   import type { LoginInput, VM } from "@/lib/schemas";
+ *   import { loginSchema, createVmSchema } from "@/lib/schemas";
+ *   import type { LoginInput, RegisterInput } from "@/lib/schemas";
  */
-export {
-  loginSchema,
-  registerSchema,
-  userProfileSchema,
-  authTokensSchema,
-  authResponseSchema,
-} from "./auth";
-export type {
-  LoginInput,
-  LoginOutput,
-  RegisterInput,
-  RegisterOutput,
-  UserProfile,
-  AuthTokens,
-  AuthResponse,
-} from "./auth";
+// Auth — used by LoginPage
+export { loginSchema, registerSchema } from "./auth";
+export type { LoginInput, RegisterInput } from "./auth";
 
-export {
-  createVmSchema,
-  vmSchema,
-  vmApiResponseSchema,
-  VM_STATUSES,
-} from "./vm";
-export type {
-  CreateVmInput,
-  CreateVmOutput,
-  VM,
-  VmApiResponse,
-  VmStatus,
-} from "./vm";
+// VM — used by CreateVmForm
+export { createVmSchema } from "./vm";
+export type { CreateVmInput } from "./vm";
 
-export {
-  apiOk,
-  apiOkList,
-  apiError,
-  apiResponse,
-  apiResponseList,
-} from "./api";
-export type { ApiError } from "./api";
+// Internal schemas (auth.ts / vm.ts / api.ts) are available for direct import
+// when needed by future consumers. Not re-exported here to keep barrel lean.

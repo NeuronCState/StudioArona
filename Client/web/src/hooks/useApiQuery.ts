@@ -18,11 +18,7 @@
  *   const opts = apiQueryOptions<Feed[]>('/feeds', ['feeds']);
  *   const { data } = useSuspenseQuery(opts);  // or useQuery(opts)
  */
-import {
-  useQuery,
-  queryOptions,
-  type UseQueryOptions,
-} from "@tanstack/react-query";
+import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api/client";
 import { useConnectionStore } from "@/stores/connection";
 
@@ -66,24 +62,3 @@ export function useApiQuery<T>(opts: UseApiQueryOptions<T>) {
   };
 }
 
-/**
- * React Query 5 queryOptions() factory — 类型安全的 query 配置, 可复用于
- * `useQuery`, `useSuspenseQuery`, `queryClient.prefetchQuery` 等。
- *
- * 不含 offline 兜底 (由 useApiQuery 负责)。适合 server-dependent 页面。
- *
- * Usage:
- *   const opts = apiQueryOptions<SystemMetrics>('/system/metrics', ['system-metrics']);
- *   const { data } = useSuspenseQuery(opts);
- */
-export function apiQueryOptions<T>(
-  path: string,
-  queryKey: readonly unknown[],
-  opts?: { staleTime?: number },
-) {
-  return queryOptions({
-    queryKey,
-    queryFn: () => api.get<T>(path),
-    staleTime: opts?.staleTime ?? 60_000,
-  });
-}

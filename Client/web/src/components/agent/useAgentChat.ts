@@ -16,50 +16,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSonettoConfigStore } from "@/stores/sonetto-config";
 import { useFocusChatsStore } from "@/stores/focus-chats";
+import type {
+  AgentAttachment,
+  AgentToolCall,
+  AgentMessage,
+} from "@/types/agent";
 
-// ============================================================
-// Types — SonettoHere 事件 schema
-// ============================================================
-
-export interface AgentAttachment {
-  id: string;
-  name: string;
-  /** Tauri 桌面: ~/Documents/studioarona/... 绝对路径; Web 端: Blob URL */
-  uri: string;
-  size: number;
-  mimeType: string;
-  kind?: "file" | "folder";
-  /** Folder uploads preserve this path relative to the selected root. */
-  relativePath?: string;
-  /** 内部 file ref (Web 端用) */
-  file?: File;
-}
-
-export interface AgentToolCall {
-  id: string;
-  name: string;
-  input: string;
-  output?: string;
-  status: "running" | "done" | "error";
-  startedAt: number;
-  endedAt?: number;
-}
-
-export interface AgentMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  createdAt: number;
-  attachments?: AgentAttachment[];
-  pending?: boolean;
-  error?: string;
-  /** ReAct thinking 文本 (折叠) */
-  thinking?: string;
-  /** 工具调用列表 (折叠) */
-  toolCalls?: AgentToolCall[];
-  /** 上下文用量 (server 推 context_usage) */
-  contextUsage?: { used: number; max: number; percent: number; model: string };
-}
+// Re-export for backward compatibility (existing consumers import from ./useAgentChat)
+export type { AgentAttachment, AgentToolCall, AgentMessage };
 
 interface SonettoEventPayload {
   token?: string;
@@ -199,8 +163,14 @@ export function useAgentChat(sessionId: string): UseAgentChat {
   const wsRef = useRef<WebSocket | null>(null);
 
   // --------------------------------------------------------
-  // Probe SonettoHere /api/health (类似旧 probeHermes)
+  // Probe SonettoHere /api/health with auto-retry (exponential backoff).
+  // SonettoHere may take >3s to boot (venv cold start, model loading).
+  // Auto-retry prevents "stuck on not ready" until the user manually retries.
   // --------------------------------------------------------
+  const retryCountRef = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+
   const probeSonetto = useCallback(async () => {
     const ac = new AbortController();
     const timer = window.setTimeout(() => ac.abort(), PROBE_TIMEOUT_MS);
@@ -208,16 +178,40 @@ export function useAgentChat(sessionId: string): UseAgentChat {
       const res = await fetch(`${sonettoBaseUrl}/api/health`, {
         signal: ac.signal,
       });
-      setSonettoReady(res.ok);
+      if (!mountedRef.current) return;
+      if (res.ok) {
+        setSonettoReady(true);
+        retryCountRef.current = 0;
+      } else {
+        setSonettoReady(false);
+        scheduleRetry();
+      }
     } catch {
+      if (!mountedRef.current) return;
       setSonettoReady(false);
+      scheduleRetry();
     } finally {
       window.clearTimeout(timer);
     }
   }, [sonettoBaseUrl]);
 
+  const scheduleRetry = useCallback(() => {
+    if (!mountedRef.current) return;
+    retryCountRef.current += 1;
+    // Exponential backoff: 2s → 4s → 8s → 16s → 30s (max)
+    const delay = Math.min(2000 * 2 ** (retryCountRef.current - 1), 30_000);
+    retryTimerRef.current = setTimeout(() => {
+      if (mountedRef.current) void probeSonetto();
+    }, delay);
+  }, [probeSonetto]);
+
   useEffect(() => {
+    mountedRef.current = true;
     void probeSonetto();
+    return () => {
+      mountedRef.current = false;
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    };
   }, [probeSonetto]);
 
   // --------------------------------------------------------

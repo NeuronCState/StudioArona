@@ -153,9 +153,10 @@ pub fn run() {
 /// 桌面应用启动时调用, 进程后台跑, 应用关闭时 kill.
 #[cfg(desktop)]
 fn spawn_sonetto() -> Option<u32> {
-    let root = client_root()?;
+    // bundled Python source (in .app Resources or repo root)
+    let sonetto_dir = client_root()?.join("services/sonetto");
+    // user-writable venv (in ~/Library/Application Support/)
     let venv_python = ensure_sonetto_venv()?;
-    let sonetto_dir = root.join("services/sonetto");
     if !sonetto_dir.join("api/server.py").exists() {
         log::error!(
             "Bundled SonettoHere runtime not found at {}",
@@ -197,8 +198,8 @@ fn spawn_sonetto() -> Option<u32> {
 /// Uses the Client-local runtime and Python 3.12 environment shared with OCR.
 #[cfg(desktop)]
 fn ensure_sonetto_venv() -> Option<PathBuf> {
-    let root = client_root()?;
-    let venv_dir = root.join(".venv-sonetto");
+    // Venv lives in user-writable app data, NOT in read-only .app bundle
+    let venv_dir = app_data_dir()?.join(".venv-sonetto");
     let venv_python = venv_dir.join("bin/python3");
 
     if venv_python.exists() {
@@ -229,9 +230,10 @@ fn ensure_sonetto_venv() -> Option<PathBuf> {
         return None;
     }
 
-    // 4. Install from the runtime bundled inside Client.
-    let sonetto_req = root.join("services/sonetto/requirements.txt");
-    let ocr_req = root.join("services/ocr/requirements.txt");
+    // 4. Install from the bundled runtime resources.
+    let bundle_root = client_root()?;
+    let sonetto_req = bundle_root.join("services/sonetto/requirements.txt");
+    let ocr_req = bundle_root.join("services/ocr/requirements.txt");
     if !sonetto_req.exists() || !ocr_req.exists() {
         log::error!("bundled requirements not found");
         return None;
@@ -294,7 +296,10 @@ fn find_python312() -> Option<PathBuf> {
     None
 }
 
-/// Resolve the Client directory without a developer-specific absolute path.
+/// Resolve the directory containing bundled `services/sonetto/api/server.py`.
+///
+/// Dev mode: finds the repo root via CWD or executable walking.
+/// Packaged app: resolves `<bundle>/Contents/Resources/` (macOS Tauri 2 resources).
 fn client_root() -> Option<PathBuf> {
     let mut candidates = Vec::new();
     if let Ok(cwd) = std::env::current_dir() {
@@ -305,23 +310,48 @@ fn client_root() -> Option<PathBuf> {
     }
     if let Ok(exe) = std::env::current_exe() {
         let mut current = exe.parent();
-        for _ in 0..6 {
+        for _ in 0..8 {
             if let Some(path) = current {
                 candidates.push(path.to_path_buf());
                 current = path.parent();
             }
         }
+        // macOS .app bundle: exe at Contents/MacOS → resources at Contents/Resources
+        if let Some(resources) = exe.parent().and_then(|p| p.parent()).map(|p| p.join("Resources")) {
+            candidates.push(resources);
+        }
     }
+
     candidates.into_iter().find(|path| {
         path.join("services/sonetto/api/server.py").exists()
-            && path.join("web/package.json").exists()
     })
+}
+
+/// User-writable data directory for venv, logs, and runtime state.
+/// macOS: `~/Library/Application Support/com.studioarona.desktop/`
+fn app_data_dir() -> Option<PathBuf> {
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var("HOME").ok()?;
+        Some(PathBuf::from(home).join("Library/Application Support/com.studioarona.desktop"))
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let home = std::env::var("HOME").ok()?;
+        Some(PathBuf::from(home).join(".local/share/studio-arona"))
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let appdata = std::env::var("APPDATA").ok()?;
+        Some(PathBuf::from(appdata).join("StudioArona"))
+    }
 }
 
 #[cfg(desktop)]
 fn sonetto_log_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
-    PathBuf::from(format!("{}/Library/Logs/StudioArona/sonetto.log", home))
+    app_data_dir()
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join("logs/sonetto.log")
 }
 
 /// 检查 SonettoHere 健康 (Tauri 端 ping)
@@ -396,13 +426,16 @@ const OCR_FASTAPI_PORT: u16 = 8083;
 const OCR_LLAMA_PORT: u16 = 8082;
 const OCR_IDLE_SECS: u64 = 300; // 5 分钟空闲自动 kill
 
-/// OCR 服务根目录 (StudioArona/vendor/)
-fn ocr_vendor_root() -> PathBuf {
+/// OCR 服务根目录 — 源码从 bundle 读，模型存用户目录
+fn ocr_source_root() -> PathBuf {
     client_root().unwrap_or_else(|| PathBuf::from(".."))
 }
 
+/// OCR 模型 vendor 目录 (用户可写，模型 1.85G 运行时下载)
 fn ocr_vendor_dir() -> PathBuf {
-    ocr_vendor_root().join("vendor").join("paddle-ocr")
+    app_data_dir()
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join("vendor/paddle-ocr")
 }
 
 /// 读 vendor/paddle-ocr/current.json 找当前激活版本, 返回 (model, mmproj) 路径.
@@ -450,21 +483,25 @@ fn ocr_current_model_paths() -> Option<(PathBuf, PathBuf)> {
 }
 
 fn ocr_llama_cpp_dir() -> PathBuf {
-    ocr_vendor_root().join("vendor").join("llama.cpp")
+    app_data_dir()
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join("vendor/llama.cpp")
 }
 
 fn ocr_log_path(name: &str) -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
-    let dir = PathBuf::from(format!("{}/Library/Logs/StudioArona", home));
+    let dir = app_data_dir()
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join("logs");
     std::fs::create_dir_all(&dir).ok();
     dir.join(name)
 }
 
 fn ocr_python_path() -> Option<PathBuf> {
-    // 共享 SonettoHere venv
+    // 共享 app_data_dir 中的 SonettoHere venv
+    let venv_dir = app_data_dir()?.join(".venv-sonetto");
     let candidates = [
-        ocr_vendor_root().join(".venv-sonetto/bin/python3"),
-        ocr_vendor_root().join(".venv-sonetto/bin/python"),
+        venv_dir.join("bin/python3"),
+        venv_dir.join("bin/python"),
     ];
     candidates.into_iter().find(|p| p.exists())
 }
@@ -649,7 +686,7 @@ async fn ocr_ensure_fastapi(state: &tauri::State<'_, OcrState>) -> Result<u32, S
 
     let python = ocr_python_path()
         .ok_or_else(|| "Python venv not found (.venv-sonetto/bin/python3)".to_string())?;
-    let ocr_main = ocr_vendor_root().join("services/ocr/main.py");
+    let ocr_main = ocr_source_root().join("services/ocr/main.py");
     if !ocr_main.exists() {
         return Err(format!("OCR main.py not found at {}", ocr_main.display()));
     }
@@ -675,7 +712,7 @@ async fn ocr_ensure_fastapi(state: &tauri::State<'_, OcrState>) -> Result<u32, S
                 "--log-level",
                 "info",
             ])
-            .current_dir(ocr_vendor_root().join("services/ocr"))
+            .current_dir(ocr_source_root().join("services/ocr"))
             .env("OCR_LLAMA_PORT", OCR_LLAMA_PORT.to_string())
             .env("OCR_PORT", OCR_FASTAPI_PORT.to_string())
             .env("PYTHONUNBUFFERED", "1")

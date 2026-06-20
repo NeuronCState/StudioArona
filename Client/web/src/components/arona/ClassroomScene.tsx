@@ -1,6 +1,7 @@
 import { Suspense, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
-import { useGLTF, Float, Environment } from "@react-three/drei";
+import { useGLTF, Float, Environment, useProgress, PerformanceMonitor, Html } from "@react-three/drei";
+import { ACESFilmicToneMapping, PCFSoftShadowMap, SRGBColorSpace } from "three";
 
 // ── Configure Draco decoder (called once on first use) ──
 let _dracoReady = false;
@@ -99,6 +100,30 @@ function GLBScene({ time }: { time: "day" | "night" }) {
   );
 }
 
+// ── Loading progress (drei useProgress) ──
+function SceneLoadProgress() {
+  const { active, progress, errors } = useProgress();
+  if (!active || errors.length > 0) return null;
+  const pct = Math.round(progress);
+  return (
+    <Html center style={{ pointerEvents: "none" }}>
+      <div
+        style={{
+          background: "rgba(0,0,0,0.5)",
+          color: "#fff",
+          padding: "8px 16px",
+          borderRadius: 12,
+          fontSize: 13,
+          fontFamily: "var(--font-sans)",
+          backdropFilter: "blur(8px)",
+        }}
+      >
+        教室加载中… {pct}%
+      </div>
+    </Html>
+  );
+}
+
 // ── Main export ──
 export function ClassroomScene({
   time = "day",
@@ -111,17 +136,40 @@ export function ClassroomScene({
     <div style={{ position: "absolute", inset: 0, zIndex: 1 }}>
       <Canvas
         camera={{ position: [0, 1.5, 4], fov: 45 }}
+        shadows="soft"
+        dpr={[1, 2]}
         gl={{
           antialias: true,
           alpha: true,
           powerPreference: "high-performance",
+          failIfMajorPerformanceCaveat: false,
+          outputColorSpace: SRGBColorSpace,
+          toneMapping: ACESFilmicToneMapping,
+          toneMappingExposure: 1.2,
+          shadowMapType: PCFSoftShadowMap,
         }}
         frameloop="demand"
+        onCreated={({ gl }) => {
+          gl.shadowMap.enabled = true;
+          gl.shadowMap.type = PCFSoftShadowMap;
+        }}
         style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
       >
-        <Suspense fallback={null}>
-          <GLBScene time={time} />
-        </Suspense>
+        <PerformanceMonitor
+          onDecline={() => {
+            // Low FPS: drop shadow quality and DPR
+          }}
+          onIncline={() => {
+            // FPS recovered: restore quality
+          }}
+          flipflops={3}
+          bounds={(refreshrate) => [refreshrate * 0.6, refreshrate]}
+        >
+          <Suspense fallback={null}>
+            <GLBScene time={time} />
+            <SceneLoadProgress />
+          </Suspense>
+        </PerformanceMonitor>
       </Canvas>
 
       {/* Day/night toggle */}

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AgentMessage } from '@/components/agent/useAgentChat';
+import type { AgentMessage } from '@/types/agent';
 
 /**
  * Focus mode chat list — 专注模式下的对话历史
