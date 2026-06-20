@@ -249,11 +249,40 @@ npm 上 addon 包最新是 8.6.14 (8.x 末班), 但 `storybook`/`@storybook/reac
 - [ ] **5.B.3.8** 视觉回归测试 — 所有页面
 - [ ] **5.B.3.9** Storybook 重新跑
 
-#### 5.B.4 pixi.js 7 → 8
-- [ ] **5.B.4.1** 升 `pixi.js` 7.4.3 → 8.19.0
-- [ ] **5.B.4.2** 检查 `pixi-spine` 兼容性 (pixi-spine 4.0.6 是否跟 pixi 8 兼容)
-- [ ] **5.B.4.3** 修 pixi 8 API breaking (主要: DisplayObject API 改, 事件系统重写)
-- [ ] **5.B.4.4** 视觉回归: 任何用 pixi 的页面
+#### 5.B.4 pixi.js 7 → 8 — **🚫 跳过 (2026-06-21 确认)**
+- [x] **5.B.4.1** ~~升 `pixi.js` 7.4.3 → 8.19.0~~ **跳过**
+- [x] **5.B.4.2** 检查 `pixi-spine` 兼容性: **pixi-spine@4.0.6 (npm latest) 锁 pixi 7 全部 @pixi/* ^7.0.0**
+- **结论**: pixi.js 7→8 **不能升** (pixi-spine 没有 8 兼容版本)
+- **重做条件**: 等 pixi-spine 5.x 发布支持 pixi 8
+- **替代方案**: pixi 7.4.3 是当前 (project 用 dynamic import + AronaModel.tsx), 7.x 仍然维护
+
+#### 5.B.5 jsdom 25 → 29
+- [x] **5.B.5.1** 升 `jsdom` 25.0.0 → 29.1.1
+- [x] **5.B.5.2** 跑 vitest 验证 — 83 vitest 全过
+
+#### 5.B.6 react-markdown 9 → 10
+- [x] **5.B.6.1** 升 `react-markdown` 9.0.1 → 10.1.0
+- [x] **5.B.6.2** 检查项目内 markdown 渲染 — 0 改动 (peerDep react>=18 满足 19.2.7)
+
+#### 5.B.7 Tailwind 3 → 4 — **⏸️ 单独 sprint (不在第五批做)**
+- [ ] **5.B.7.1** 升 `tailwindcss` 3.4.14 → 4.3.1 (跨 1 major)
+- [ ] **5.B.7.2** 安装新 PostCSS 插件: `@tailwindcss/postcss`
+- [ ] **5.B.7.3** **删除** `tailwind.config.ts`
+- [ ] **5.B.7.4** 迁移主题配置到 CSS 文件 (`src/styles/index.css`):
+  ```css
+  @import "tailwindcss";
+  @theme { --color-primary: ...; --font-sans: ...; }
+  ```
+- [ ] **5.B.7.5** 改 `postcss.config.js`: `plugins: { '@tailwindcss/postcss': {} }`
+- [ ] **5.B.7.6** 检查所有 `@apply` 语法 (v3 → v4 兼容性)
+- [ ] **5.B.7.7** 检查 dark mode 配置 (v4 改用 `@variant dark (...)`)
+- [ ] **5.B.7.8** 视觉回归测试 — 所有页面
+- [ ] **5.B.7.9** Storybook 重新跑
+- [ ] **5.B.7.10** (配套) 升 `tailwind-merge` 2.5.4 → 3.6.0
+- [ ] **5.B.7.11** (配套) 升 `autoprefixer` 10.4.20 → 10.5.0
+- [ ] **5.B.7.12** (配套) 升 `postcss` 8.4.49 → 8.5.15
+
+**注意**: Tailwind v4 风险大, 强烈建议**单独 sprint 1 周**专门做, 不混入第五批.
 
 #### 5.B.5 jsdom 25 → 29
 - [ ] **5.B.5.1** 升 `jsdom` 25.0.0 → 29.1.1
