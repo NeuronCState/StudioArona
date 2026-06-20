@@ -42,11 +42,30 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ["react", "react-dom", "react-router-dom"],
-          motion: ["framer-motion"],
-          markdown: ["react-markdown", "remark-gfm", "rehype-highlight"],
-          xterm: ["@xterm/xterm", "@xterm/addon-fit"],
+        // Vite 8 + rolldown requires function form (object form is rollup-only)
+        manualChunks: (id: string) => {
+          if (
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/react-dom/") ||
+            id.includes("node_modules/react-router-dom/") ||
+            id.includes("node_modules/scheduler/")
+          ) {
+            return "vendor";
+          }
+          if (id.includes("node_modules/framer-motion/")) {
+            return "motion";
+          }
+          if (
+            id.includes("node_modules/react-markdown/") ||
+            id.includes("node_modules/remark-gfm/") ||
+            id.includes("node_modules/rehype-highlight/")
+          ) {
+            return "markdown";
+          }
+          if (id.includes("node_modules/@xterm/")) {
+            return "xterm";
+          }
+          return undefined;
         },
       },
     },
