@@ -50,7 +50,7 @@
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "stats.js": "^0.17.0",
-    "tailwind-merge": "^2.5.4",
+    "tailwind-merge": "^3.6.0",
     "three": "^0.184.0",
     "twgl.js": "^7.0.0",
     "web-vitals": "^5.3.0",
