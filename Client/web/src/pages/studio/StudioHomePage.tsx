@@ -266,7 +266,13 @@ export function StudioHomePage() {
             aria-hidden={!isDashboard}
             style={{ pointerEvents: focusMode ? "none" : "auto" }}
           >
-            <div className="tile-shell tile-schedule">
+            <motion.div
+              className="tile-shell tile-schedule"
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.4, delay: 0 }}
+            >
               {schedLoading ? (
                 <CardSkeleton variant="list" count={3} />
               ) : schedError ? (
@@ -278,8 +284,14 @@ export function StudioHomePage() {
               ) : (
                 <ScheduleTile events={scheduleEvents} />
               )}
-            </div>
-            <div className="tile-shell tile-weather">
+            </motion.div>
+            <motion.div
+              className="tile-shell tile-weather"
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+            >
               {weatherLoading ? (
                 <CardSkeleton variant="list" count={4} />
               ) : weatherError ? (
@@ -312,8 +324,14 @@ export function StudioHomePage() {
                   </p>
                 </div>
               )}
-            </div>
-            <div className="tile-shell tile-system">
+            </motion.div>
+            <motion.div
+              className="tile-shell tile-system"
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.4, delay: 0.2 }}
+            >
               {vmsLoading ? (
                 <CardSkeleton variant="list" count={3} />
               ) : !vmsOnline ? (
@@ -336,8 +354,14 @@ export function StudioHomePage() {
               ) : (
                 <SystemTile vms={vms ?? []} />
               )}
-            </div>
-            <div className="tile-shell tile-rss">
+            </motion.div>
+            <motion.div
+              className="tile-shell tile-rss"
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.4, delay: 0.3 }}
+            >
               {feedsLoading ? (
                 <CardSkeleton variant="list" count={3} />
               ) : feedsError ? (
@@ -349,7 +373,7 @@ export function StudioHomePage() {
               ) : (
                 <RSSTile items={rssItems} />
               )}
-            </div>
+            </motion.div>
           </div>
 
           {/* Center action button — focus mode 起始点
