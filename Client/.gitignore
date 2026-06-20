@@ -1,3 +1,7 @@
 
 # SonettoHere local Python environment; runtime data rules live in the root ignore file.
 .venv-sonetto/
+
+# Vite/TypeScript auto-generated type declarations (vite.config.d.ts, etc.)
+**/vite.config.d.ts
+**/*.tsbuildinfo

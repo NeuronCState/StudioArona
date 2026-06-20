@@ -489,7 +489,31 @@ npm 上 addon 包最新是 8.6.14 (8.x 末班), 但 `storybook`/`@storybook/reac
 
 **下一步**: 第四批 5.A 低风险 (1 天) — 20 个 dep 升级
 
-### 11.3 第三批计划重做 (2026-06-21 拉网式重扫)
+### 11.4 第五批 5.B 执行 (2026-06-20)
+
+- ✅ 5.B.1 TypeScript 5.6.3 → 6.0.3
+- ✅ 5.B.2 Zod 3.23.8 → 4.4.3
+- ✅ 5.B.3 jsdom 25.0.0 → 29.1.1
+- ✅ 5.B.4 react-markdown 9.0.1 → 10.1.0
+- 🚫 5.B.5 pixi.js 7→8 跳过 (pixi-spine 4.0.6 锁 pixi 7, 等 5.x)
+- ⏸️ 5.B.6 Tailwind 3→4 单独 sprint (风险大, 1 周+)
+
+### 11.5 第五批 5.C.low 执行 (2026-06-21)
+
+- 🚫 5.C.1 Storybook 8→10 跳过 (addon 生态分裂, 单独 sprint)
+- 🚫 5.C.2 Vitest 2→4 跳过 (需 Vite 6, 跟 5.C.3 一起做)
+- ⏸️ 5.C.3 Vite 5→8 单独 sprint (跨 3 major, 1 周+)
+- ✅ 5.C.4 ESLint 9→10 + 配套 (eslint 9.13→10.5, @eslint/js 9→10, eslint-plugin-react-hooks 5→7)
+- ✅ 5.C.5 stylelint 16→17 + config (106 处 rgba→rgb CSS Color L4 自动修)
+- ✅ 5.C.6 tailwind-merge 2.5→3.6
+- ✅ 5.C.7 lucide-react 0.460→1.21 (0.x→1.x 跳大版本, 0 改动)
+- ✅ 5.C.8 reqwest 0.12→0.13 (Rust, 0 代码改动)
+- ✅ Rust 4 patch (serde/serde_json/anyhow/tokio/libc/log/base64): 全部已经是 latest, 0 改动
+
+**剩余独立 sprint**:
+- 5.B.6 Tailwind 3→4 (1 周+, 风险大, 视觉回归全页面)
+- 5.C.1 Storybook 8→10 (1-2 周, addon 生态重做)
+- 5.C.2 + 5.C.3 Vitest 4 + Vite 5→6→7→8 (1 周+, 跨 4 major)
 
 **触发**: 用户要求"用官方 npm 再拉一次所有最新的版本", 发现 plan 调研过期:
 - 8 个新 stable major (TS 6 / Zod 4 / Vite 8 / Vitest 4 / Storybook 10 / lucide-react 1.x / pixi.js 8 / reqwest 0.13) plan 都没列
