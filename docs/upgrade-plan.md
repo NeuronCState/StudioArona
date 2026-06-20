@@ -1,30 +1,96 @@
 # 依赖升级计划
 
 > **目标**: 把 Studio Arona v3 monorepo 的核心前端依赖分批升级到 2026-06 最新稳定版
-> **基线日期**: 2026-06-20
-> **当前状态**: 调研完成，待执行
+> **基线日期**: 2026-06-20 (调研) / **2026-06-21 拉网式重扫**
+> **当前状态**: 第一批 + 第二批已完成, 第三批已重规划
 > **原则**: 分批升、低风险优先、不破坏 Tauri 桌面端构建链路
 
 ---
 
-## 1. 版本基线对比
+## 1. 版本基线对比 (2026-06-21 拉网式重扫)
 
-| 依赖 | 当前版本 | 最新稳定版 | 类型 | 升级风险 |
-|---|---|---|---|---|
-| `@tauri-apps/api` | 2.11.0 | **2.11.1** | patch | 🟢 零 |
-| `@tauri-apps/cli` | (跟随 v2) | **2.11.3** | patch | 🟢 零 |
-| `tailwindcss` | 3.4.14 | **4.3.1** | major | 🟡 中-高 |
-| `react` | 18.3.1 | **19.2.7** | major | 🟡 中 |
-| `react-dom` | 18.3.1 | **19.2.7** | major | 🟡 中 |
-| `vite` | 5.4.11 | **8.0.16** | 3 major | 🔴 高 |
-| `@tanstack/react-query` | 5.60.0 | **5.101.0** | minor | 🟢 低 |
-| `framer-motion` | 11.11.0 | **12.40.0** | major | 🟡 中 |
-| `zustand` | 5.0.0 | **5.0.14** | patch | 🟢 零 |
-| `three` | 0.160.0 | **0.184.0** | 25 minor | 🟡 中-高 |
-| `@react-three/fiber` | 8.17.0 | (跟随 three) | - | 🟡 中 |
-| `@tanstack/react-query` | 5.60.0 | **5.101.0** | minor | 🟢 低 |
+### Frontend npm (Client/web + Client/packages/ui-kit) — 60 个包扫描
 
-**版本数据来源**: `npm view <pkg> version` (2026-06-20)
+| 状态 | 数量 | 工作量 |
+|---|---|---|
+| ✅ 已经是最新 | 18 | 0 |
+| 🟢 Patch 升级 (零风险) | 4 | 几秒 |
+| 🟡 Minor 升级 (低风险) | 16 | 1-2 天 |
+| 🔴 Major 升级 (高风险) | 19 | 1-2 周, 分批 |
+
+#### 🟢 Patch 升级 (4 个)
+| 包 | 当前 | 最新 |
+|---|---|---|
+| `dexie` | 4.4.3 | 4.4.4 |
+| `eslint-plugin-react` | 7.37.2 | 7.37.5 |
+| `rehype-highlight` | 7.0.0 | 7.0.2 |
+| `remark-gfm` | 4.0.0 | 4.0.1 |
+
+#### 🟡 Minor 升级 (16 个, 低风险)
+| 包 | 当前 | 最新 |
+|---|---|---|
+| `@hookform/resolvers` | 5.2.2 | 5.4.0 |
+| `@playwright/test` | 1.48.0 | 1.61.0 |
+| `@storybook/addon-essentials` | 8.4.0 | 8.6.14 |
+| `@storybook/addon-interactions` | 8.4.0 | 8.6.14 |
+| `@storybook/blocks` | 8.4.0 | 8.6.14 |
+| `@testing-library/jest-dom` | 6.6.0 | 6.9.1 |
+| `@types/three` | 0.160.0 | 0.184.1 |
+| `@typescript-eslint/eslint-plugin` | 8.13.0 | 8.61.1 |
+| `@typescript-eslint/parser` | 8.13.0 | 8.61.1 |
+| `autoprefixer` | 10.4.20 | 10.5.0 |
+| `msw` | 2.6.0 | 2.14.6 |
+| `postcss` | 8.4.49 | 8.5.15 |
+| `prettier` | 3.3.3 | 3.8.4 |
+| `react-hook-form` | 7.53.0 | 7.80.0 |
+| `three` | 0.160.0 | 0.184.0 |
+| `typescript-eslint` | 8.59.4 | 8.61.1 |
+| `web-vitals` | 5.2.0 | 5.3.0 |
+
+#### 🔴 Major 升级 (19 个, 高风险, 1-2 周)
+| 包 | 当前 | 最新 | 备注 |
+|---|---|---|---|
+| **`typescript`** | 5.6.3 | **6.0.3** | TS 6 stable (plan 调研时可能刚出) |
+| **`zod`** | 3.23.8 | **4.4.3** | zod 4 stable (plan 漏) |
+| **`tailwindcss`** | 3.4.14 | **4.3.1** | plan §5.1 已列 |
+| **`vite`** | 5.4.11 | **8.0.16** | plan §5.3 "不推荐"已 outdated — Vite 8 已是 official latest |
+| **`vitest`** | 2.1.4 | **4.1.9** | 跨 2 major (plan 漏) |
+| **`storybook`** | 8.4.0 | **10.4.6** | 跨 2 major (plan 漏) |
+| **`lucide-react`** | 0.460.0 | **1.21.0** | 0.x→1.x (plan 漏) |
+| **`pixi.js`** | 7.4.3 | **8.19.0** | 跨 1 major (plan 漏) |
+| **`react-markdown`** | 9.0.1 | **10.1.0** | plan 漏 |
+| `jsdom` | 25.0.0 | 29.1.1 | plan 漏 |
+| `eslint` | 9.13.0 | 10.5.0 | plan 漏 |
+| `@eslint/js` | 9.39.4 | 10.0.1 | plan 漏 |
+| `eslint-plugin-react-hooks` | 5.0.0 | 7.1.1 | plan 漏 |
+| `stylelint` | 16.10.0 | 17.13.0 | plan 漏 |
+| `stylelint-config-standard` | 36.0.1 | 40.0.0 | plan 漏 |
+| `stylelint-config-tailwindcss` | 0.0.7 | 1.0.1 | plan 漏 |
+| `tailwind-merge` | 2.5.4 | 3.6.0 | plan 漏 |
+| `@vitejs/plugin-react` | 4.3.4 | 6.0.2 | plan 漏 |
+| `@storybook/react` + `@storybook/react-vite` | 8.4.0 | 10.4.6 | plan 漏 |
+
+#### ✅ 已经是最新 (18 个, 0 工作)
+`@axe-core/playwright`, `@react-three/drei`, `@react-three/fiber`, `@tanstack/react-query`, `@tauri-apps/api`, `@tauri-apps/plugin-dialog/fs`, `@testing-library/react/user-event`, `@types/react/react-dom`, `@xterm/*`, `clsx`, `dexie-react-hooks`, `framer-motion`, `highlight.js`, `pixi-spine`, `react`, `react-dom`, `react-router-dom`, `rollup-plugin-visualizer`, `stats.js`, `twgl.js`, `zustand`, `fake-indexeddb`
+
+### 🦀 Rust crate (Client/tauri/Cargo.toml) — 16 个扫描
+
+| crate | Cargo.toml | crates.io latest | 状态 |
+|---|---|---|---|
+| `tauri` | "2" → lock 2.11.2 | **2.11.3** | patch outdated |
+| `tauri-build` | "2" → lock 2.6.2 | **2.6.3** | patch outdated |
+| `tauri-plugin-shell/dialog/notification/log/fs` | "2" | 各自 latest | ✅ |
+| **`reqwest`** | "0.12" | **0.13.4** | 🔴 minor outdated, breaking |
+| `serde` | "1" | 1.0.228 | patch outdated |
+| `serde_json` | "1" | 1.0.150 | patch outdated |
+| `anyhow` | "1" | 1.0.102 | patch outdated |
+| `tokio` | "1" | 1.52.3 | patch outdated |
+| `libc` | "0.2" | 0.2.186 | patch outdated |
+| `log` | "0.4" | 0.4.32 | patch outdated |
+| `base64` | "0.22" | 0.22.1 | patch outdated |
+| `open` | "5" | 5.3.5 | ✅ |
+
+**版本数据来源**: `npm view <pkg> version` (官方源 registry.npmjs.org, 2026-06-21) + `crates.io API`
 
 ---
 
@@ -116,67 +182,140 @@
 
 ---
 
-## 5. 第三批: 重活 (强烈建议单独立项)
+## 5. 第三批: 重做规划 (基于 2026-06-21 拉网式重扫)
+
+> **风险等级**: 🟢🟡🔴 视子批而定
+> **前置条件**: 第二批完成并合并
+> **建议**: 拆 3 个子批, 每批独立验证
+
+### 5.0 决策重做 (plan 调研过期)
+
+**原 plan (2026-06-20) 漏了**:
+1. **TypeScript 6.0.3** 已 stable (TS 6 是 2026-06 最新, plan 调研时可能刚出)
+2. **Zod 4.4.3** 已 stable (跨 1 major, zod 4 是 stable)
+3. **Vite 8.0.16** 已 stable (plan §5.3 写"Vite 8 还在跟进" — **已 outdated**, Vite 8 已是 official latest)
+4. **Vitest 4.1.9** 已 stable (跨 2 major)
+5. **Storybook 10.4.6** 已 stable (跨 2 major)
+6. **lucide-react 1.21.0** 已 stable (0.x→1.x 跳大版本)
+7. **pixi.js 8.19.0** 已 stable
+8. **reqwest 0.13.4** 已 stable (Rust, 0.12→0.13 跨 minor, breaking)
+
+**plan 旧决策"Vite 8 暂不升"已过时** — 重做: Vite 8 已经是 latest, Tauri v2 CLI 对 Vite 8 的支持应该已跟进 (待验证). 决定权交给用户.
+
+### 5.A 第四批: 低风险 (1 天) — 建议立即做
+
+> **风险等级**: 🟢 零
+> **目标**: 0 + 4 + 16 = 20 个 dep 升级
+> **前置条件**: 第二批已合
+
+#### 5.A.1 npm patch + minor (20 个)
+- [ ] **5.A.1.1** 4 个 patch: `dexie` `eslint-plugin-react` `rehype-highlight` `remark-gfm`
+- [ ] **5.A.1.2** 16 个 minor: 全部列在 §1 表格"🟡 Minor 升级"里 (含 `three 0.160→0.184` + `@types/three 0.160→0.184.1`)
+- [ ] **5.A.1.3** `pnpm install` 重生 lockfile
+- [ ] **5.A.1.4** `pnpm check` 全过
+- [ ] **5.A.1.5** `pnpm tauri build --debug` 验证 (尤其 three 0.184 + R3F 9 兼容性)
+- [ ] **5.A.1.6** commit + push
+
+#### 5.A.2 Rust patch (2 个)
+- [ ] **5.A.2.1** `cd Client/tauri && cargo update -p tauri -p tauri-build` 拉 2.11.3 + 2.6.3
+- [ ] **5.A.2.2** tauri build --debug 验证 (patch 级, 0 风险)
+
+### 5.B 第五批: 中风险 (3-5 天) — 含 plan §5.1 + 新发现
+
+> **风险等级**: 🟡 中
+> **目标**: 6 个 major (含 Tailwind v4, 跳过 lucide-react 0→1 等高影响)
+> **建议**: 每个 major 单独 commit, 独立验证
+
+#### 5.B.1 TypeScript 5 → 6
+- [ ] **5.B.1.1** 升 `typescript` 5.6.3 → 6.0.3
+- [ ] **5.B.1.2** 跑 tsc 看新增错误
+- [ ] **5.B.1.3** 修 TS 6 breaking (主要: `lib.d.ts` 改, 一些 type 重命名)
+- [ ] **5.B.1.4** 全套 typecheck + build
+
+#### 5.B.2 Zod 3 → 4
+- [ ] **5.B.2.1** 升 `zod` 3.23.8 → 4.4.3
+- [ ] **5.B.2.2** 修 zod 4 breaking (主要: `z.string().email()` 等 API 改, `z.infer` 行为变化)
+- [ ] **5.B.2.3** 检查项目内所有 `z.` 调用
+
+#### 5.B.3 Tailwind CSS 3 → 4 (plan §5.1 原样)
+- [ ] **5.B.3.1** 升级 `tailwindcss` 到 `^4.3.1`
+- [ ] **5.B.3.2** 安装新 PostCSS 插件: `@tailwindcss/postcss`
+- [ ] **5.B.3.3** **删除** `tailwind.config.ts`
+- [ ] **5.B.3.4** 迁移主题配置到 CSS 文件
+- [ ] **5.B.3.5** 改 `postcss.config.js` 用 `@tailwindcss/postcss`
+- [ ] **5.B.3.6** 检查所有 `@apply` 语法 (v3 用法 v4 不支持)
+- [ ] **5.B.3.7** 检查 dark mode 配置 (v4 改用 `@variant dark (...)`)
+- [ ] **5.B.3.8** 视觉回归测试 — 所有页面
+- [ ] **5.B.3.9** Storybook 重新跑
+
+#### 5.B.4 pixi.js 7 → 8
+- [ ] **5.B.4.1** 升 `pixi.js` 7.4.3 → 8.19.0
+- [ ] **5.B.4.2** 检查 `pixi-spine` 兼容性 (pixi-spine 4.0.6 是否跟 pixi 8 兼容)
+- [ ] **5.B.4.3** 修 pixi 8 API breaking (主要: DisplayObject API 改, 事件系统重写)
+- [ ] **5.B.4.4** 视觉回归: 任何用 pixi 的页面
+
+#### 5.B.5 jsdom 25 → 29
+- [ ] **5.B.5.1** 升 `jsdom` 25.0.0 → 29.1.1
+- [ ] **5.B.5.2** 跑 vitest 验证
+
+#### 5.B.6 react-markdown 9 → 10
+- [ ] **5.B.6.1** 升 `react-markdown` 9.0.1 → 10.1.0
+- [ ] **5.B.6.2** 检查项目内 markdown 渲染
+
+### 5.C 第六批: 高风险 (1 周+) — 重做决策
 
 > **风险等级**: 🔴 高
-> **预估工作量**: 1-2 周
-> **前置条件**: 第二批完成并稳定运行 ≥ 1 周
-> **建议**: 每个子项单独 PR, 独立验证
+> **目标**: 11 个 major (Storybook 10 + Vitest 4 + Vite 8 + ESLint 10 + stylelint 17 + 等)
+> **建议**: 独立 sprint, 每个子项单独 PR
 
-### 5.1 Tailwind CSS 3 → 4
-- [ ] **5.1.1** 升级 `tailwindcss` 到 `^4.3.1`
-- [ ] **5.1.2** 安装新 PostCSS 插件: `@tailwindcss/postcss`
-- [ ] **5.1.3** **删除** `tailwind.config.js`
-- [ ] **5.1.4** 迁移主题配置到 CSS 文件 (`src/styles/index.css`):
-  ```css
-  @import "tailwindcss";
-  @theme {
-    --color-primary: ...;
-    --font-sans: ...;
-  }
-  ```
-- [ ] **5.1.5** 改 `postcss.config.js`:
-  ```js
-  module.exports = {
-    plugins: { '@tailwindcss/postcss': {} }
-  }
-  ```
-- [ ] **5.1.6** 检查所有 `@apply` 语法 (部分 v3 用法 v4 不支持)
-- [ ] **5.1.7** 检查所有自定义 class 命名约定 (v4 默认排除)
-- [ ] **5.1.8** 检查 dark mode 配置 (v4 改用 `@variant dark (...)`)
-- [ ] **5.1.9** 视觉回归测试 — 所有页面
-- [ ] **5.1.10** Storybook 重新跑: `pnpm storybook`
+#### 5.C.1 Storybook 8 → 10 (跨 2 major) — **必须升级以匹配 React 19 / 第三方**
+- [ ] **5.C.1.1** 升 `storybook` 8.4.0 → 10.4.6
+- [ ] **5.C.1.2** 同步升 `@storybook/*` 全部 6 个
+- [ ] **5.C.1.3** 检查 Storybook config 兼容性 (v9/v10 breaking)
+- [ ] **5.C.1.4** 跑 `pnpm storybook` 验证
 
-### 5.2 Three.js 0.160 → 0.184 (分两次)
-- [ ] **5.2.1** 第一阶段: 0.160 → 0.170
-  - 升级 `three` 到 `^0.170.0`
-  - 升级 `@react-three/fiber` 到对应版本
-  - 升级 `@react-three/drei` 到对应版本
-  - 跑 AronaModel/ClassroomScene 验证
-- [ ] **5.2.2** 第二阶段: 0.170 → 0.184
-  - 升级 `three` 到 `^0.184.0`
-  - 同步升级 R3F + drei
-  - 跑 AronaModel/ClassroomScene 验证
-  - 性能基准对比 (FPS, 内存)
-- [ ] **5.2.3** 视觉回归 + 性能回归
-- [ ] **5.2.4** 更新 Three.js 文档/API 注释
+#### 5.C.2 Vitest 2 → 4 (跨 2 major)
+- [ ] **5.C.2.1** 升 `vitest` 2.1.4 → 4.1.9
+- [ ] **5.C.2.2** 升 `@vitest/*` 相关 (如果用)
+- [ ] **5.C.2.3** 跑全套测试
 
-### 5.3 Vite 5 → 8 (慎重考虑)
-- [ ] **5.3.1** **决策点**: 是否真的需要 Vite 8?
-  - 当前 Vite 5.4 已支持所有用到的功能
-  - 升 Vite 8 必须经过 v6 (SSR API 改) + v7 (砍 legacy) + v8
-  - Tauri v2 CLI 对 Vite 8 的支持还在跟进
-- [ ] **5.3.2** (如决定升) 升级到 Vite 6:
-  - 处理 SSR API breaking
-  - 处理 `import.meta.url` 行为变化
-- [ ] **5.3.3** 升级到 Vite 7:
-  - 处理 legacy module graph 移除
-  - 处理 css.devSourcemap 配置
-- [ ] **5.3.4** 升级到 Vite 8:
-  - 处理 build target 默认值变化
-  - 处理 HMR API 改
-- [ ] **5.3.5** 验证 Tauri `beforeDevCommand` / `beforeBuildCommand` 路径
-- [ ] **5.3.6** 验证生产构建产物体积、构建时间
+#### 5.C.3 Vite 5 → 8 (重做决策) — **待用户拍板**
+- [ ] **5.C.3.1** **决策点**: Vite 8 现在是 official latest, 是否升?
+  - **支持升**: Vite 8 已 stable, 性能/特性更好, 长期维护角度应该升
+  - **反对升**: 跨 3 major 工作量大, 项目当前 Vite 5 工作良好
+  - **建议**: 升 (配合 Storybook 10 / Vitest 4 一起做, 避免多次 breaking)
+- [ ] **5.C.3.2** (如决定升) 升 Vite 5 → 6 → 7 → 8 逐步
+  - Vite 6: SSR API breaking, `import.meta.url` 行为变化
+  - Vite 7: legacy module graph 移除, css.devSourcemap 配置
+  - Vite 8: build target 默认值变化, HMR API 改
+- [ ] **5.C.3.3** 同步升 `@vitejs/plugin-react` 4 → 6
+- [ ] **5.C.3.4** 验证 Tauri `beforeDevCommand` / `beforeBuildCommand` 路径
+- [ ] **5.C.3.5** 验证生产构建产物体积、构建时间
+
+#### 5.C.4 ESLint 9 → 10 + 配套
+- [ ] **5.C.4.1** 升 `eslint` 9.13.0 → 10.5.0
+- [ ] **5.C.4.2** 升 `@eslint/js` 9 → 10
+- [ ] **5.C.4.3** 升 `eslint-plugin-react-hooks` 5.0.0 → 7.1.1
+- [ ] **5.C.4.4** 处理 ESLint 10 flat config 改
+
+#### 5.C.5 stylelint 16 → 17 + config
+- [ ] **5.C.5.1** 升 `stylelint` 16.10.0 → 17.13.0
+- [ ] **5.C.5.2** 升 `stylelint-config-standard` 36 → 40
+- [ ] **5.C.5.3** 升 `stylelint-config-tailwindcss` 0.0.7 → 1.0.1
+- [ ] **5.C.5.4** 验证 lint:style
+
+#### 5.C.6 tailwind-merge 2 → 3
+- [ ] **5.C.6.1** 升 `tailwind-merge` 2.5.4 → 3.6.0
+- [ ] **5.C.6.2** 验证 utility 合并逻辑 (v3 API 改)
+
+#### 5.C.7 lucide-react 0 → 1 (0.x→1.x, 跳大版本)
+- [ ] **5.C.7.1** 升 `lucide-react` 0.460.0 → 1.21.0
+- [ ] **5.C.7.2** 检查 icon name 变化 (lucide v1 重组了一些 icon)
+
+#### 5.C.8 reqwest 0.12 → 0.13 (Rust)
+- [ ] **5.C.8.1** 升 `reqwest` 0.12 → 0.13.4
+- [ ] **5.C.8.2** 检查 API breaking (reqwest 0.13 重写了 client builder)
+- [ ] **5.C.8.3** tauri build 验证
 
 ---
 
@@ -184,12 +323,14 @@
 
 | ❌ 不要 | 原因 |
 |---|---|
-| **Tauri v3** | 还在 alpha/beta, 2026 Q3 才 stable, 你 v3 monorepo 够用 |
-| **Vite 一锅跳 8** | 中间 v6/v7 两次 breaking, 没意义地做两遍工 |
-| **Three.js 一次跳 25 minor** | API surface 太大, 容易出回归 |
+| **Tauri v3** | 2026-06-21 重测: npm/crates.io 仍无 3.x 发布, Q3 才 stable. v2 monorepo 够用 |
 | **批量混合升级** | 出问题难定位, 必须分批 |
 | **跳过视觉回归** | 3D / 动画 / 主题类升级必须看效果 |
 | **生产环境 hot upgrade** | 必须本地 dev 充分测试, 走 PR + CI 流程 |
+
+**plan §6 旧条目已删**:
+- ~~"Vite 一锅跳 8"~~ — Vite 8 已是 official latest, 应升 (v5→v6→v7→v8 逐步), 不再"一锅跳"
+- ~~"Three.js 一次跳 25 minor"~~ — 第四批 minor 升级会一次升 0.160→0.184, 因为 R3F 9 + drei 10 已支持, 风险可接受
 
 ---
 
@@ -224,11 +365,13 @@
 
 ## 9. 时间线估算
 
-| 批次 | 工作量 | 建议时机 |
-|---|---|---|
-| 第一批 | 10 分钟 + CI 验证 | 立即 |
-| 第二批 | 1-2 天 | 下个 sprint |
-| 第三批 | 1-2 周 | 单独立项, 不混入功能 sprint |
+| 批次 | 工作量 | 状态 | 建议时机 |
+|---|---|---|---|
+| 第一批 (patch 零风险) | 10 分钟 + CI | ✅ 已完成 (2026-06-20) | - |
+| 第二批 (React 19 + Framer 12 + R3F 9) | 1-2 天 | ✅ 已完成 (2026-06-20) | - |
+| 第四批 (5.A: 4 patch + 16 minor + 2 Rust patch) | 1 天 | 🟡 待执行 | 立即 |
+| 第五批 (5.B: 6 个中风险 major) | 3-5 天 | 🟡 待执行 | 本周内 |
+| 第六批 (5.C: 11 个高风险 major) | 1 周+ | 🟡 待执行 (重做决策) | 独立 sprint |
 
 ---
 
@@ -314,5 +457,25 @@
 - 总大小: 第一批 ~1132 kB → 第二批 ~1213 kB (+7%, 略超 plan 5% 阈值, 但能接受)
 - 增长主要来自 React 19 dev runtime + motion v12 + R3F 9
 
-**下一步**: 第三批 Tailwind v4 + Three.js 0.184 (1-2 周)
+**下一步**: 第四批 5.A 低风险 (1 天) — 20 个 dep 升级
+
+### 11.3 第三批计划重做 (2026-06-21 拉网式重扫)
+
+**触发**: 用户要求"用官方 npm 再拉一次所有最新的版本", 发现 plan 调研过期:
+- 8 个新 stable major (TS 6 / Zod 4 / Vite 8 / Vitest 4 / Storybook 10 / lucide-react 1.x / pixi.js 8 / reqwest 0.13) plan 都没列
+- "Vite 8 暂不升"决策已 outdated (Vite 8 现在是 official latest, Tauri 2.11.3 应该已跟进支持)
+
+**重规划**: 原第三批拆为 5.A (低) / 5.B (中) / 5.C (高) 三个子批, 每批独立 sprint 验证
+
+**新发现的高价值升级**:
+1. TypeScript 6 (TS 6.0.3 已 stable) — 必须升
+2. Zod 4 (4.4.3 已 stable) — 必须升
+3. Vite 8 (8.0.16 已 stable) — 重做决策, 建议升
+4. Storybook 10 (10.4.6 已 stable) — 配合 React 19 必须升
+5. Vitest 4 (4.1.9 已 stable) — 跨 2 major
+6. lucide-react 1.x (0.x→1.x) — 跳大版本
+
+**待用户决策**:
+- Vite 5→8 升不升 (plan 旧决策"不推荐"已 outdated, 重做)
+- 第四批是否立即做 (4 patch + 16 minor, 1 天, 低风险)
 
