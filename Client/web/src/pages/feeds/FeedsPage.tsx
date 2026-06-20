@@ -140,6 +140,14 @@ export function FeedsPage() {
       setNewUrl("");
       setNewTitle("");
     },
+    onError: (e) => {
+      const msg = (e as Error).message ?? "";
+      if (msg.includes("offline") || msg.includes("not in online mode")) {
+        addToast("服务器未连接，网页监控需要服务在线", "warn");
+      } else {
+        addToast(`添加失败: ${msg}`, "error");
+      }
+    },
   });
 
   const deleteFeedMutation = useMutation({
@@ -155,7 +163,12 @@ export function FeedsPage() {
       addToast(`已刷新: 新增 ${data.inserted} 条`, "info");
     },
     onError: (e) => {
-      addToast(`刷新失败: ${(e as Error).message}`, "error");
+      const msg = (e as Error).message ?? "";
+      if (msg.includes("offline") || msg.includes("not in online mode")) {
+        addToast("服务器未连接，刷新需要服务在线", "warn");
+      } else {
+        addToast(`刷新失败: ${msg}`, "error");
+      }
     },
   });
 
@@ -229,7 +242,7 @@ export function FeedsPage() {
               </div>
             </div>
           </FadeIn>
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-6 grid grid-cols-1 gap-4 @2xl:grid-cols-2 @5xl:grid-cols-3">
             {[1, 2, 3, 4].map((i) => (
               <Skeleton key={i} variant="rect" height={100} />
             ))}
@@ -359,7 +372,7 @@ export function FeedsPage() {
         {/* Unified list — RSS 用轻量卡片, page monitor 用 PageMonitorCard (含状态 + 编辑) */}
         {unified.length > 0 ? (
           <StaggerList
-            className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            className="grid grid-cols-1 gap-4 @2xl:grid-cols-2 @5xl:grid-cols-3"
             staggerKey="list"
           >
             {unified.map((item) => (

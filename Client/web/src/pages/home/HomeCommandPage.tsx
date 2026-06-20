@@ -160,7 +160,7 @@ export function HomeCommandPage() {
   >("idle");
 
   return (
-    <div className="arona-page min-h-full overflow-hidden bg-[var(--color-bg)] p-4 sm:p-6 lg:p-8">
+    <div className="arona-page @container min-h-full overflow-hidden bg-[var(--color-bg)] p-4 sm:p-6 lg:p-8">
       <HomeAmbient />
 
       <div className="relative mx-auto flex max-w-[1480px] flex-col gap-5">
@@ -194,7 +194,7 @@ export function HomeCommandPage() {
         </section>
 
         <section
-          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"
+          className="grid gap-3 @2xl:grid-cols-2 @7xl:grid-cols-6"
           aria-label={t("home.command.quickActions.aria")}
         >
           {QUICK_ACTION_KEYS.map(
@@ -239,7 +239,7 @@ export function HomeCommandPage() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-5 grid gap-2 @3xl:grid-cols-2 @7xl:grid-cols-4">
             {TIMELINE_KEYS.map((item, idx) => (
               <div
                 key={`${item.event}-${idx}`}

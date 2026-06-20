@@ -200,7 +200,7 @@ export function AgentConfigPage() {
       </div>
     );
   return (
-    <div className="studio-page mx-auto min-h-full max-w-6xl px-6 py-6">
+    <div className="studio-page @container mx-auto min-h-full max-w-6xl px-6 py-6">
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-medium uppercase text-stone-400">Agent</p>
@@ -1058,7 +1058,7 @@ function McpPanel({
           </div>
         ))}
       </Rows>
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
+      <div className="mt-5 grid gap-3 @md:grid-cols-2">
         <Field label="名称">
           <input
             className={inputClass}

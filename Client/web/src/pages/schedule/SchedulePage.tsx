@@ -355,7 +355,7 @@ export function SchedulePage() {
   const grouped = events ? groupByDate(events) : {};
 
   return (
-    <div className="studio-page mx-auto max-w-5xl space-y-6 p-6">
+    <div className="studio-page @container mx-auto max-w-5xl space-y-6 p-6">
       {isOffline ? (
         <OfflineBanner
           message="未连接 server, 显示本地日程数据"

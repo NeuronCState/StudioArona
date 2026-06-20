@@ -109,13 +109,13 @@ export function SharedPage() {
   });
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="@container mx-auto max-w-4xl space-y-6">
       <h2 className="text-lg font-semibold text-text-primary">共享信息源</h2>
 
       {/* Permission legend — always visible (结构骨架), 不受 loading 影响 */}
       <div className="card space-y-3">
         <h3 className="text-sm font-medium text-text-primary">编辑权限</h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 @xs:grid-cols-3">
           {Object.values(permissionMap).map((perm) => (
             <div
               key={perm.level}
@@ -232,7 +232,7 @@ export function SharedPage() {
         {feedsLoading ? (
           <CardSkeleton variant="grid" count={3} />
         ) : feeds && feeds.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2 @5xl:grid-cols-3">
             {feeds.map((feed) => {
               const perm = feedPermissions[feed.id] ?? "public";
               const pInfo = permissionMap[perm];

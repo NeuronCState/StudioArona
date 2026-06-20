@@ -143,7 +143,7 @@ export function PersonalSettingsPage() {
       };
 
   return (
-    <div className="studio-page mx-auto min-h-full max-w-6xl px-5 py-6 md:px-8 md:py-8">
+    <div className="studio-page @container mx-auto min-h-full max-w-6xl px-5 py-6 md:px-8 md:py-8">
       <header className="mb-8 flex items-center gap-4 border-b border-[var(--color-border)] pb-6">
         <Avatar
           src={avatarUrl}
@@ -208,7 +208,7 @@ export function PersonalSettingsPage() {
                   title="个人资料"
                   description="用于 Studio Arona 中的账户显示。"
                 >
-                  <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="grid gap-5 @2xl:grid-cols-2">
                     <SettingField label="用户名">
                       <input
                         className={fieldClass}

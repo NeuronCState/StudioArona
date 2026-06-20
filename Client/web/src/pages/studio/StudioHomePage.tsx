@@ -262,9 +262,9 @@ export function StudioHomePage() {
           data-phase={phase}
         >
           <div
-            className="tile-layer"
+            className="tile-layer inert:opacity-40 inert:pointer-events-none"
+            inert={focusMode}
             aria-hidden={!isDashboard}
-            style={{ pointerEvents: focusMode ? "none" : "auto" }}
           >
             <motion.div
               className="tile-shell tile-schedule"

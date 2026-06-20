@@ -20,7 +20,7 @@ function VmListSkeleton() {
         <Skeleton width={100} height={24} />
         <Skeleton width={100} height={36} />
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2">
         {[1, 2, 3, 4].map((i) => (
           <Skeleton key={i} variant="rect" height={100} />
         ))}
@@ -126,7 +126,7 @@ export function VmsPage() {
         </Drawer>
 
         {vms && vms.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2">
             {vms.map((vm) => (
               <div
                 key={vm.id}

@@ -1,7 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
-import { isOfflineError } from "@/lib/api/error-helpers";
+/**
+ * SystemPage — react-query v5 useSuspenseQuery + ErrorBoundary 模式。
+ *
+ * 迁移自 useQuery + 手动 isPending/isError 分支:
+ *   - useSuspenseQuery 保证 data 非空 (否则 throw promise → Suspense)
+ *   - ErrorBoundary 捕获 query error → 显示 CardError
+ *   - 消除组件内的 loading/error 分支, 渲染路径更纯粹
+ */
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api/client";
-import { useLocalResource } from "@/lib/storage/useLocalResource";
 import type { SystemMetrics, NetworkDevice } from "@/types/contracts";
 import { CpuGrid } from "./CpuGrid";
 import { GpuCard } from "./GpuCard";
@@ -11,7 +17,6 @@ import { NetworkTable } from "./NetworkTable";
 import { MetricsRing } from "./MetricsRing";
 import { BarChartSimple } from "./BarChartSimple";
 import { CronStatusCard, type CronStatus } from "./CronStatusCard";
-import { Skeleton, CardError } from "@javis/ui-kit";
 import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PageLayout } from "@/components/layout/PageLayout";
@@ -28,79 +33,31 @@ function usePageVisible() {
   return visible;
 }
 
-function SystemSkeleton() {
-  return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <Skeleton width={120} height={24} />
-        <Skeleton width={60} height={20} />
-      </div>
-      <div className="card">
-        <div className="flex flex-wrap items-center justify-center gap-8">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} variant="circle" width={80} height={80} />
-          ))}
-        </div>
-      </div>
-      <div className="card space-y-3">
-        <Skeleton width={140} height={16} />
-        <div className="flex items-end gap-2">
-          {Array.from({ length: 16 }).map((_, i) => (
-            <Skeleton key={i} width={24} height={80} />
-          ))}
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Skeleton variant="rect" height={80} />
-        <Skeleton variant="rect" height={80} />
-      </div>
-    </div>
-  );
-}
-
 export function SystemPage() {
   const pageVisible = usePageVisible();
 
-  // 系统指标只读：本地缓存立即展示，在线时按可见状态轮询刷新。
-  const localMetrics = useLocalResource<SystemMetrics & { id: string }>({
-    table: "system",
-    queryKey: ["system-metrics", "local"],
-    serverList: () =>
+  // useSuspenseQuery: data is guaranteed non-null (throw → parent Suspense).
+  // React 19 <Suspense> is already set up in App.tsx around AppRoutes.
+  const { data: wrapped, refetch: refetchMetrics } = useSuspenseQuery({
+    queryKey: ["system-metrics", "suspense"],
+    queryFn: () =>
       api
         .get<SystemMetrics>("/system/metrics")
-        .then((m) => [{ ...m, id: "singleton" }]),
+        .then((m) => ({ ...m, id: "singleton" })),
     refetchInterval: pageVisible ? 5000 : false,
   });
+  const metrics = wrapped!;
 
-  const { isLoading, isError, error, refetch } = localMetrics.query;
-  const metrics = localMetrics.data?.[0];
-
-  const { data: devices } = useQuery({
+  const { data: devices } = useSuspenseQuery({
     queryKey: ["network-devices"],
     queryFn: () => api.get<NetworkDevice[]>("/network/devices"),
   });
 
-  const { data: cronStatus } = useQuery({
+  const { data: cronStatus } = useSuspenseQuery({
     queryKey: ["cron-status"],
     queryFn: () => api.get<{ crons: CronStatus[] }>("/system/cron-status"),
     refetchInterval: 30_000,
   });
-
-  if (isLoading) {
-    return <SystemSkeleton />;
-  }
-
-  if (isError || !metrics) {
-    return (
-      <div className="mx-auto max-w-5xl p-6">
-        <CardError
-          offline={isOfflineError(error)}
-          message={error?.message ?? "无法加载系统指标"}
-          onRetry={() => refetch()}
-        />
-      </div>
-    );
-  }
 
   const cpuAvg = Math.round(
     metrics.cpu_cores.reduce((a, c) => a + c.util_pct, 0) /
@@ -116,7 +73,7 @@ export function SystemPage() {
       title="硬件监控"
       action={
         <button
-          onClick={() => refetch()}
+          onClick={() => refetchMetrics()}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text-secondary)] transition-colors"
         >
           <RefreshCw size={12} />
@@ -124,10 +81,9 @@ export function SystemPage() {
         </button>
       }
     >
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 @5xl:grid-cols-3">
         {/* Left: 2/3 — charts */}
         <div className="space-y-6 lg:col-span-2">
-          {/* Metrics rings */}
           <div className="card">
             <div className="flex flex-wrap items-center justify-center gap-8">
               <MetricsRing value={cpuAvg} max={100} label="CPU" unit="%" />
@@ -153,7 +109,6 @@ export function SystemPage() {
             </div>
           </div>
 
-          {/* CPU bar chart */}
           <div className="card">
             <h3 className="mb-3 text-sm font-medium text-[var(--color-text-primary)]">
               CPU 核心利用率
@@ -168,22 +123,19 @@ export function SystemPage() {
             />
           </div>
 
-          {/* GPU cards */}
           {hasGpu && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2">
               {metrics.gpus.map((gpu, i) => (
                 <GpuCard key={i} gpu={gpu} />
               ))}
             </div>
           )}
 
-          {/* CPU grid */}
           {metrics.cpu_cores && <CpuGrid cores={metrics.cpu_cores} />}
         </div>
 
         {/* Right: 1/3 — summary + network */}
         <div className="space-y-6">
-          {/* Memory + disks */}
           <MemoryBar
             label="内存"
             used={metrics.mem_used_mb}
@@ -200,15 +152,12 @@ export function SystemPage() {
             />
           ))}
 
-          {/* Training jobs */}
           {metrics.training_jobs && metrics.training_jobs.length > 0 && (
             <TrainingTable jobs={metrics.training_jobs} />
           )}
 
-          {/* Network devices */}
           {devices && <NetworkTable devices={devices} />}
 
-          {/* Cron status (P2 #28) */}
           {cronStatus && <CronStatusCard crons={cronStatus.crons} />}
         </div>
       </div>

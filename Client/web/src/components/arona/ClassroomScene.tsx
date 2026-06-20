@@ -1,6 +1,6 @@
 import { Suspense, useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useGLTF, Float, Environment } from "@react-three/drei";
 
 // ── Configure Draco decoder (called once on first use) ──
 let _dracoReady = false;
@@ -11,40 +11,30 @@ function ensureDracoDecoder() {
   (useGLTF as any).setDecoderPath("/draco/");
 }
 
-// ── Dynamic Sun ──
-function sunForTime(time: "day" | "night") {
-  return time === "day"
-    ? {
-        position: [8, 12, 4] as [number, number, number],
-        color: "#fff5e6",
-        intensity: 1.2,
-        ambientColor: "#b8d4f0",
-        ambientIntensity: 0.4,
-        skyColor: "#87CEEB",
-      }
-    : {
-        position: [3, 2, -4] as [number, number, number],
-        color: "#8899cc",
-        intensity: 0.15,
-        ambientColor: "#1a1a3e",
-        ambientIntensity: 0.08,
-        skyColor: "#0d0d2b",
-      };
-}
+// ── Lighting rig (drei <Environment> + legacy directional for shadows) ──
+// <Environment> replaces ambientLight — HDR-based ambient provides natural
+// color bleeding and diffuse lighting. directionalLight kept for sharp sun
+// shadows that Environment presets don't generate.
+function SceneLighting({ time }: { time: "day" | "night" }) {
+  const bg = time === "day" ? "#87CEEB" : "#0d0d2b";
+  const envPreset = time === "day" ? "sunset" as const : "night" as const;
+  const sun = time === "day"
+    ? { position: [8, 12, 4] as const, color: "#fff5e6", intensity: 1.0 }
+    : { position: [3, 2, -4] as const, color: "#8899cc", intensity: 0.12 };
 
-function DynamicSun({ time }: { time: "day" | "night" }) {
-  const target = useMemo(() => sunForTime(time), [time]);
   return (
     <>
-      <color attach="background" args={[target.skyColor]} />
-      <ambientLight
-        color={target.ambientColor}
-        intensity={target.ambientIntensity}
+      <color attach="background" args={[bg]} />
+      {/* HDR environment for natural ambient + reflections */}
+      <Environment
+        preset={envPreset}
+        environmentIntensity={time === "day" ? 0.5 : 0.15}
       />
+      {/* Directional sun for sharp shadows (Environment doesn't cast shadows) */}
       <directionalLight
-        position={target.position}
-        color={target.color}
-        intensity={target.intensity}
+        position={sun.position}
+        color={sun.color}
+        intensity={sun.intensity}
         castShadow
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
@@ -56,6 +46,31 @@ function DynamicSun({ time }: { time: "day" | "night" }) {
         shadow-camera-bottom={-15}
       />
     </>
+  );
+}
+
+// ── Floating Sun Orb (drei <Float>) ──
+function SunOrb({ time }: { time: "day" | "night" }) {
+  const color = time === "day" ? "#fff5e6" : "#8899cc";
+  const intensity = time === "day" ? 1.4 : 0.3;
+  return (
+    <Float
+      speed={0.5}
+      rotationIntensity={0.2}
+      floatIntensity={0.3}
+      floatingRange={[0, 0.3]}
+    >
+      <mesh position={[4, 3, -2]}>
+        <sphereGeometry args={[0.15, 16, 16]} />
+        <meshStandardMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={intensity}
+          transparent
+          opacity={0.9}
+        />
+      </mesh>
+    </Float>
   );
 }
 
@@ -71,9 +86,15 @@ function GLBScene({ time }: { time: "day" | "night" }) {
 
   return (
     <>
-      <primitive object={dayClone} visible={time === "day"} />
-      <primitive object={nightClone} visible={time === "night"} />
-      <DynamicSun time={time} />
+      {/* Classroom models with subtle Float for breathing effect */}
+      <Float speed={0.3} rotationIntensity={0.05} floatIntensity={0.08}>
+        <primitive object={dayClone} visible={time === "day"} />
+      </Float>
+      <Float speed={0.3} rotationIntensity={0.05} floatIntensity={0.08}>
+        <primitive object={nightClone} visible={time === "night"} />
+      </Float>
+      <SceneLighting time={time} />
+      <SunOrb time={time} />
     </>
   );
 }

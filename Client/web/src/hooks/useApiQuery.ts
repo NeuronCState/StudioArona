@@ -13,8 +13,16 @@
  *     path: '/feeds',
  *     defaultData: [] as Feed[],
  *   });
+ *
+ * React Query 5 queryOptions() factory:
+ *   const opts = apiQueryOptions<Feed[]>('/feeds', ['feeds']);
+ *   const { data } = useSuspenseQuery(opts);  // or useQuery(opts)
  */
-import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
+import {
+  useQuery,
+  queryOptions,
+  type UseQueryOptions,
+} from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api/client";
 import { useConnectionStore } from "@/stores/connection";
 
@@ -38,8 +46,6 @@ export function useApiQuery<T>(opts: UseApiQueryOptions<T>) {
         return await api.get<T>(opts.path);
       } catch (e) {
         if (e instanceof ApiError && e.code === "OFFLINE") {
-          // Offline: silent success → 用 defaultData, queryFn 视为成功
-          // page 不会进 isError 分支, 继续渲染 (data 是 defaultData, 可结合 IDB 数据)
           return opts.defaultData;
         }
         throw e;
@@ -53,10 +59,31 @@ export function useApiQuery<T>(opts: UseApiQueryOptions<T>) {
   return {
     data: q.data ?? opts.defaultData,
     isPending: q.isPending && !isOffline,
-    // OFFLINE 视为非 error (silent success), 业务 4xx 才是 error
     isError: q.isError && !isOffline,
     error: isOffline ? null : q.error,
     refetch: q.refetch,
     isOffline,
   };
+}
+
+/**
+ * React Query 5 queryOptions() factory — 类型安全的 query 配置, 可复用于
+ * `useQuery`, `useSuspenseQuery`, `queryClient.prefetchQuery` 等。
+ *
+ * 不含 offline 兜底 (由 useApiQuery 负责)。适合 server-dependent 页面。
+ *
+ * Usage:
+ *   const opts = apiQueryOptions<SystemMetrics>('/system/metrics', ['system-metrics']);
+ *   const { data } = useSuspenseQuery(opts);
+ */
+export function apiQueryOptions<T>(
+  path: string,
+  queryKey: readonly unknown[],
+  opts?: { staleTime?: number },
+) {
+  return queryOptions({
+    queryKey,
+    queryFn: () => api.get<T>(path),
+    staleTime: opts?.staleTime ?? 60_000,
+  });
 }

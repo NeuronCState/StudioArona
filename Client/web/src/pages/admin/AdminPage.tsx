@@ -130,8 +130,8 @@ function SystemTab() {
   if (!data) return null;
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+    <div className="@container space-y-4">
+      <div className="grid grid-cols-1 gap-3 @md:grid-cols-2">
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-glass)] p-4 backdrop-blur-xl">
           <div className="mb-3 flex items-center gap-2">
             <Cpu size={14} className="text-[var(--color-accent)]" />

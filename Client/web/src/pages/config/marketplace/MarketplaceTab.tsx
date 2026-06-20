@@ -595,7 +595,7 @@ export function MarketplaceTab() {
               duration: m.duration.fast / 1000,
               ease: m.easing.out,
             }}
-            className="grid grid-cols-1 gap-4 md:grid-cols-2"
+            className="grid grid-cols-1 gap-4 @3xl:grid-cols-2"
           >
             {[1, 2, 3, 4].map((i) => (
               <Skeleton key={i} variant="rect" height={180} />
@@ -643,7 +643,7 @@ export function MarketplaceTab() {
                   : `共 ${currentData.total} 个技能`}
             </p>
             <StaggerList
-              className="grid grid-cols-1 gap-4 md:grid-cols-2"
+              className="grid grid-cols-1 gap-4 @3xl:grid-cols-2"
               staggerKey={
                 (viewMode +
                   (trendingWindow ?? "") +

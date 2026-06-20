@@ -253,7 +253,7 @@ export function OCRPage() {
   const notInstalled = !!updateInfo && !updateInfo.installed;
 
   return (
-    <div className="studio-page mx-auto max-w-6xl space-y-6 p-6">
+    <div className="studio-page @container mx-auto max-w-6xl space-y-6 p-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -292,7 +292,7 @@ export function OCRPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 @5xl:grid-cols-3">
         {/* Left: Upload + History */}
         <div className="space-y-4 lg:col-span-1">
           {notInstalled ? (

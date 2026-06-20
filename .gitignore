@@ -48,6 +48,9 @@ Client/services/sonetto/anthropic_skills/*
 # AI
 .claude/
 
+# Project docs (local only, not committed)
+docs/
+
 # Docker
 pgdata/
 

@@ -16,7 +16,7 @@ export function PageLayout({
   children,
 }: PageLayoutProps) {
   return (
-    <div className="studio-page mx-auto max-w-5xl space-y-6 p-6">
+    <div className="studio-page @container mx-auto max-w-5xl space-y-6 p-6">
       <div className="flex items-start justify-between">
         <div>
           {subtitle && (

@@ -76,3 +76,49 @@ export const fadeIn = (delay = 0) => ({
     delay,
   },
 });
+
+/**
+ * Scroll-triggered variants for whileInView usage (Framer Motion 12).
+ *
+ * Usage:
+ *   <motion.div variants={scrollFadeIn} initial="hidden" whileInView="visible"
+ *     viewport={{ once: true, margin: "-60px" }} />
+ *
+ *   <motion.ul variants={scrollStaggerContainer} initial="hidden" whileInView="show">
+ *     {items.map(i => <motion.li variants={scrollStaggerItem} key={i.id}>{i}</motion.li>)}
+ *   </motion.ul>
+ */
+export const scrollFadeIn = {
+  hidden: { opacity: 0, y: 12 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: motion.duration.base / 1000,
+      ease: motion.easing.out,
+    },
+  },
+};
+
+export const scrollStaggerContainer = {
+  hidden: { opacity: 1 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: motion.stagger.list,
+      delayChildren: 0.05,
+    },
+  },
+};
+
+export const scrollStaggerItem = {
+  hidden: { opacity: 0, y: 12 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: motion.duration.base / 1000,
+      ease: motion.easing.out,
+    },
+  },
+};
