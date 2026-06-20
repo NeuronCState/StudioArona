@@ -27,7 +27,7 @@ tauri-plugin-fs = "2"
 log = "0.4"
 anyhow = "1"
 open = "5"
-reqwest = { version = "0.12", features = ["json", "multipart"] }
+reqwest = { version = "0.13", features = ["json", "multipart"] }
 libc = "0.2"
 tokio = { version = "1", features = ["time", "rt"] }
 base64 = "0.22"
