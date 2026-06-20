@@ -11,22 +11,28 @@ import { useConnectionStore } from "@/stores/connection";
 // xterm requires DOM APIs (ResizeObserver, canvas measurement) not fully
 // supported in jsdom. Stub Terminal and FitAddon so VmDetail renders
 // without crashing when it mounts the embedded terminal.
+// NOTE: vitest 4 requires mockImplementation to be a `function` (not arrow)
+// so that `new Terminal(...)` works — arrow functions are not constructable.
 vi.mock("@xterm/xterm", () => ({
-  Terminal: vi.fn().mockImplementation(() => ({
-    open: vi.fn(),
-    loadAddon: vi.fn(),
-    onData: vi.fn(),
-    write: vi.fn(),
-    writeln: vi.fn(),
-    clear: vi.fn(),
-    dispose: vi.fn(),
-  })),
+  Terminal: vi.fn().mockImplementation(function () {
+    return {
+      open: vi.fn(),
+      loadAddon: vi.fn(),
+      onData: vi.fn(),
+      write: vi.fn(),
+      writeln: vi.fn(),
+      clear: vi.fn(),
+      dispose: vi.fn(),
+    };
+  }),
 }));
 
 vi.mock("@xterm/addon-fit", () => ({
-  FitAddon: vi.fn().mockImplementation(() => ({
-    fit: vi.fn(),
-  })),
+  FitAddon: vi.fn().mockImplementation(function () {
+    return {
+      fit: vi.fn(),
+    };
+  }),
 }));
 
 const queryClient = new QueryClient({
