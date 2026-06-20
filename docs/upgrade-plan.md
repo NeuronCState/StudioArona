@@ -26,14 +26,11 @@
 | `rehype-highlight` | 7.0.0 | 7.0.2 |
 | `remark-gfm` | 4.0.0 | 4.0.1 |
 
-#### 🟡 Minor 升级 (16 个, 低风险)
+#### 🟡 Minor 升级 (13 个, 低风险) — 第四批 5.A
 | 包 | 当前 | 最新 |
 |---|---|---|
 | `@hookform/resolvers` | 5.2.2 | 5.4.0 |
 | `@playwright/test` | 1.48.0 | 1.61.0 |
-| `@storybook/addon-essentials` | 8.4.0 | 8.6.14 |
-| `@storybook/addon-interactions` | 8.4.0 | 8.6.14 |
-| `@storybook/blocks` | 8.4.0 | 8.6.14 |
 | `@testing-library/jest-dom` | 6.6.0 | 6.9.1 |
 | `@types/three` | 0.160.0 | 0.184.1 |
 | `@typescript-eslint/eslint-plugin` | 8.13.0 | 8.61.1 |
@@ -46,6 +43,10 @@
 | `three` | 0.160.0 | 0.184.0 |
 | `typescript-eslint` | 8.59.4 | 8.61.1 |
 | `web-vitals` | 5.2.0 | 5.3.0 |
+
+**注意**: Storybook 生态 (`@storybook/*` + `storybook`) **移出第四批**——
+npm 上 addon 包最新是 8.6.14 (8.x 末班), 但 `storybook`/`@storybook/react`/`@storybook/react-vite`
+已经跳到 10.4.6。**整组必须同步升级**, 跨 2 major, **移到第六批 5.C.1**。
 
 #### 🔴 Major 升级 (19 个, 高风险, 1-2 周)
 | 包 | 当前 | 最新 | 备注 |
