@@ -107,5 +107,8 @@ jobs:
             artifacts/**/*.dmg
             artifacts/**/*.msi
             artifacts/**/*.deb
-          generate_release_notes: true
+          body: |
+            Release 描述请查看 Release Notes 文档或联系维护者。
+            安装包由 CI 自动构建。
+          generate_release_notes: false
           fail_on_unmatched_files: true
