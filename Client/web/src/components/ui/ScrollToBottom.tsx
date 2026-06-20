@@ -12,7 +12,7 @@ export function ScrollToBottom({
   threshold = 300,
 }: ScrollToBottomProps) {
   const [visible, setVisible] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const checkScroll = useCallback(() => {
     const el = containerRef.current;

@@ -1,3 +1,4 @@
+import { type ReactElement } from "react";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 /**
@@ -9,7 +10,7 @@ import { useReducedMotion } from "@/hooks/useReducedMotion";
  * The animation is `transform`-only — runs on the compositor thread
  * with zero main-thread cost.
  */
-export function HomeAmbient(): JSX.Element {
+export function HomeAmbient(): ReactElement {
   const reduced = useReducedMotion();
 
   // TODO: Replace CSS gradient with pre-rendered WebP textures

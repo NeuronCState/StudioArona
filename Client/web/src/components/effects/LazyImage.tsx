@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, type ImgHTMLAttributes } from "react";
+import { useRef, useState, useCallback, type ImgHTMLAttributes, type ReactElement } from "react";
 import { DURATION, EASING, bezierCSS } from "@/lib/motion/tokens";
 
 type Status = "pending" | "loading" | "loaded" | "error";
@@ -28,7 +28,7 @@ export function LazyImage({
   className = "",
   style,
   ...imgProps
-}: LazyImageProps): JSX.Element {
+}: LazyImageProps): ReactElement {
   const [status, setStatus] = useState<Status>("pending");
   const imgRef = useRef<HTMLImageElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);

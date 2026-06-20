@@ -24,9 +24,7 @@ describe("PersonalSettingsPage", () => {
 
   it("renders profile data and updates appearance preferences", async () => {
     render(
-      <MemoryRouter
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-      >
+      <MemoryRouter>
         <PersonalSettingsPage />
       </MemoryRouter>,
     );

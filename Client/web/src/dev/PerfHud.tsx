@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactElement } from "react";
 import Stats from "stats.js";
 
 /**
@@ -6,7 +6,7 @@ import Stats from "stats.js";
  * Only renders when `import.meta.env.DEV` is true.
  * Displays: FPS, frame time (ms), and JS heap size (MB).
  */
-export function PerfHud(): JSX.Element | null {
+export function PerfHud(): ReactElement | null {
   if (!import.meta.env.DEV) return null;
 
   const containerRef = useRef<HTMLDivElement>(null);

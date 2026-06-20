@@ -1,3 +1,4 @@
+import { type ReactElement } from 'react';
 import { Skeleton } from './Skeleton';
 
 export interface CardSkeletonProps {
@@ -68,7 +69,7 @@ const compactSkeleton = (
   </div>
 );
 
-const variantMap: Record<NonNullable<CardSkeletonProps['variant']>, JSX.Element> = {
+const variantMap: Record<NonNullable<CardSkeletonProps['variant']>, ReactElement> = {
   list: listItem,
   grid: gridItem,
   detail: detailSkeleton,

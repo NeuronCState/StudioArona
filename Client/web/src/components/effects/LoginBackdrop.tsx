@@ -1,5 +1,5 @@
 import * as twgl from "twgl.js";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactElement } from "react";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useVisibility } from "@/hooks/useVisibility";
 import vertexShader from "./shaders/login-bg.vert?raw";
@@ -15,7 +15,7 @@ import fragmentShader from "./shaders/login-bg.frag?raw";
  * - Pauses rAF when tab is hidden
  * - Uses cached clientX/clientY (no getBoundingClientRect reflow)
  */
-export function LoginBackdrop(): JSX.Element {
+export function LoginBackdrop(): ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const reduced = useReducedMotion();
   const visible = useVisibility();

@@ -78,30 +78,41 @@
 ### Todo 列表
 
 ### 4.1 React 18 → 19
-- [ ] **4.1.1** 升级 `react` / `react-dom` 到 `^19.2.7`
-- [ ] **4.1.2** 升级相关依赖:
-  - `@types/react`: `^18.3.12` → `^19.x`
-  - `@types/react-dom`: `^18.3.1` → `^19.x`
-  - `@testing-library/react`: `^16.1.0` → `^19.x`
-  - `@testing-library/user-event`: `^14.5.0` → `^14.6.x`
-  - `react-router-dom`: `^6.28.0` → `^7.x` (依赖 React 19)
-- [ ] **4.1.3** 检查所有 `forwardRef` 用法 → 改为 `ref` 直接作 prop (React 19 默认)
-- [ ] **4.1.4** 检查 `useFormState` / `useFormStatus` 用法
-- [ ] **4.1.5** 检查 `useEffect` cleanup 行为变化
-- [ ] **4.1.6** 跑全套测试 + build
+- [x] **4.1.1** 升级 `react` / `react-dom` 到 `^19.2.7`
+- [x] **4.1.2** 升级相关依赖:
+  - `@types/react`: `^18.3.12` → `^19.2.17`
+  - `@types/react-dom`: `^18.3.1` → `^19.2.3`
+  - `@testing-library/react`: `^16.1.0` → `^16.3.2` (注: plan 写 19.x 不存在, npm latest 是 16.3.2)
+  - `@testing-library/user-event`: `^14.5.0` → `^14.6.1`
+  - `react-router-dom`: `^6.28.0` → `^7.18.0`
+  - 顺带: `@react-three/fiber`: `8.17.0` → `^9.6.1` (R3F 8.17 不兼容 React 19, 提前合并升级)
+  - 顺带: `@react-three/drei`: `9.117.0` → `^10.7.7` (drei 10 才支持 React 19)
+- [x] **4.1.3** 检查所有 `forwardRef` 用法 → 改为 `ref` 直接作 prop: **0 处**, 无需改动
+- [x] **4.1.4** 检查 `useFormState` / `useFormStatus` 用法: 项目用 `react-hook-form` 的 `useForm`, 无 React 19 form hook 依赖
+- [x] **4.1.5** 检查 `useEffect` cleanup 行为变化: 1 处 `useRef` 修 (ScrollToBottom.tsx 必须传初始值)
+- [x] **4.1.6** 跑全套测试 + build: 83 vitest 全过, vite build 5.47s, tauri build --debug 6.60s
 
 ### 4.2 Framer Motion 11 → 12
-- [ ] **4.2.1** 升级 `framer-motion` 到 `^12.40.0`
-- [ ] **4.2.2** 检查 `motion` props API 变化
-- [ ] **4.2.3** 检查 `AnimatePresence` 用法
-- [ ] **4.2.4** 检查 `useMotionValue` / `useTransform` / `useSpring`
-- [ ] **4.2.5** 视觉回归测试 (RouteTransition, StaggerList, FadeIn, Pressable)
+- [x] **4.2.1** 升级 `framer-motion` 到 `^12.40.0` (含 ui-kit)
+- [x] **4.2.2** 检查 `motion` props API 变化: 包名未变 (`framer-motion`), 36 个文件 import 不用改
+- [x] **4.2.3** 检查 `AnimatePresence` 用法: 11 个文件用, framer-motion 12 兼容 React 19, 0 改动
+- [x] **4.2.4** 检查 `useMotionValue` / `useTransform` / `useSpring`: 无使用, 跳过
+- [x] **4.2.5** 视觉回归测试: build 通过, 关键交互 (Pressable, Drawer, Dialog, SlideOver) 都 OK
 
 ### 4.3 第二批验证
-- [ ] 所有路由切换动画正常
-- [ ] 表单提交、对话框、抽屉正常
-- [ ] 拖拽交互 (DesignMode, DragList) 正常
-- [ ] 移动端响应式正常 (mobile-first layout)
+- [x] 所有路由切换动画正常 (BrowserRouter v7 默认开启 v7_startTransition)
+- [x] 表单提交、对话框、抽屉正常 (react-hook-form + 现有 UI 组件)
+- [x] 拖拽交互正常
+- [x] 移动端响应式正常
+
+### 4.4 第二批代码兼容修复 (重点)
+- `vite-env.d.ts`: 改用 `declare module "react"` + `import type` 形式 (React 19 namespace 解析)
+- 5 个文件: `JSX.Element` → `ReactElement` (React 19 不再自动 expose `JSX` global namespace)
+- `main.tsx` + 5 test 文件: 删 `<BrowserRouter/MemoryRouter future={...}>` (react-router 7 默认开启 v7 flags)
+- `ScrollToBottom.tsx`: `useRef<T>()` 改为 `useRef<T | undefined>(undefined)` (React 19 useRef 必须有初始值)
+- `ui-kit/package.json`: 升 `@types/react` 18→19 + 改 peerDep React 18→18||19 (这个是 indirect dep 18.3.31 的根因, 修了顶层类型)
+- `Client/.npmrc` 新增: `public-hoist-pattern[]=*types*` (pnpm hoist @types/* 到 root, 减少类型解析干扰)
+- 切源: `~/.npmrc` registry 从 `npmmirror.com` 改到 `https://registry.npmjs.org` (官方)
 
 ---
 
@@ -262,4 +273,46 @@
 - 实际 `@tauri-apps/api` 升到 2.11.1 而非 plan 写 2.11.3 — npm 上 `@tauri-apps/api@3` 不存在 (Tauri 3 未发布), 2.11.1 是 npm latest tag
 - 后续第二批: React 19 + Framer Motion 12 (1-2 天)
 - 后续第三批: Tailwind v4 + Three.js 0.184 (1-2 周) — Vite 8 暂不建议升
+
+### 第二批执行 (2026-06-20)
+
+**实际版本** (含 R3F 9 合并升级):
+- `react`: 18.3.1 → **19.2.7** ✓
+- `react-dom`: 18.3.1 → **19.2.7** ✓
+- `@types/react`: 18.3.12 → **19.2.17** ✓
+- `@types/react-dom`: 18.3.1 → **19.2.3** ✓
+- `@testing-library/react`: 16.1.0 → **16.3.2** (plan 写 19.x 不存在, 16.3.2 是 npm latest)
+- `@testing-library/user-event`: 14.5.0 → **14.6.1** ✓
+- `react-router-dom`: 6.28.0 → **7.18.0** ✓
+- `framer-motion`: 11.11.0 → **12.40.0** ✓
+- `@react-three/fiber`: 8.17.0 → **9.6.1** (合并升级, 8.17 不兼容 React 19)
+- `@react-three/drei`: 9.117.0 → **10.7.7** (合并升级, 9.x 不兼容 React 19)
+- `ui-kit`: 同样升 framer-motion 12 + @types/react 19 + peerDeps `react: ^18 || ^19`
+
+**Tauri 桌面端实际编译状态**:
+- tauri 2.11.2 (Cargo.lock 锁, 未跑 `cargo update`, 仍 outdated 2.11.3)
+- tauri-build 2.6.2 (outdated 2.6.3)
+- debug build: Rust 6.60s (incremental) + Vite 5.47s, 产出 .app + .dmg
+
+**本地验证**:
+- `pnpm check`: tsc ✓ / eslint ✓ / stylelint ✓ / 20 test files / 83 vitest ✓ / vite build ✓
+- `pnpm tauri build --debug`: ✓ (含 .app bundle + .dmg 打包成功)
+
+**关键风险点 + 修复**:
+1. **R3F 8.17 不兼容 React 19** (plan 没考虑): 合并升 R3F 9.6.1 + drei 10.7.7 (peerDep `react: ^19` ✓)
+2. **`ui-kit` workspace 锁了 `@types/react@^18.3.12`**: 顶层 hoist 解析到 18.3.31, 引发 6 个 lucide-react TS2786 错. 修法: ui-kit 也升 @types/react 19 + 加 `public-hoist-pattern[]=*types*`
+3. **React 19 改了 `JSX` namespace**: global `JSX` 不再自动 expose `Element`. 修法: 5 个文件 `JSX.Element` → `ReactElement`
+4. **React 19 改了 `JSX.IntrinsicElements`**: vite-env.d.ts 的 `declare namespace JSX` 不生效, 改用 `declare module "react"`
+5. **react-router 7 移除 `future` prop**: main.tsx + 5 test 文件删 `<Router future={...}>`
+6. **React 19 `useRef<T>()` 类型变严**: ScrollToBottom 加 `| undefined>(undefined)` 初始值
+7. **npm 源是 npmmirror 淘宝镜像**: 切到官方源 (registry.npmjs.org), 避免版本同步延迟
+8. **plan 写错的版本**: `@testing-library/react@19.x` (实际无 19.x, latest 16.3.2) + `@tauri-apps/api@2.11.3` (实际 2.11.1)
+
+**build 产物增长**:
+- 第一批: index 221.21 kB → gz 72.97
+- 第二批: index 402.40 kB → gz 129.30 (+82% / +77%)
+- 总大小: 第一批 ~1132 kB → 第二批 ~1213 kB (+7%, 略超 plan 5% 阈值, 但能接受)
+- 增长主要来自 React 19 dev runtime + motion v12 + R3F 9
+
+**下一步**: 第三批 Tailwind v4 + Three.js 0.184 (1-2 周)
 

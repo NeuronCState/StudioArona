@@ -1,10 +1,14 @@
 /// <reference types="vite/client" />
 
-declare namespace JSX {
-  interface IntrinsicElements {
-    'theme-button': React.DetailedHTMLProps<
-      React.HTMLAttributes<HTMLElement> & { value?: string; size?: string },
-      HTMLElement
-    >;
+import type { DetailedHTMLProps, HTMLAttributes } from "react";
+
+declare module "react" {
+  namespace JSX {
+    interface IntrinsicElements {
+      'theme-button': DetailedHTMLProps<
+        HTMLAttributes<HTMLElement> & { value?: string; size?: string },
+        HTMLElement
+      >;
+    }
   }
 }
