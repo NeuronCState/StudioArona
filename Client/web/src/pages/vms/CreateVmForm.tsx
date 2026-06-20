@@ -13,7 +13,8 @@ const vmSchema = z.object({
   hypervisor: z.enum(["libvirt", "vbox", "mock"]),
 });
 
-type VmForm = z.infer<typeof vmSchema>;
+type VmFormInput = z.input<typeof vmSchema>;
+type VmForm = z.output<typeof vmSchema>;
 
 interface CreateVmFormProps {
   onClose: () => void;
@@ -25,7 +26,7 @@ export function CreateVmForm({ onClose, onSuccess }: CreateVmFormProps) {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<VmForm>({
+  } = useForm<VmFormInput, undefined, VmForm>({
     resolver: zodResolver(vmSchema),
     defaultValues: {
       spec_cpu: 2,
