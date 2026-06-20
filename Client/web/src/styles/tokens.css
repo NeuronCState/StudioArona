@@ -21,7 +21,7 @@
   --color-arona-blue: #5b8def;
   --color-arona-deep: #1e3a5f;
   --shadow-arona-1:
-    0 1px 3px rgba(91, 141, 239, 0.12), 0 1px 2px rgba(91, 141, 239, 0.08);
+    0 1px 3px rgb(91, 141, 239, 0.12), 0 1px 2px rgb(91, 141, 239, 0.08);
   --color-sky-soft: #e8f4fd;
 
   /* === Typography === */
@@ -56,16 +56,16 @@
 
   /* === Shadows (soft, warm) === */
   --shadow-1:
-    0 1px 3px rgba(26, 25, 22, 0.06), 0 1px 2px rgba(26, 25, 22, 0.04);
+    0 1px 3px rgb(26, 25, 22, 0.06), 0 1px 2px rgb(26, 25, 22, 0.04);
   --shadow-2:
-    0 4px 8px rgba(26, 25, 22, 0.06), 0 2px 4px rgba(26, 25, 22, 0.04);
+    0 4px 8px rgb(26, 25, 22, 0.06), 0 2px 4px rgb(26, 25, 22, 0.04);
   --shadow-3:
-    0 12px 24px rgba(26, 25, 22, 0.08), 0 4px 8px rgba(26, 25, 22, 0.04);
+    0 12px 24px rgb(26, 25, 22, 0.08), 0 4px 8px rgb(26, 25, 22, 0.04);
 
   /* === Decorative glows === */
-  --color-glow-blue: rgba(103, 215, 255, 0.24);
-  --color-glow-purple: rgba(168, 184, 255, 0.2);
-  --color-glow-cyan: rgba(75, 163, 255, 0.16);
+  --color-glow-blue: rgb(103, 215, 255, 0.24);
+  --color-glow-purple: rgb(168, 184, 255, 0.2);
+  --color-glow-cyan: rgb(75, 163, 255, 0.16);
 
   /* === Motion (C: performance & animation tokens) === */
 
@@ -121,14 +121,14 @@
   --color-arona-cyan: #5ed4f0;
   --color-arona-blue: #6da8f7;
   --color-arona-deep: #8fb8f0;
-  --shadow-arona-1: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-arona-1: 0 1px 3px rgb(0, 0, 0, 0.3), 0 1px 2px rgb(0, 0, 0, 0.2);
   --color-sky-soft: #1a2d3d;
 
-  --shadow-1: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-2: 0 4px 8px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.2);
-  --shadow-3: 0 12px 24px rgba(0, 0, 0, 0.5), 0 4px 8px rgba(0, 0, 0, 0.2);
+  --shadow-1: 0 1px 3px rgb(0, 0, 0, 0.3), 0 1px 2px rgb(0, 0, 0, 0.2);
+  --shadow-2: 0 4px 8px rgb(0, 0, 0, 0.4), 0 2px 4px rgb(0, 0, 0, 0.2);
+  --shadow-3: 0 12px 24px rgb(0, 0, 0, 0.5), 0 4px 8px rgb(0, 0, 0, 0.2);
 
-  --color-glow-blue: rgba(103, 215, 255, 0.1);
-  --color-glow-purple: rgba(168, 184, 255, 0.08);
-  --color-glow-cyan: rgba(75, 163, 255, 0.06);
+  --color-glow-blue: rgb(103, 215, 255, 0.1);
+  --color-glow-purple: rgb(168, 184, 255, 0.08);
+  --color-glow-cyan: rgb(75, 163, 255, 0.06);
 }
