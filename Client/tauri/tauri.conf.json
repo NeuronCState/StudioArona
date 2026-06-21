@@ -44,9 +44,7 @@
     "externalBin": [],
     "macOS": {
       "minimumSystemVersion": "10.15",
-      "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Studio Arona 需要获取位置以显示当地天气信息"
-      }
+      "infoPlist": "./Info.plist"
     },
     "windows": {
       "nsis": {
