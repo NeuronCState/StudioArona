@@ -1,0 +1,19 @@
+{
+  "name": "Studio Arona - 什亭之匣",
+  "short_name": "Arona",
+  "description": "个人 AI 助理平台。日程、信息源、记忆、技能、OCR、虚拟机、系统监控。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f7f4",
+  "theme_color": "#b8552b",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "lang": "zh-CN",
+  "dir": "ltr"
+}

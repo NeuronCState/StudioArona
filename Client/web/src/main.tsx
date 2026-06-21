@@ -49,6 +49,17 @@ function renderApp() {
       <RootWithConnection />
     </React.StrictMode>,
   );
+
+  // Register Service Worker (production only, not in dev/tauri)
+  if (
+    import.meta.env.PROD &&
+    "serviceWorker" in navigator &&
+    !(window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
+  ) {
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // SW registration is best-effort
+    });
+  }
 }
 
 enableMocking().then(renderApp, renderApp);
