@@ -26,6 +26,7 @@ import { PageLayout } from "@/components/layout/PageLayout";
 import { SlideOver } from "@/components/ui/SlideOver";
 import { StaggerList, StaggerItem, FadeIn } from "@/components/motion";
 import { motion as m } from "@/lib/motion";
+import { useT } from "@/lib/i18n";
 
 interface PageMonitor {
   id: string;
@@ -56,6 +57,7 @@ function isRSSUrl(url: string): boolean {
 }
 
 export function FeedsPage() {
+  const tr = useT();
   const queryClient = useQueryClient();
   const addToast = useUIStore((s) => s.addToast);
   const [newUrl, setNewUrl] = useState("");
@@ -219,9 +221,9 @@ export function FeedsPage() {
     return (
       <>
         <PageLayout
-          subtitle="信息源"
-          title="信息源"
-          description="输入 RSS 链接或网页 URL，自动识别并订阅。"
+          subtitle={tr("feeds.title")}
+          title={tr("feeds.title")}
+          description={tr("feeds.description")}
         >
           <FadeIn>
             <div className="card space-y-3">
@@ -229,7 +231,7 @@ export function FeedsPage() {
                 <input
                   value={newUrl}
                   onChange={(e) => setNewUrl(e.target.value)}
-                  placeholder="输入 RSS / 网页 URL，按 Enter 订阅"
+                  placeholder={tr("feeds.urlPlaceholder")}
                   className="input flex-1"
                 />
                 <button
@@ -334,7 +336,7 @@ export function FeedsPage() {
                   ) : (
                     <Globe size={12} />
                   )}
-                  {detectedType === "rss" ? "RSS 解析" : "网页监控"}
+                  {detectedType === "rss" ? tr("feeds.rssParse") : tr("feeds.pageMonitor")}
                 </span>
               )}
             </div>

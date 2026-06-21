@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { motion as m } from "@/lib/motion";
 import { Drawer } from "@/components/ui/Drawer";
 import { Calendar as CalendarPicker } from "@/components/ui/Calendar";
+import { useT } from "@/lib/i18n";
 
 type ScheduleEvent = ScheduleDocument;
 
@@ -273,6 +274,7 @@ function ScheduleEventForm({
 }
 
 export function SchedulePage() {
+  const tr = useT();
   const [view, setView] = useState<"upcoming" | "all">("upcoming");
   const [showAdd, setShowAdd] = useState(false);
   const [addInitialDate, setAddInitialDate] = useState<string | undefined>(
@@ -368,10 +370,10 @@ export function SchedulePage() {
             Schedule
           </p>
           <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[var(--color-text-primary)]">
-            日程计划
+            {tr("schedule.title")}
           </h2>
           <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-            阿洛娜会帮你整理今日安排，并把计划带回对话上下文。
+            {tr("schedule.description")}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -383,16 +385,16 @@ export function SchedulePage() {
             className="btn-primary gap-2"
           >
             <Plus size={16} />
-            添加日程
+            {tr("schedule.add")}
           </button>
           <div className="relative inline-flex rounded-full bg-white/60 p-1 shadow-[var(--shadow-1)]">
             {[
               {
                 id: "upcoming" as const,
-                label: "即将到来",
+                label: tr("schedule.upcoming"),
                 Icon: CalendarClock,
               },
-              { id: "all" as const, label: "全部", Icon: CalendarRange },
+              { id: "all" as const, label: tr("schedule.all"), Icon: CalendarRange },
             ].map(({ id, label, Icon }) => {
               const active = view === id;
               return (
@@ -501,7 +503,7 @@ export function SchedulePage() {
                     setShowAdd(true);
                   }}
                 >
-                  添加日程
+                  {tr("schedule.add")}
                 </Button>
               }
             />

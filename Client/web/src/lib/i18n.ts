@@ -296,6 +296,25 @@ const zh: Record<string, string> = {
   "vm.status.error": "异常",
   "vm.status.destroyed": "已销毁",
   "vm.ram": "内存 (MB)",
+
+  // Feeds
+  "feeds.title": "信息源",
+  "feeds.description": "输入 RSS 链接或网页 URL，自动识别并订阅。",
+  "feeds.urlPlaceholder": "输入 RSS / 网页 URL，按 Enter 订阅",
+  "feeds.nameOptional": "名称（可选）",
+  "feeds.rssParse": "RSS 解析",
+  "feeds.pageMonitor": "网页监控",
+  "feeds.subscribe": "订阅",
+  "feeds.noSubscriptions": "暂无订阅",
+  "feeds.noSubscriptionsHint": "输入 RSS 链接或网页 URL 开始订阅",
+
+  // System
+  "system.title": "硬件监控",
+  "system.refresh": "刷新",
+  "system.cpu": "CPU",
+  "system.memory": "内存",
+  "system.gpu": "GPU",
+  "system.gpuTemp": "GPU 温度",
 };
 
 const en: Record<string, string> = {
@@ -591,6 +610,23 @@ const en: Record<string, string> = {
   "vm.status.stopped": "Stopped",
   "vm.status.error": "Error",
   "vm.status.destroyed": "Destroyed",
+
+  "feeds.title": "Feeds",
+  "feeds.description": "Enter an RSS link or web page URL. Auto-detection and subscription.",
+  "feeds.urlPlaceholder": "Enter RSS / web URL, press Enter to subscribe",
+  "feeds.nameOptional": "Name (optional)",
+  "feeds.rssParse": "RSS Parse",
+  "feeds.pageMonitor": "Page Monitor",
+  "feeds.subscribe": "Subscribe",
+  "feeds.noSubscriptions": "No subscriptions",
+  "feeds.noSubscriptionsHint": "Enter an RSS link or web page URL to start subscribing",
+
+  "system.title": "System Monitor",
+  "system.refresh": "Refresh",
+  "system.cpu": "CPU",
+  "system.memory": "Memory",
+  "system.gpu": "GPU",
+  "system.gpuTemp": "GPU Temp",
 };
 
 /**

@@ -20,6 +20,7 @@ import { CronStatusCard, type CronStatus } from "./CronStatusCard";
 import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PageLayout } from "@/components/layout/PageLayout";
+import { useT } from "@/lib/i18n";
 
 function usePageVisible() {
   const [visible, setVisible] = useState(true);
@@ -34,6 +35,7 @@ function usePageVisible() {
 }
 
 export function SystemPage() {
+  const tr = useT();
   const pageVisible = usePageVisible();
 
   // useSuspenseQuery: data is guaranteed non-null (throw → parent Suspense).
@@ -70,14 +72,14 @@ export function SystemPage() {
 
   return (
     <PageLayout
-      title="硬件监控"
+      title={tr("system.title")}
       action={
         <button
           onClick={() => refetchMetrics()}
           className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text-secondary)] transition-colors"
         >
           <RefreshCw size={12} />
-          刷新
+          {tr("system.refresh")}
         </button>
       }
     >
