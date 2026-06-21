@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useDeferredValue, useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -269,6 +269,7 @@ export function MarketplaceTab() {
     "all" | "week" | "month"
   >("all");
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [category, setCategory] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const user = useAuthStore((s) => s.user);
@@ -314,12 +315,12 @@ export function MarketplaceTab() {
     isPending: searchPending,
     refetch: refetchSearch,
   } = useQuery({
-    queryKey: ["marketplace", search, category, page],
+    queryKey: ["marketplace", deferredSearch, category, page],
     queryFn: () => {
       // 直接用用户输入作为 q — 空 q 在 service 里走 "返回该 category 全部 skills" 分支,
       // 不再 fallback 到 docker/k8s 等子关键词 (那是 skillsmp 不支持 category 时的 workaround).
       const opts: SearchOptions = {
-        q: search || "skill",
+        q: deferredSearch || "skill",
         page,
         limit: 20,
         sortBy: "stars",
