@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef, type ReactNode } from "react";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { StudioAppShell } from "./components/studio/StudioAppShell";
@@ -60,6 +61,11 @@ const PersonalSettingsPage = lazy(() =>
   })),
 );
 
+/** Per-route error boundary: one page crash doesn't take down the whole app. */
+function RouteGuard({ children }: { children: ReactNode }) {
+  return <ErrorBoundary>{children}</ErrorBoundary>;
+}
+
 function ShellFallback() {
   return (
     <div className="flex h-screen items-center justify-center bg-[var(--color-bg)]">
@@ -119,16 +125,16 @@ function AppRoutes() {
         }}
       >
         <Routes location={location}>
-          <Route path="/" element={<StudioHomePage />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/schedule" element={<SchedulePage />} />
-          <Route path="/feeds" element={<FeedsPage />} />
-          <Route path="/system" element={<SystemPage />} />
-          <Route path="/vms" element={<VmsPage />} />
-          <Route path="/ocr" element={<OCRPage />} />
-          <Route path="/config" element={<AgentConfigPage />} />
-          <Route path="/settings" element={<PersonalSettingsPage />} />
-          <Route path="/me/feeds" element={<FeedsPage />} />
+          <Route path="/" element={<RouteGuard><StudioHomePage /></RouteGuard>} />
+          <Route path="/admin" element={<RouteGuard><AdminPage /></RouteGuard>} />
+          <Route path="/schedule" element={<RouteGuard><SchedulePage /></RouteGuard>} />
+          <Route path="/feeds" element={<RouteGuard><FeedsPage /></RouteGuard>} />
+          <Route path="/system" element={<RouteGuard><SystemPage /></RouteGuard>} />
+          <Route path="/vms" element={<RouteGuard><VmsPage /></RouteGuard>} />
+          <Route path="/ocr" element={<RouteGuard><OCRPage /></RouteGuard>} />
+          <Route path="/config" element={<RouteGuard><AgentConfigPage /></RouteGuard>} />
+          <Route path="/settings" element={<RouteGuard><PersonalSettingsPage /></RouteGuard>} />
+          <Route path="/me/feeds" element={<RouteGuard><FeedsPage /></RouteGuard>} />
         </Routes>
       </motion.div>
     </AnimatePresence>
