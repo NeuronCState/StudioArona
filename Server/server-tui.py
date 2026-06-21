@@ -28,13 +28,6 @@ COMPOSE_FILE = ROOT / "infra" / "compose" / "docker-compose.yml"
 LOG_DIR = ROOT / ".run-logs"
 LOG_DIR.mkdir(exist_ok=True)
 
-# 确保 .venv-runner 的 site-packages 在 path 里 (rich 装在那里)
-_venv = ROOT / ".venv-runner"
-if _venv.exists():
-    _lib = next(_venv.glob("lib/python*/site-packages"), None)
-    if _lib and str(_lib) not in sys.path:
-        sys.path.insert(0, str(_lib))
-
 try:
     from rich.live import Live
     from rich.panel import Panel
@@ -45,9 +38,16 @@ try:
     from rich.align import Align
     from rich import box
 except ImportError:
-    print("rich 未安装。请先运行: python3 run.py --build (自动装 rich)")
-    print(f"或手动: {_venv_python} -m pip install rich")
-    sys.exit(1)
+    print("rich 未安装，正在安装...")
+    subprocess.run([sys.executable, "-m", "pip", "install", "rich"], check=True)
+    from rich.live import Live
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.layout import Layout
+    from rich.console import Console, Group
+    from rich.text import Text
+    from rich.align import Align
+    from rich import box
 
 console = Console()
 center_proc = None
@@ -63,6 +63,8 @@ status = {
     "port": "8080",
     "pid": "",
     "uptime": "",
+    "ips": [],
+    "devices": [],
 }
 start_time = time.time()
 
@@ -144,35 +146,29 @@ def log_reader():
 
 
 def health_check() -> None:
-    import urllib.request
+    import urllib.request, json
     try:
         r = urllib.request.urlopen("http://127.0.0.1:8080/health", timeout=2)
         status["health"] = f"正常 ({r.status})"
     except Exception as e:
-        status["health"] = f"未响应 ({e})"
+        status["health"] = f"未响应"
+
+    # Also fetch discovery info (IPs + devices)
+    try:
+        r = urllib.request.urlopen("http://127.0.0.1:8080/api/discovery", timeout=2)
+        data = json.loads(r.read())
+        status["ips"] = data.get("ips", [])
+        status["devices"] = data.get("devices", [])
+    except Exception:
+        pass
 
 
-def build_layout() -> Layout:
-    layout = Layout()
-    layout.split_column(
-        Layout(name="header", size=3),
-        Layout(name="body"),
-        Layout(name="footer", size=3),
-    )
-    layout["body"].split_row(
-        Layout(name="left", ratio=2),
-        Layout(name="right", ratio=3),
-    )
-    layout["left"].split_column(
-        Layout(name="status"),
-        Layout(name="info"),
-    )
-    return layout
 
 
 def render_header() -> Panel:
     title = Text("什亭之匣 · Studio Arona Server", style="bold white on #b8552b")
-    subtitle = Text(f"端口 :8080  |  运行时间 {int(time.time() - start_time)}s  |  Ctrl+C 停止", style="dim")
+    ips_str = ", ".join(status["ips"]) if status["ips"] else "获取中..."
+    subtitle = Text(f"IP: {ips_str}  |  端口 :8080  |  运行 {int(time.time() - start_time)}s  |  Ctrl+C 停止", style="dim")
     return Panel(Group(title, Align.center(subtitle)), box=box.HEAVY)
 
 
@@ -204,16 +200,79 @@ def render_info() -> Panel:
 
 def render_logs() -> Panel:
     with log_lock:
-        lines = list(log_lines[-40:])
+        lines = list(log_lines[-20:])
     if not lines:
         lines = ["等待日志输出..."]
-    text = "\n".join(lines[-40:])
+    text = "\n".join(lines[-20:])
     return Panel(
         Text(text, style="dim", overflow="fold"),
         title="实时日志",
         border_style="green",
-        height=22,
+        height=12,
     )
+
+
+def render_devices() -> Panel:
+    table = Table(box=box.SIMPLE, show_header=True, padding=(0, 2))
+    table.add_column("设备 IP", style="cyan", width=18)
+    table.add_column("状态", style="green", width=10)
+    table.add_column("最后连接", style="dim")
+
+    devices = status.get("devices", [])
+    if not devices:
+        table.add_row("—", "等待连接", "—")
+    else:
+        now_ts = int(time.time())
+        for d in sorted(devices, key=lambda d: d.get("last_seen_sec", 0), reverse=True)[:10]:
+            ip = d.get("ip", "?")
+            ago = now_ts - d.get("last_seen_sec", 0)
+            ago_str = f"{ago}s 前" if ago < 60 else f"{ago // 60}m 前"
+            table.add_row(ip, "[green]在线[/green]" if ago < 30 else "[dim]离线[/dim]", ago_str)
+
+    return Panel(table, title="已连接设备", border_style="magenta")
+
+
+def build_layout() -> Layout:
+    layout = Layout()
+    layout.split_column(
+        Layout(render_header(), name="header", size=3),
+        Layout(name="body"),
+        Layout(render_help(), name="footer", size=3),
+    )
+    layout["body"].split_row(
+        Layout(name="left", ratio=2),
+        Layout(name="right", ratio=3),
+    )
+    layout["right"].split_column(
+        Layout(render_logs(), name="logs"),
+        Layout(render_devices(), name="devices"),
+    )
+    layout["left"].split_column(
+        Layout(render_status(), name="status"),
+        Layout(render_info(), name="info"),
+    )
+    return layout
+
+
+# ── 交互状态 ──
+show_stats = False
+show_all_logs = True
+cmd_pending = threading.Event()
+last_cmd = [""]
+cmd_lock = threading.Lock()
+
+
+def render_stats() -> Panel:
+    """实时系统资源."""
+    try:
+        import psutil
+        cpu = psutil.cpu_percent()
+        mem = psutil.virtual_memory()
+        bars = f"CPU  [{'#' * int(cpu / 5)}{' ' * (20 - int(cpu / 5))}] {cpu:.0f}%\n"
+        bars += f"内存 [{'#' * int(mem.percent / 5)}{' ' * (20 - int(mem.percent / 5))}] {mem.percent:.0f}%"
+    except ImportError:
+        bars = "pip install psutil 可显示实时 CPU/内存"
+    return Panel(Text(bars, style="bold"), title="系统资源", border_style="yellow")
 
 
 def render_help() -> Panel:
@@ -232,28 +291,30 @@ def main():
     layout = build_layout()
 
     with Live(layout, console=console, refresh_per_second=4, screen=True) as live:
-        # 1. Docker
         if not args.no_docker:
             docker_up()
             live.update(layout)
 
-        # 2. Build + Start center
-        cargo_start()
+        ok = cargo_start()
         live.update(layout)
+        if not ok:
+            time.sleep(3)
+            return
 
-        # 3. Start log reader
         log_thread = threading.Thread(target=log_reader, daemon=True)
         log_thread.start()
 
-        # 4. Main loop
         try:
             while center_proc and center_proc.poll() is None:
                 health_check()
                 layout["header"].update(render_header())
                 layout["status"].update(render_status())
                 layout["info"].update(render_info())
-                layout["right"].update(render_logs())
+                layout["logs"].update(render_logs())
+                layout["devices"].update(render_stats() if show_stats else render_devices())
                 layout["footer"].update(render_help())
+                live.update(layout)
+
                 time.sleep(1)
         except KeyboardInterrupt:
             pass

@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+use std::net::IpAddr;
+use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use axum::{
-    extract::State,
+    extract::{ConnectInfo, State},
     http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse},
     routing::{delete, get, post},
@@ -39,6 +42,9 @@ use email::SmtpConfig;
 use events::EventBus;
 use weather::MetricsCache;
 
+/// Track LAN clients that recently connected.
+pub type ConnectedDevices = Arc<Mutex<HashMap<IpAddr, u64>>>;
+
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
@@ -47,8 +53,8 @@ pub struct AppState {
     pub event_bus: EventBus,
     pub cron_tracker: CronTracker,
     pub smtp_config: SmtpConfig,
-    /// P2#2: 单实例 ID, 写到 cron 日志方便排障. 不用于协调.
     pub instance_id: String,
+    pub devices: ConnectedDevices,
 }
 
 /// Liveness probe — 仅返回进程是否在跑, 不查 DB.
@@ -116,6 +122,47 @@ fn format_uptime() -> String {
         }
     }
     "未知".to_string()
+}
+
+/// LAN discovery endpoint — returns server IPs + connected devices for the TUI.
+async fn discovery(State(state): State<AppState>, ConnectInfo(addr): ConnectInfo<IpAddr>) -> impl IntoResponse {
+    {
+        let mut devices = state.devices.lock().unwrap();
+        let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+        devices.insert(addr, ts);
+        devices.retain(|_, t| ts - *t < 300);
+    }
+
+    let devices: Vec<_> = state.devices.lock().unwrap()
+        .iter()
+        .map(|(ip, t)| json!({"ip": ip.to_string(), "last_seen_sec": t}))
+        .collect();
+
+    let ips = get_local_ips();
+
+    Json(json!({
+        "service": "studio-arona-center",
+        "ips": ips,
+        "port": 8080,
+        "mdns": "studio-arona._tcp.local",
+        "devices": devices,
+    }))
+}
+
+fn get_local_ips() -> Vec<String> {
+    use std::net::UdpSocket;
+    let mut ips = Vec::new();
+    // Best-effort: bind a UDP socket and read local addr
+    if let Ok(s) = UdpSocket::bind("0.0.0.0:0") {
+        if let Ok(()) = s.connect("10.255.255.255:1") {
+            if let Ok(addr) = s.local_addr() {
+                ips.push(addr.ip().to_string());
+            }
+        }
+    }
+    // Also add loopback
+    ips.push("127.0.0.1".into());
+    ips
 }
 
 /// Readiness probe — DB 可达才返 200. K8s / load balancer 用这个摘流量.
@@ -652,6 +699,7 @@ pub fn build_router(state: AppState, config: &Config) -> axum::Router {
     Router::new()
         .route("/", get(home))
         .route("/health", get(health))
+        .route("/api/discovery", get(discovery))
         .route("/readyz", get(readyz))
         .route("/api/auth/register", post(register))
         .route("/api/auth/login", post(login))
@@ -815,8 +863,9 @@ pub async fn build_test_app_state(db: sqlx::PgPool) -> AppState {
         metrics_cache: weather::MetricsCache::new(),
         event_bus: events::EventBus::new(),
         cron_tracker: cron_tracker::CronTracker::new(),
-        smtp_config: email::SmtpConfig::from_env(), // 默认 disabled (无 SMTP_HOST)
+        smtp_config: email::SmtpConfig::from_env(),
         instance_id: format!("test-{}", uuid::Uuid::new_v4()),
+        devices: Arc::new(Mutex::new(HashMap::new())),
     }
 }
 
@@ -877,6 +926,7 @@ pub async fn run() -> anyhow::Result<()> {
         cron_tracker: cron_tracker::CronTracker::new(),
         smtp_config: email::SmtpConfig::from_env(),
         instance_id: instance_id.clone(),
+        devices: Arc::new(Mutex::new(HashMap::new())),
     };
 
     weather::init_weather_cache();
@@ -891,6 +941,6 @@ pub async fn run() -> anyhow::Result<()> {
     tracing::info!("listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await?;
     Ok(())
 }
