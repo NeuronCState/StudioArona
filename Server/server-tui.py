@@ -8,8 +8,6 @@ Studio Arona Server — TUI 面板 (OpenCode 风格).
   - 健康检查
   - 一键停止
 
-依赖: rich (Server/.venv-runner 已装)
-
 用法:
   python3 server-tui.py              # 前台 TUI 模式
   python3 server-tui.py --no-docker  # 跳过 Docker
@@ -30,6 +28,13 @@ COMPOSE_FILE = ROOT / "infra" / "compose" / "docker-compose.yml"
 LOG_DIR = ROOT / ".run-logs"
 LOG_DIR.mkdir(exist_ok=True)
 
+# 确保 .venv-runner 的 site-packages 在 path 里 (rich 装在那里)
+_venv = ROOT / ".venv-runner"
+if _venv.exists():
+    _lib = next(_venv.glob("lib/python*/site-packages"), None)
+    if _lib and str(_lib) not in sys.path:
+        sys.path.insert(0, str(_lib))
+
 try:
     from rich.live import Live
     from rich.panel import Panel
@@ -40,7 +45,8 @@ try:
     from rich.align import Align
     from rich import box
 except ImportError:
-    print("需要 rich 库: pip install rich")
+    print("rich 未安装。请先运行: python3 run.py --build (自动装 rich)")
+    print(f"或手动: {_venv_python} -m pip install rich")
     sys.exit(1)
 
 console = Console()
