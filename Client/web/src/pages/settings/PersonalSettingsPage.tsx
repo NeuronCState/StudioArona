@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import {
   Bell,
   Check,
@@ -44,76 +44,22 @@ export function PersonalSettingsPage() {
   const designMode = useDesignModeStore((state) => state.mode);
   const setDesignMode = useDesignModeStore((state) => state.setMode);
   const [section, setSection] = useState<Section>("profile");
-  const [username, setUsername] = useState(user?.username ?? "");
-  const [displayName, setDisplayName] = useState(user?.display_name ?? "");
-  const [avatarUrl, setAvatarUrl] = useState(
-    () =>
-      (user?.preferences as Record<string, string> | undefined)?.avatar_url ??
-      "",
-  );
+  // Profile fields → migrated to useActionState ProfileForm component
+  // Notifications fields → still local state
   const [email, setEmail] = useState(user?.email ?? "");
-  const [notifyByEmail, setNotifyByEmail] = useState(
-    user?.notify_by_email ?? false,
-  );
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{
-    error: boolean;
-    text: string;
-  } | null>(null);
+  const [notifyByEmail, setNotifyByEmail] = useState(user?.notify_by_email ?? false);
+  const [notifSaving, setNotifSaving] = useState(false);
+  const [notifMessage, setNotifMessage] = useState<{ error: boolean; text: string } | null>(null);
 
   useEffect(() => {
-    setUsername(user?.username ?? "");
-    setDisplayName(user?.display_name ?? "");
-    setAvatarUrl(
-      (user?.preferences as Record<string, string> | undefined)?.avatar_url ??
-        "",
-    );
     setEmail(user?.email ?? "");
     setNotifyByEmail(user?.notify_by_email ?? false);
   }, [user]);
 
-  const saveProfile = async () => {
-    if (!user) return;
-    setSaving(true);
-    setMessage(null);
-    const nextUsername = username.trim() || user.username;
-    const nextDisplayName = displayName.trim() || user.display_name;
-    const preferences = {
-      ...(user.preferences as Record<string, unknown>),
-      avatar_url: avatarUrl.trim() || null,
-    };
-    setUser({
-      ...user,
-      username: nextUsername,
-      display_name: nextDisplayName,
-      preferences,
-    });
-    try {
-      await Promise.all([
-        api.patch("/me", {
-          username: nextUsername,
-          display_name: nextDisplayName,
-        }),
-        api.patch("/me/preferences", {
-          key: "avatar_url",
-          value: avatarUrl.trim() || null,
-        }),
-      ]);
-      setMessage({ error: false, text: "个人资料已保存" });
-    } catch {
-      setMessage({
-        error: false,
-        text: "已保存到本机，连接 Server 后将继续同步",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const saveNotifications = async () => {
     if (!user) return;
-    setSaving(true);
-    setMessage(null);
+    setNotifSaving(true);
+    setNotifMessage(null);
     try {
       const response = await api.patch<{
         email: string | null;
@@ -127,11 +73,11 @@ export function PersonalSettingsPage() {
         email: response.email,
         notify_by_email: response.notify_by_email,
       });
-      setMessage({ error: false, text: "通知设置已保存" });
+      setNotifMessage({ error: false, text: "通知设置已保存" });
     } catch (error) {
-      setMessage({ error: true, text: (error as Error).message });
+      setNotifMessage({ error: true, text: (error as Error).message });
     } finally {
-      setSaving(false);
+      setNotifSaving(false);
     }
   };
 
@@ -146,8 +92,8 @@ export function PersonalSettingsPage() {
     <div className="studio-page @container mx-auto min-h-full max-w-6xl px-5 py-6 md:px-8 md:py-8">
       <header className="mb-8 flex items-center gap-4 border-b border-[var(--color-border)] pb-6">
         <Avatar
-          src={avatarUrl}
-          alt={displayName || username || "User"}
+          src={(user?.preferences as Record<string, string> | undefined)?.avatar_url ?? ""}
+          alt={user?.display_name || user?.username || "User"}
           size="xl"
         />
         <div className="min-w-0">
@@ -155,10 +101,10 @@ export function PersonalSettingsPage() {
             Personal
           </p>
           <h1 className="mt-1 truncate text-2xl font-bold text-[var(--color-text-primary)]">
-            {displayName || username || "个人设置"}
+            {user?.display_name || user?.username || "个人设置"}
           </h1>
           <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
-            @{username || "user"}
+            @{user?.username || "user"}
           </p>
         </div>
       </header>
@@ -173,7 +119,7 @@ export function PersonalSettingsPage() {
               key={id}
               onClick={() => {
                 setSection(id);
-                setMessage(null);
+                setNotifMessage(null);
               }}
               className={`relative flex shrink-0 items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm font-medium transition-colors md:w-full ${
                 section === id
@@ -204,44 +150,7 @@ export function PersonalSettingsPage() {
               transition={transition}
             >
               {section === "profile" && (
-                <SettingsSection
-                  title="个人资料"
-                  description="用于 Studio Arona 中的账户显示。"
-                >
-                  <div className="grid gap-5 @2xl:grid-cols-2">
-                    <SettingField label="用户名">
-                      <input
-                        className={fieldClass}
-                        value={username}
-                        onChange={(event) => setUsername(event.target.value)}
-                      />
-                    </SettingField>
-                    <SettingField label="显示名">
-                      <input
-                        className={fieldClass}
-                        value={displayName}
-                        onChange={(event) => setDisplayName(event.target.value)}
-                      />
-                    </SettingField>
-                    <div className="sm:col-span-2">
-                      <SettingField label="头像 URL">
-                        <input
-                          className={fieldClass}
-                          value={avatarUrl}
-                          onChange={(event) => setAvatarUrl(event.target.value)}
-                        />
-                      </SettingField>
-                    </div>
-                  </div>
-                  <ActionRow message={message}>
-                    <Button
-                      disabled={saving}
-                      onClick={() => void saveProfile()}
-                    >
-                      <Save size={14} /> {saving ? "保存中…" : "保存资料"}
-                    </Button>
-                  </ActionRow>
-                </SettingsSection>
+                <ProfileForm user={user} setUser={setUser} />
               )}
 
               {section === "notifications" && (
@@ -275,12 +184,12 @@ export function PersonalSettingsPage() {
                       className="mt-1 h-4 w-4 accent-[var(--color-accent)]"
                     />
                   </label>
-                  <ActionRow message={message}>
+                  <ActionRow message={notifMessage}>
                     <Button
-                      disabled={saving}
+                      disabled={notifSaving}
                       onClick={() => void saveNotifications()}
                     >
-                      <Save size={14} /> {saving ? "保存中…" : "保存通知"}
+                      <Save size={14} /> {notifSaving ? "保存中…" : "保存通知"}
                     </Button>
                   </ActionRow>
                 </SettingsSection>
@@ -387,6 +296,63 @@ function SettingsSection({
       </div>
       {children}
     </section>
+  );
+}
+
+// ── ProfileForm (React 19 useActionState) ──
+
+interface ProfileFormState { message: string; error: boolean }
+
+function ProfileForm({ user, setUser }: {
+  user: ReturnType<typeof useAuthStore.getState>["user"];
+  setUser: ReturnType<typeof useAuthStore.getState>["setUser"];
+}) {
+  const [state, formAction, isPending] = useActionState(
+    async (_prev: ProfileFormState, formData: FormData) => {
+      if (!user) return { message: "", error: false };
+      const username = (formData.get("username") as string).trim() || user.username;
+      const displayName = (formData.get("displayName") as string).trim() || user.display_name;
+      const avatarUrl = (formData.get("avatarUrl") as string).trim() || null;
+
+      const preferences = { ...(user.preferences as Record<string, unknown>), avatar_url: avatarUrl };
+      setUser({ ...user, username, display_name: displayName, preferences });
+
+      try {
+        await Promise.all([
+          api.patch("/me", { username, display_name: displayName }),
+          api.patch("/me/preferences", { key: "avatar_url", value: avatarUrl }),
+        ]);
+        return { message: "个人资料已保存", error: false };
+      } catch {
+        return { message: "已保存到本机，连接 Server 后将继续同步", error: false };
+      }
+    },
+    { message: "", error: false } satisfies ProfileFormState,
+  );
+
+  return (
+    <SettingsSection title="个人资料" description="用于 Studio Arona 中的账户显示。">
+      <form action={formAction} className="space-y-0">
+        <div className="grid gap-5 @2xl:grid-cols-2">
+          <SettingField label="用户名">
+            <input className={fieldClass} name="username" defaultValue={user?.username ?? ""} />
+          </SettingField>
+          <SettingField label="显示名">
+            <input className={fieldClass} name="displayName" defaultValue={user?.display_name ?? ""} />
+          </SettingField>
+          <div className="sm:col-span-2">
+            <SettingField label="头像 URL">
+              <input className={fieldClass} name="avatarUrl" defaultValue={(user?.preferences as Record<string, string> | undefined)?.avatar_url ?? ""} />
+            </SettingField>
+          </div>
+        </div>
+        <ActionRow message={state.message ? { error: state.error, text: state.message } : null}>
+          <Button type="submit" disabled={isPending}>
+            <Save size={14} /> {isPending ? "保存中…" : "保存资料"}
+          </Button>
+        </ActionRow>
+      </form>
+    </SettingsSection>
   );
 }
 
