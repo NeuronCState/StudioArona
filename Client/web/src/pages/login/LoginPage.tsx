@@ -18,6 +18,7 @@ import { useSonettoConfigStore } from "@/stores/sonetto-config";
 import { Spinner } from "@javis/ui-kit";
 import { LoginBackdrop } from "@/components/effects/LoginBackdrop";
 import { db } from "@/lib/db";
+import { useT } from "@/lib/i18n";
 import * as storage from "@/lib/storage";
 
 async function clearAllUserData(): Promise<{ hadData: boolean }> {
@@ -65,6 +66,7 @@ interface FormState {
 
 // ── Login form ──
 function LoginForm() {
+  const tr = useT();
   const login = useAuthStore((s) => s.login);
 
   const [state, formAction, isPending] = useActionState(
@@ -74,7 +76,7 @@ function LoginForm() {
         password: formData.get("password") as string,
       };
       const result = loginSchema.safeParse(raw);
-      if (!result.success) return { error: "请输入用户名和密码" };
+      if (!result.success) return { error: tr("login.error.credentials") };
 
       try {
         const data = await api.post<{
@@ -87,9 +89,9 @@ function LoginForm() {
       } catch (e) {
         const msg = e instanceof Error ? e.message : "";
         if (msg.includes("offline") || msg.includes("unreachable") || msg.includes("not in online mode")) {
-          return { error: "服务器未连接，请确认服务已启动后重试" };
+          return { error: tr("login.error.serverOffline") };
         }
-        return { error: "登录失败，请检查用户名和密码" };
+        return { error: tr("login.error.credentials") };
       }
     },
     { error: "" } satisfies FormState,
@@ -116,46 +118,21 @@ function LoginForm() {
       )}
 
       <div>
-        <label
-          htmlFor="login-username"
-          className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]"
-        >
-          用户名
+        <label htmlFor="login-username" className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]">
+          {tr("login.username")}
         </label>
-        <input
-          id="login-username"
-          name="username"
-          className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors"
-          autoComplete="username"
-          placeholder="输入用户名"
-          defaultValue=""
-        />
+        <input id="login-username" name="username" className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors" autoComplete="username" placeholder={tr("login.usernamePlaceholder")} defaultValue="" />
       </div>
 
       <div>
-        <label
-          htmlFor="login-password"
-          className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]"
-        >
-          密码
+        <label htmlFor="login-password" className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]">
+          {tr("login.password")}
         </label>
-        <input
-          id="login-password"
-          name="password"
-          type="password"
-          className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors"
-          autoComplete="current-password"
-          placeholder="输入密码"
-          defaultValue=""
-        />
+        <input id="login-password" name="password" type="password" className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors" autoComplete="current-password" placeholder={tr("login.passwordPlaceholder")} defaultValue="" />
       </div>
 
-      <button
-        type="submit"
-        disabled={isPending}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2 disabled:opacity-60"
-      >
-        {isPending ? <Spinner size="sm" /> : "登录"}
+      <button type="submit" disabled={isPending} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2 disabled:opacity-60">
+        {isPending ? <Spinner size="sm" /> : tr("login.submit")}
       </button>
     </motion.form>
   );
@@ -163,6 +140,7 @@ function LoginForm() {
 
 // ── Register form ──
 function RegisterForm() {
+  const tr = useT();
   const login = useAuthStore((s) => s.login);
   const [selectedAvatar, setSelectedAvatar] = useState("");
 
@@ -176,7 +154,7 @@ function RegisterForm() {
       const result = registerSchema.safeParse(raw);
       if (!result.success) {
         const firstIssue = result.error.issues[0];
-        return { error: firstIssue?.message ?? "请检查注册信息" };
+        return { error: firstIssue?.message ?? tr("login.error.credentials") };
       }
 
       try {
@@ -217,9 +195,9 @@ function RegisterForm() {
       } catch (e) {
         const msg = e instanceof Error ? e.message : "";
         if (msg.includes("offline") || msg.includes("unreachable") || msg.includes("not in online mode")) {
-          return { error: "服务器未连接，请确认服务已启动后重试" };
+          return { error: tr("login.error.serverOffline") };
         }
-        return { error: "注册失败，请检查信息或稍后重试" };
+        return { error: tr("login.error.credentials") };
       }
     },
     { error: "" } satisfies FormState,
@@ -248,55 +226,18 @@ function RegisterForm() {
       <input type="hidden" name="avatar" value={selectedAvatar || ""} />
 
       <div>
-        <label
-          htmlFor="reg-username"
-          className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]"
-        >
-          用户名
-        </label>
-        <input
-          id="reg-username"
-          name="username"
-          className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors"
-          autoComplete="username"
-          placeholder="输入用户名"
-          defaultValue=""
-        />
+        <label htmlFor="reg-username" className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]">{tr("login.username")}</label>
+        <input id="reg-username" name="username" className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors" autoComplete="username" placeholder={tr("login.usernamePlaceholder")} defaultValue="" />
       </div>
 
       <div>
-        <label
-          htmlFor="reg-display"
-          className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]"
-        >
-          显示名
-        </label>
-        <input
-          id="reg-display"
-          name="displayName"
-          className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors"
-          autoComplete="name"
-          placeholder="你的名字"
-          defaultValue=""
-        />
+        <label htmlFor="reg-display" className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]">{tr("login.displayName")}</label>
+        <input id="reg-display" name="displayName" className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors" autoComplete="name" placeholder={tr("login.displayNamePlaceholder")} defaultValue="" />
       </div>
 
       <div>
-        <label
-          htmlFor="reg-password"
-          className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]"
-        >
-          密码
-        </label>
-        <input
-          id="reg-password"
-          name="password"
-          type="password"
-          className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors"
-          autoComplete="new-password"
-          placeholder="至少 6 位"
-          defaultValue=""
-        />
+        <label htmlFor="reg-password" className="mb-1.5 block text-xs font-medium text-[var(--color-text-secondary)]">{tr("login.password")}</label>
+        <input id="reg-password" name="password" type="password" className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] transition-colors" autoComplete="new-password" placeholder={tr("login.passwordMinHint")} defaultValue="" />
       </div>
 
       {/* Avatar picker */}
@@ -323,12 +264,8 @@ function RegisterForm() {
         </div>
       </div>
 
-      <button
-        type="submit"
-        disabled={isPending}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2 disabled:opacity-60"
-      >
-        {isPending ? <Spinner size="sm" /> : "注册"}
+      <button type="submit" disabled={isPending} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2 disabled:opacity-60">
+        {isPending ? <Spinner size="sm" /> : tr("login.registerSubmit")}
       </button>
     </motion.form>
   );
@@ -336,6 +273,7 @@ function RegisterForm() {
 
 // ── Page ──
 export function LoginPage() {
+  const tr = useT();
   const [mode, setMode] = useState<"login" | "register">("login");
 
   return (
@@ -350,12 +288,10 @@ export function LoginPage() {
             </div>
           </div>
           <h1 className="font-serif text-3xl font-semibold text-[var(--color-text-primary)]">
-            什亭之匣 · 阿洛娜
+            {tr("login.brand.title")}
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-[var(--color-text-secondary)]">
-            Shtin Box · Arona，你的智能工作室伙伴。
-            <br />
-            管理 NAS、虚拟机、RSS 订阅，记住每一个来过的人。
+            {tr("login.brand.subtitle")}
           </p>
         </div>
       </div>
@@ -380,7 +316,7 @@ export function LoginPage() {
                   : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
               }`}
             >
-              登录
+              {tr("login.title")}
             </button>
             <button
               onClick={() => setMode("register")}
@@ -390,7 +326,7 @@ export function LoginPage() {
                   : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
               }`}
             >
-              注册
+              {tr("login.register")}
             </button>
           </div>
 
