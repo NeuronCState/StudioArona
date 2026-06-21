@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Bot, Plus, Trash2, ArrowRight, Check } from "lucide-react";
 import {
@@ -17,23 +17,31 @@ export function SetupPage() {
     markSetupComplete,
   } = useSonettoConfigStore();
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState<SonettoProviderConfig>({
-    id: "",
-    provider_type: "openai",
-    label: "自定义",
-    api_key: "",
-    base_url: "",
-    models: [],
-    context_window: 32000,
-  });
+  const formRef = useRef<HTMLFormElement>(null);
 
-  const handleAdd = () => {
-    if (!form.base_url) return;
-    const id = `custom-${Date.now()}`;
-    addProvider({ ...form, id, label: form.label || form.base_url });
-    setForm({ ...form, id: "", api_key: "" });
-    setEditing(false);
-  };
+  const [, formAction, isPending] = useActionState(
+    async (_prev: null, formData: FormData) => {
+      const base_url = (formData.get("base_url") as string).trim();
+      if (!base_url) return null;
+      const id = `custom-${Date.now()}`;
+      addProvider({
+        id,
+        provider_type: "openai",
+        label: (formData.get("label") as string).trim() || base_url,
+        api_key: (formData.get("api_key") as string).trim(),
+        base_url,
+        models: ((formData.get("models") as string) || "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        context_window: 32000,
+      });
+      formRef.current?.reset();
+      setEditing(false);
+      return null;
+    },
+    null,
+  );
 
   const handlePreset = (preset: SonettoProviderConfig) => {
     addProvider(preset);
@@ -130,81 +138,35 @@ export function SetupPage() {
           </div>
         )}
 
-        {/* Custom add */}
+        {/* Custom add — React 19 useActionState */}
         {editing ? (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
-            className="mb-6 space-y-3 rounded-xl border border-[var(--color-accent)]/30 bg-[var(--color-surface)] p-4"
+            className="mb-6 rounded-xl border border-[var(--color-accent)]/30 bg-[var(--color-surface)] p-4"
           >
-            <div>
-              <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">
-                标签
-              </label>
-              <input
-                value={form.label}
-                onChange={(e) => setForm({ ...form, label: e.target.value })}
-                placeholder="我的 MiniMax"
-                className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">
-                Base URL
-              </label>
-              <input
-                value={form.base_url}
-                onChange={(e) => setForm({ ...form, base_url: e.target.value })}
-                placeholder="https://api.example.com/v1"
-                className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">
-                API Key
-              </label>
-              <input
-                value={form.api_key}
-                onChange={(e) => setForm({ ...form, api_key: e.target.value })}
-                placeholder="sk-..."
-                type="password"
-                className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-[var(--color-text-secondary)]">
-                模型 (逗号分隔)
-              </label>
-              <input
-                value={form.models.join(",")}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    models: e.target.value
-                      .split(",")
-                      .map((s) => s.trim())
-                      .filter(Boolean),
-                  })
-                }
-                placeholder="gpt-4o-mini, gpt-4o"
-                className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setEditing(false)}
-                className="rounded-lg px-3 py-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleAdd}
-                disabled={!form.base_url}
-                className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-xs text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-50"
-              >
-                添加
-              </button>
-            </div>
+            <form ref={formRef} action={formAction} className="space-y-3">
+              <div>
+                <label htmlFor="sp-label" className="mb-1 block text-xs text-[var(--color-text-secondary)]">标签</label>
+                <input id="sp-label" name="label" placeholder="我的 MiniMax" className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]" />
+              </div>
+              <div>
+                <label htmlFor="sp-url" className="mb-1 block text-xs text-[var(--color-text-secondary)]">Base URL</label>
+                <input id="sp-url" name="base_url" placeholder="https://api.example.com/v1" required className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]" />
+              </div>
+              <div>
+                <label htmlFor="sp-key" className="mb-1 block text-xs text-[var(--color-text-secondary)]">API Key</label>
+                <input id="sp-key" name="api_key" placeholder="sk-..." type="password" className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]" />
+              </div>
+              <div>
+                <label htmlFor="sp-models" className="mb-1 block text-xs text-[var(--color-text-secondary)]">模型 (逗号分隔)</label>
+                <input id="sp-models" name="models" placeholder="gpt-4o-mini, gpt-4o" className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]" />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setEditing(false)} className="rounded-lg px-3 py-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]">取消</button>
+                <button type="submit" disabled={isPending} className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-xs text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-50">{isPending ? "添加中…" : "添加"}</button>
+              </div>
+            </form>
           </motion.div>
         ) : (
           <button
