@@ -22,7 +22,8 @@
     "storybook:build": "storybook build",
     "lint:style": "stylelint 'src/**/*.css'",
     "chromatic": "chromatic --exit-zero-on-changes",
-    "dev:ocr": "cd ../services/ocr && ../../.venv-sonetto/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8083 --reload"
+    "dev:ocr": "cd ../services/ocr && ../../.venv-sonetto/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8083 --reload",
+    "prepare": "husky"
   },
   "dependencies": {
     "@javis/ui-kit": "workspace:*",
@@ -44,7 +45,6 @@
     "pixi.js": "^7.4.3",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.0",
     "rehype-highlight": "^7.0.2",
@@ -83,7 +83,9 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "fake-indexeddb": "^6.2.5",
+    "husky": "^9.1.7",
     "jsdom": "^29.1.1",
+    "lint-staged": "^17.0.8",
     "msw": "^2.14.6",
     "playwright": "^1.61.0",
     "postcss": "^8.5.15",
@@ -102,6 +104,16 @@
   "msw": {
     "workerDirectory": [
       "public"
+    ]
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix --max-warnings 0",
+      "prettier --write"
+    ],
+    "*.css": [
+      "stylelint --fix",
+      "prettier --write"
     ]
   }
 }
