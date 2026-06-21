@@ -5,6 +5,7 @@ import { Moon, Sun, Monitor, PanelLeft } from "lucide-react";
 import { Avatar } from "@javis/ui-kit";
 import { useAuthStore } from "@/stores/auth";
 import { NotificationBell } from "./NotificationBell";
+import { LocaleToggle } from "./LocaleToggle";
 
 const pageTitles: Record<string, string> = {
   "/": "对话",
@@ -63,6 +64,7 @@ export function TopBar() {
 
       <div className="flex items-center gap-1">
         <NotificationBell />
+        <LocaleToggle />
         <button
           onClick={toggle}
           className="rounded-md p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text-primary)] transition-colors"

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useTransition } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
   Upload,
@@ -33,6 +33,7 @@ interface ParseResult {
 }
 
 export function OCRPage() {
+  const [, startTransition] = useTransition();
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [results, setResults] = useState<ParseResult[]>([]);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -175,8 +176,8 @@ export function OCRPage() {
       alert("请选择 PDF 或图片文件");
       return;
     }
-    setPdfFile(file);
-  }, []);
+    startTransition(() => setPdfFile(file));
+  }, [startTransition]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {

@@ -6,8 +6,10 @@ import {
   SONETTO_PRESETS,
   type SonettoProviderConfig,
 } from "@/stores/sonetto-config";
+import { useT } from "@/lib/i18n";
 
 export function SetupPage() {
+  const tr = useT();
   const {
     providers,
     activeProviderId,
@@ -64,19 +66,15 @@ export function SetupPage() {
               <Bot size={32} className="text-white" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
-            配置 AI 服务
-          </h1>
-          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-            连接到你的 LLM 供应商, SonettoHere 整端当 agent 框架 (LangGraph
-            ReAct + 30+ tool)
+          <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">{tr("setup.title")}</h1>
+          <p className="mt-2 text-sm text-[var(--color-text-secondary)]">{tr("setup.subtitle")}
           </p>
         </div>
 
         {/* Presets */}
         <div className="mb-6">
           <p className="mb-3 text-xs font-medium text-[var(--color-text-muted)]">
-            快速添加
+            {tr("setup.quickAdd")}
           </p>
           <div className="grid grid-cols-2 gap-2">
             {SONETTO_PRESETS.map((preset) => (
@@ -98,7 +96,7 @@ export function SetupPage() {
         {providers.length > 0 && (
           <div className="mb-6">
             <p className="mb-3 text-xs font-medium text-[var(--color-text-muted)]">
-              已添加的供应商
+              {tr("setup.addedProviders")}
             </p>
             <div className="space-y-2">
               {providers.map((p) => (
@@ -124,7 +122,7 @@ export function SetupPage() {
                         : "bg-[var(--color-bg)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
                     }`}
                   >
-                    {p.id === activeProviderId ? "当前" : "使用"}
+                    {p.id === activeProviderId ? tr("setup.current") : tr("setup.use")}
                   </button>
                   <button
                     onClick={() => removeProvider(p.id)}
@@ -147,24 +145,24 @@ export function SetupPage() {
           >
             <form ref={formRef} action={formAction} className="space-y-3">
               <div>
-                <label htmlFor="sp-label" className="mb-1 block text-xs text-[var(--color-text-secondary)]">标签</label>
-                <input id="sp-label" name="label" placeholder="我的 MiniMax" className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]" />
+                <label htmlFor="sp-label" className="mb-1 block text-xs text-[var(--color-text-secondary)]">{tr("setup.label")}</label>
+                <input id="sp-label" name="label" placeholder={tr("setup.label")} className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]" />
               </div>
               <div>
-                <label htmlFor="sp-url" className="mb-1 block text-xs text-[var(--color-text-secondary)]">Base URL</label>
+                <label htmlFor="sp-url" className="mb-1 block text-xs text-[var(--color-text-secondary)]">{tr("setup.baseUrl")}</label>
                 <input id="sp-url" name="base_url" placeholder="https://api.example.com/v1" required className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]" />
               </div>
               <div>
-                <label htmlFor="sp-key" className="mb-1 block text-xs text-[var(--color-text-secondary)]">API Key</label>
+                <label htmlFor="sp-key" className="mb-1 block text-xs text-[var(--color-text-secondary)]">{tr("setup.apiKey")}</label>
                 <input id="sp-key" name="api_key" placeholder="sk-..." type="password" className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]" />
               </div>
               <div>
-                <label htmlFor="sp-models" className="mb-1 block text-xs text-[var(--color-text-secondary)]">模型 (逗号分隔)</label>
+                <label htmlFor="sp-models" className="mb-1 block text-xs text-[var(--color-text-secondary)]">{tr("setup.models")}</label>
                 <input id="sp-models" name="models" placeholder="gpt-4o-mini, gpt-4o" className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]" />
               </div>
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setEditing(false)} className="rounded-lg px-3 py-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]">取消</button>
-                <button type="submit" disabled={isPending} className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-xs text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-50">{isPending ? "添加中…" : "添加"}</button>
+                <button type="button" onClick={() => setEditing(false)} className="rounded-lg px-3 py-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]">{tr("setup.cancel")}</button>
+                <button type="submit" disabled={isPending} className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-xs text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-50">{isPending ? tr("setup.adding") : tr("setup.add")}</button>
               </div>
             </form>
           </motion.div>
@@ -174,7 +172,7 @@ export function SetupPage() {
             className="mb-6 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--color-border)] py-3 text-sm text-[var(--color-text-muted)] transition-colors hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]"
           >
             <Plus size={16} />
-            自定义添加供应商
+            {tr("setup.customAdd")}
           </button>
         )}
 
@@ -184,14 +182,14 @@ export function SetupPage() {
             onClick={handleSkip}
             className="text-sm text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-secondary)]"
           >
-            跳过, 稍后配置
+            {tr("setup.skip")}
           </button>
           <button
             onClick={handleComplete}
             className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-accent)] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--color-accent-hover)]"
           >
             <Check size={16} />
-            完成
+            {tr("setup.complete")}
             <ArrowRight size={16} />
           </button>
         </div>
