@@ -131,8 +131,18 @@ def ensure_sonetto_source() -> None:
 def ensure_ocr_vendor() -> None:
     """Run scripts/download_ocr.sh if vendor/ is missing."""
     plat = get_platform()
-    model_ok = (OCR_VENDOR_DIR / "PaddleOCR-VL-1.6-GGUF.gguf").exists()
-    mmproj_ok = (OCR_VENDOR_DIR / "PaddleOCR-VL-1.6-GGUF-mmproj.gguf").exists()
+    # Check both flat and versioned (1.6/) layouts
+    ver = "1.6"
+    model_paths = [
+        OCR_VENDOR_DIR / "PaddleOCR-VL-1.6-GGUF.gguf",        # flat (legacy)
+        OCR_VENDOR_DIR / ver / "PaddleOCR-VL-1.6-GGUF.gguf",   # versioned
+    ]
+    mmproj_paths = [
+        OCR_VENDOR_DIR / "PaddleOCR-VL-1.6-GGUF-mmproj.gguf",
+        OCR_VENDOR_DIR / ver / "PaddleOCR-VL-1.6-GGUF-mmproj.gguf",
+    ]
+    model_ok = any(p.exists() for p in model_paths)
+    mmproj_ok = any(p.exists() for p in mmproj_paths)
     llama_ok = (OCR_LLAMA_DIR / plat / "llama-server").exists() or (OCR_LLAMA_DIR / plat / "llama-server.exe").exists()
     if model_ok and mmproj_ok and llama_ok:
         log(f"OCR vendor OK ({plat})")
@@ -143,7 +153,7 @@ def ensure_ocr_vendor() -> None:
     if not download_script.exists():
         log(f"ERROR: {download_script} not found")
         sys.exit(1)
-    subprocess.run(["bash", str(download_script), plat], check=True)
+    subprocess.run(["bash", str(download_script), "1.6", plat], check=True)
     log("OCR vendor downloaded")
 
 

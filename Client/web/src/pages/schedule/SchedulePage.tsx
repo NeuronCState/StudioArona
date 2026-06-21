@@ -379,7 +379,8 @@ export function SchedulePage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
-              setAddInitialDate(undefined);
+              // Default to today so the submit button is immediately clickable
+              setAddInitialDate(new Date().toISOString().split("T")[0]);
               setShowAdd(true);
             }}
             className="btn-primary gap-2"
@@ -499,7 +500,7 @@ export function SchedulePage() {
                 <Button
                   size="sm"
                   onClick={() => {
-                    setAddInitialDate(undefined);
+                    setAddInitialDate(new Date().toISOString().split("T")[0]);
                     setShowAdd(true);
                   }}
                 >
