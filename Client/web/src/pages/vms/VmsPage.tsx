@@ -12,6 +12,7 @@ import { SlideOver } from "@/components/ui/SlideOver";
 import { Drawer } from "@/components/ui/Drawer";
 import { StudioServiceOffline } from "@/components/studio/StudioServiceOffline";
 import { useConnectionStore } from "@/stores/connection";
+import { useT } from "@/lib/i18n";
 
 function VmListSkeleton() {
   return (
@@ -30,6 +31,7 @@ function VmListSkeleton() {
 }
 
 export function VmsPage() {
+  const tr = useT();
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [selectedVm, setSelectedVm] = useState<VM | null>(null);
@@ -64,12 +66,12 @@ export function VmsPage() {
   };
 
   const statusLabels: Record<VM["status"], string> = {
-    queued: "排队中",
-    creating: "创建中",
-    running: "运行中",
-    stopped: "已停止",
-    error: "异常",
-    destroyed: "已销毁",
+    queued: tr("vm.status.queued"),
+    creating: tr("vm.status.creating"),
+    running: tr("vm.status.running"),
+    stopped: tr("vm.status.stopped"),
+    error: tr("vm.status.error"),
+    destroyed: tr("vm.status.destroyed"),
   };
 
   // 离线先于 loading/error 判: 工作室服务需 server, 没连接时不打 server
@@ -97,15 +99,15 @@ export function VmsPage() {
     <>
       <PageLayout
         subtitle="VMs"
-        title="VM 控制台"
-        description="创建、查看并管理工作室虚拟机，危险操作由阿洛娜二次确认。"
+        title={tr("vm.title")}
+        description={tr("vm.description")}
         action={
           <button
             onClick={() => setShowCreate(true)}
             className="btn-primary gap-2"
           >
             <Plus size={16} />
-            申请 VM
+            {tr("vm.request")}
           </button>
         }
       >
@@ -113,7 +115,7 @@ export function VmsPage() {
           open={showCreate}
           onClose={() => setShowCreate(false)}
           from="right"
-          title="申请 VM"
+          title={tr("vm.request")}
           width="560px"
         >
           <CreateVmForm
@@ -171,8 +173,8 @@ export function VmsPage() {
           </div>
         ) : (
           <CardEmpty
-            hint="创建一个虚拟机来运行训练任务或开发环境"
-            cta="创建第一个 VM"
+            hint={tr("vm.firstHint")}
+            cta={tr("vm.first")}
             onCta={() => setShowCreate(true)}
             icon={
               <Terminal size={32} className="text-[var(--color-text-muted)]" />
