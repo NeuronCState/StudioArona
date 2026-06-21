@@ -2,7 +2,7 @@ use anyhow::Result;
 use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
-    response::IntoResponse,
+    response::{Html, IntoResponse},
     routing::{delete, get, post},
     Json, Router,
 };
@@ -58,6 +58,64 @@ async fn health() -> impl IntoResponse {
         "service": "studio-arona-center",
         "version": "0.1.0"
     }))
+}
+
+/// Home page — 服务状态面板 (中文).
+async fn home() -> impl IntoResponse {
+    Html(format!(
+        r#"<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>Studio Arona Server</title>
+<style>
+  *{{margin:0;padding:0;box-sizing:border-box}}
+  body{{font-family:"SF Mono",Monaco,"JetBrains Mono",monospace;background:#0d1117;color:#c9d1d9;min-height:100vh;display:flex;align-items:center;justify-content:center}}
+  .card{{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:32px 40px;max-width:480px;width:100%}}
+  h1{{font-size:20px;color:#f0883e;margin-bottom:4px}}
+  .sub{{font-size:12px;color:#8b949e;margin-bottom:24px}}
+  .row{{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #21262d;font-size:13px}}
+  .row:last-child{{border-bottom:none}}
+  .label{{color:#8b949e}}
+  .val{{color:#c9d1d9;font-weight:500}}
+  .ok{{color:#3fb950}}.warn{{color:#d29922}}
+  .links{{margin-top:20px;display:flex;gap:12px}}
+  .links a{{color:#58a6ff;text-decoration:none;font-size:12px;padding:6px 12px;border:1px solid #30363d;border-radius:6px}}
+  .links a:hover{{background:#1f2937}}
+</style></head>
+<body>
+<div class="card">
+  <h1>什亭之匣 · Studio Arona</h1>
+  <p class="sub">Server Center Daemon — Rust axum</p>
+  <div class="row"><span class="label">服务状态</span><span class="val ok">运行中</span></div>
+  <div class="row"><span class="label">版本</span><span class="val">{version}</span></div>
+  <div class="row"><span class="label">端口</span><span class="val">8080</span></div>
+  <div class="row"><span class="label">运行时间</span><span class="val">{uptime}</span></div>
+  <div class="row"><span class="label">PID</span><span class="val">{pid}</span></div>
+  <div class="links">
+    <a href="/health">/health</a>
+    <a href="/readyz">/readyz</a>
+    <a href="/api/me">/api/me</a>
+  </div>
+</div>
+</body></html>"#,
+        version = env!("CARGO_PKG_VERSION"),
+        uptime = format_uptime(),
+        pid = std::process::id(),
+    ))
+}
+
+fn format_uptime() -> String {
+    // uptime via /proc/uptime on Linux, else placeholder
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(s) = std::fs::read_to_string("/proc/uptime") {
+            let secs = s.split_whitespace().next().and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
+            let d = secs as u64 / 86400;
+            let h = (secs as u64 % 86400) / 3600;
+            let m = (secs as u64 % 3600) / 60;
+            return format!("{d}d {h}h {m}m");
+        }
+    }
+    "未知".to_string()
 }
 
 /// Readiness probe — DB 可达才返 200. K8s / load balancer 用这个摘流量.
@@ -592,6 +650,7 @@ pub fn build_router(state: AppState, config: &Config) -> axum::Router {
         .max_age(Duration::from_secs(600));
 
     Router::new()
+        .route("/", get(home))
         .route("/health", get(health))
         .route("/readyz", get(readyz))
         .route("/api/auth/register", post(register))
