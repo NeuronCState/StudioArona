@@ -10,7 +10,7 @@
  * 编辑 (P2#19): name / css_selector / check_interval_min / enabled
  * 操作: 保存 / 立即检查 / 暂停/启用 / 删除
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useActionState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Trash2, Play, Pause, RefreshCw, X, Check } from "lucide-react";
 import { api } from "@/lib/api/client";
@@ -199,133 +199,68 @@ interface EditDialogProps {
 function PageMonitorEditDialog({ monitor, onClose, onSaved }: EditDialogProps) {
   const queryClient = useQueryClient();
   const t = useT();
-  const [label, setLabel] = useState(monitor.label);
-  const [cssSelector, setCssSelector] = useState(monitor.css_selector);
-  const [interval, setInterval] = useState(monitor.check_interval_min);
-  const [enabled, setEnabled] = useState(monitor.enabled);
+  const callbacks = useRef({ onSaved });
+  callbacks.current = { onSaved };
+
+  const [state, formAction, isPending] = useActionState(
+    async (_prev: { error: string }, formData: FormData) => {
+      try {
+        await api.patch<PageMonitor>(`/page-monitors/${monitor.id}`, {
+          label: (formData.get("label") as string).trim(),
+          css_selector: (formData.get("css_selector") as string).trim() || "body",
+          check_interval_min: Math.max(1, Math.min(1440, Number(formData.get("interval")) || 1)),
+          enabled: formData.get("enabled") === "on",
+        });
+        queryClient.invalidateQueries({ queryKey: ["page-monitors"] });
+        callbacks.current.onSaved();
+        return { error: "" };
+      } catch (e) {
+        return { error: (e as Error).message || "保存失败" };
+      }
+    },
+    { error: "" },
+  );
 
   // ESC 关
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const save = useMutation({
-    mutationFn: () =>
-      api.patch<PageMonitor>(`/page-monitors/${monitor.id}`, {
-        label: label.trim(),
-        css_selector: cssSelector.trim() || "body",
-        check_interval_min: interval,
-        enabled,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["page-monitors"] });
-      onSaved();
-    },
-  });
-
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold">
-            {t("pageMonitor.editDialogTitle")}
-          </h3>
-          <button
-            onClick={onClose}
-            className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text-primary)]"
-            aria-label={t("pageMonitor.close")}
-          >
-            <X size={16} />
-          </button>
+          <h3 className="text-sm font-semibold">{t("pageMonitor.editDialogTitle")}</h3>
+          <button onClick={onClose} className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text-primary)]" aria-label={t("pageMonitor.close")}><X size={16} /></button>
         </div>
 
-        <div className="space-y-3">
+        <form action={formAction} className="space-y-3">
+          {state.error && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{state.error}</div>}
           <Field label={t("pageMonitor.field.name")}>
-            <input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              className="input w-full"
-              autoFocus
-            />
+            <input name="label" defaultValue={monitor.label} className="input w-full" autoFocus />
           </Field>
-          <Field
-            label={t("pageMonitor.field.url")}
-            hint={t("pageMonitor.field.urlHint")}
-          >
-            <input
-              value={monitor.url}
-              readOnly
-              className="input w-full opacity-60"
-            />
+          <Field label={t("pageMonitor.field.url")} hint={t("pageMonitor.field.urlHint")}>
+            <input value={monitor.url} readOnly className="input w-full opacity-60" />
           </Field>
-          <Field
-            label={t("pageMonitor.field.cssSelector")}
-            hint={t("pageMonitor.field.cssSelectorHint")}
-          >
-            <input
-              value={cssSelector}
-              onChange={(e) => setCssSelector(e.target.value)}
-              placeholder="body"
-              className="input w-full font-mono text-xs"
-            />
+          <Field label={t("pageMonitor.field.cssSelector")} hint={t("pageMonitor.field.cssSelectorHint")}>
+            <input name="css_selector" defaultValue={monitor.css_selector} placeholder="body" className="input w-full font-mono text-xs" />
           </Field>
           <Field label={t("pageMonitor.field.interval")}>
-            <input
-              type="number"
-              min={1}
-              max={1440}
-              value={interval}
-              onChange={(e) =>
-                setInterval(
-                  Math.max(1, Math.min(1440, Number(e.target.value) || 1)),
-                )
-              }
-              className="input w-full"
-            />
+            <input name="interval" type="number" min={1} max={1440} defaultValue={monitor.check_interval_min} className="input w-full" />
           </Field>
           <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={enabled}
-              onChange={(e) => setEnabled(e.target.checked)}
-              className="h-4 w-4"
-            />
+            <input name="enabled" type="checkbox" defaultChecked={monitor.enabled} className="h-4 w-4" />
             <span className="text-xs">{t("pageMonitor.field.enabled")}</span>
           </label>
-        </div>
-
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <button onClick={onClose} className="btn-secondary text-xs">
-            {t("common.cancel")}
-          </button>
-          <button
-            onClick={() => save.mutate()}
-            disabled={!label.trim() || save.isPending}
-            className="btn-primary inline-flex items-center gap-1 text-xs disabled:opacity-50"
-          >
-            <Check size={12} />
-            {save.isPending ? t("pageMonitor.saving") : t("pageMonitor.save")}
-          </button>
-        </div>
-        {save.isError && (
-          <p className="mt-2 text-[11px] text-[var(--color-error)]">
-            {t("pageMonitor.saveFailed", {
-              msg: (save.error as Error).message,
-            })}
-          </p>
-        )}
+          <div className="mt-5 flex items-center justify-end gap-2">
+            <button type="button" onClick={onClose} className="btn-secondary text-xs">{t("common.cancel")}</button>
+            <button type="submit" disabled={isPending} className="btn-primary inline-flex items-center gap-1 text-xs disabled:opacity-50">
+              <Check size={12} /> {isPending ? t("pageMonitor.saving") : t("pageMonitor.save")}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
