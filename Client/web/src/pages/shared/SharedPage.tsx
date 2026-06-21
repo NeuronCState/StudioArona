@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { isOfflineError } from "@/lib/api/error-helpers";
 import { api } from "@/lib/api/client";
+import { useT } from "@/lib/i18n";
 import { useAuthStore } from "@/stores/auth";
 import type { Feed, Schedule } from "@/types/contracts";
 import { formatRelativeTime, formatCountdown } from "@/lib/utils";
@@ -48,6 +49,7 @@ const permissionMap: Record<PermissionLevel, PermissionInfo> = {
 };
 
 export function SharedPage() {
+  const tr = useT();
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === "admin";
   const queryClient = useQueryClient();
@@ -110,7 +112,7 @@ export function SharedPage() {
 
   return (
     <div className="@container mx-auto max-w-4xl space-y-6">
-      <h2 className="text-lg font-semibold text-text-primary">共享信息源</h2>
+      <h2 className="text-lg font-semibold text-text-primary">{tr("shared.title")}</h2>
 
       {/* Permission legend — always visible (结构骨架), 不受 loading 影响 */}
       <div className="card space-y-3">

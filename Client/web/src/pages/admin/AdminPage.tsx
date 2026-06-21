@@ -3,6 +3,7 @@ import { isOfflineError } from "@/lib/api/error-helpers";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useDelayedPending } from "@/hooks/useDelayedPending";
+import { useT } from "@/lib/i18n";
 import {
   Cpu,
   MemoryStick,
@@ -921,6 +922,7 @@ function NotificationsTab() {
 // ─── Page ────────────────────────────────────────────────
 
 export function AdminPage() {
+  const tr = useT();
   const user = useAuthStore((s) => s.user);
   const navigate = useNavigate();
   const [tab, setTab] = useState<"system" | "users" | "notifications">(
@@ -957,7 +959,7 @@ export function AdminPage() {
               Admin
             </p>
             <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[var(--color-text-primary)]">
-              管理面板
+              {tr("admin.title")}
             </h2>
             <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
               系统资源监控、用户管理、邮件通知（仅管理员可见）。

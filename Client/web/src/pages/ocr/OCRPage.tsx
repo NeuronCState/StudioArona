@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useTransition } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useT } from "@/lib/i18n";
 import {
   Upload,
   FileText,
@@ -33,6 +34,7 @@ interface ParseResult {
 }
 
 export function OCRPage() {
+  const tr = useT();
   const [, startTransition] = useTransition();
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [results, setResults] = useState<ParseResult[]>([]);
@@ -262,7 +264,7 @@ export function OCRPage() {
             Document
           </p>
           <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[var(--color-text-primary)]">
-            文档解析
+            {tr("ocr.title")}
           </h2>
           <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
             使用{" "}

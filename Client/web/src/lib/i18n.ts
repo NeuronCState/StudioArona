@@ -315,6 +315,12 @@ const zh: Record<string, string> = {
   "system.memory": "内存",
   "system.gpu": "GPU",
   "system.gpuTemp": "GPU 温度",
+
+  "ocr.title": "文档解析",
+
+  "shared.title": "共享信息源",
+
+  "admin.title": "管理面板",
 };
 
 const en: Record<string, string> = {
@@ -627,6 +633,12 @@ const en: Record<string, string> = {
   "system.memory": "Memory",
   "system.gpu": "GPU",
   "system.gpuTemp": "GPU Temp",
+
+  "ocr.title": "Document OCR",
+
+  "shared.title": "Shared Feeds",
+
+  "admin.title": "Admin Panel",
 };
 
 /**
