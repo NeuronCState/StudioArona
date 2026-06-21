@@ -11,6 +11,7 @@ import { useActionState, useEffect, useRef } from "react";
 import { createVmSchema } from "@/lib/schemas";
 import { api } from "@/lib/api/client";
 import type { VM } from "@/types/contracts";
+import { useT } from "@/lib/i18n";
 
 interface VmFormState {
   errors: Record<string, string>;
@@ -24,6 +25,7 @@ interface CreateVmFormProps {
 }
 
 export function CreateVmForm({ onClose, onSuccess }: CreateVmFormProps) {
+  const tr = useT();
   const callbacks = useRef({ onSuccess, onClose });
   callbacks.current = { onSuccess, onClose };
 
@@ -74,18 +76,18 @@ export function CreateVmForm({ onClose, onSuccess }: CreateVmFormProps) {
 
   return (
     <div className="card motion-slide-up space-y-4">
-      <h3 className="text-sm font-medium text-text-primary">申请虚拟机</h3>
+      <h3 className="text-sm font-medium text-text-primary">{tr("vm.create")}</h3>
 
       <form action={formAction} className="space-y-3">
         <div>
           <label htmlFor="vm-name" className="mb-1 block text-xs text-text-secondary">
-            名称
+            {tr("vm.name")}
           </label>
           <input
             id="vm-name"
             name="name"
             className="input"
-            placeholder="my-vm"
+            placeholder={tr("vm.namePlaceholder")}
             defaultValue=""
           />
           {fieldError("name")}
@@ -93,7 +95,7 @@ export function CreateVmForm({ onClose, onSuccess }: CreateVmFormProps) {
 
         <div>
           <label htmlFor="vm-cpu" className="mb-1 block text-xs text-text-secondary">
-            CPU 核数
+            {tr("vm.cpuCores")}
           </label>
           <input
             id="vm-cpu"
@@ -109,7 +111,7 @@ export function CreateVmForm({ onClose, onSuccess }: CreateVmFormProps) {
 
         <div>
           <label htmlFor="vm-ram" className="mb-1 block text-xs text-text-secondary">
-            内存 (MB)
+            {tr("vm.ram")}
           </label>
           <input
             id="vm-ram"
@@ -126,7 +128,7 @@ export function CreateVmForm({ onClose, onSuccess }: CreateVmFormProps) {
 
         <div>
           <label htmlFor="vm-disk" className="mb-1 block text-xs text-text-secondary">
-            硬盘 (GB)
+            {tr("vm.disk")}
           </label>
           <input
             id="vm-disk"
@@ -141,7 +143,7 @@ export function CreateVmForm({ onClose, onSuccess }: CreateVmFormProps) {
 
         <div>
           <label htmlFor="vm-hv" className="mb-1 block text-xs text-text-secondary">
-            Hypervisor
+            {tr("vm.hypervisor")}
           </label>
           <select id="vm-hv" name="hypervisor" className="input" defaultValue="mock">
             <option value="mock">Mock (开发)</option>
@@ -152,16 +154,16 @@ export function CreateVmForm({ onClose, onSuccess }: CreateVmFormProps) {
 
         {state.serverError && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
-            创建失败: {state.serverError}
+            {tr("vm.createFailed")} {state.serverError}
           </div>
         )}
 
         <div className="flex gap-2 pt-2">
           <button type="submit" disabled={isPending} className="btn-primary">
-            {isPending ? "提交中..." : "提交"}
+            {isPending ? tr("vm.submitting") : tr("vm.submit")}
           </button>
           <button type="button" onClick={onClose} className="btn-secondary">
-            取消
+            {tr("vm.cancel")}
           </button>
         </div>
       </form>
