@@ -579,6 +579,30 @@ struct UpdateNotificationPrefsInput {
     notify_by_email: Option<bool>,
 }
 
+/// DELETE /api/me/face — 清除 face_enrolled 标记.
+///
+/// 当前只翻 flag; 真正的人脸特征向量存储位置 (如果将来加了) 在此基础上扩展.
+async fn delete_face_profile(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let (user_id, _, _) =
+        auth::extract_user_id(&headers, &state.config.jwt_secret).map_err(|(s, v)| (s, Json(v)))?;
+
+    sqlx::query("UPDATE users SET face_enrolled = FALSE, updated_at = NOW() WHERE id = $1::uuid")
+        .bind(&user_id)
+        .execute(&state.db)
+        .await
+        .map_err(|_e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "failed to clear face profile"})),
+            )
+        })?;
+
+    Ok(Json(json!({ "ok": true, "face_enrolled": false })))
+}
+
 // ─── Email verification (P0#3) ─────────────────────────────────────────────
 
 #[derive(Deserialize)]
@@ -716,6 +740,7 @@ pub fn build_router(state: AppState, config: &Config) -> axum::Router {
             "/api/me/notification-prefs",
             axum::routing::patch(update_notification_prefs),
         )
+        .route("/api/me/face", axum::routing::delete(delete_face_profile))
         .route("/api/feeds", get(rss::list_feeds).post(rss::create_feed))
         .route(
             "/api/feeds/:id",

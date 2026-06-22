@@ -6,6 +6,7 @@ import {
   MonitorCog,
   Save,
   ShieldCheck,
+  Trash2,
   UserRound,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -50,6 +51,27 @@ export function PersonalSettingsPage() {
   const [notifyByEmail, setNotifyByEmail] = useState(user?.notify_by_email ?? false);
   const [notifSaving, setNotifSaving] = useState(false);
   const [notifMessage, setNotifMessage] = useState<{ error: boolean; text: string } | null>(null);
+  // Face profile deletion state (账户 page)
+  const [faceDeleting, setFaceDeleting] = useState(false);
+  const [faceMessage, setFaceMessage] = useState<{ error: boolean; text: string } | null>(null);
+
+  const handleDeleteFace = async () => {
+    if (!user || faceDeleting) return;
+    if (typeof window !== "undefined" && !window.confirm("确定要删除人脸资料吗? 此操作不可撤销, 后续需要重新录入。")) {
+      return;
+    }
+    setFaceDeleting(true);
+    setFaceMessage(null);
+    try {
+      await api.delete("/me/face");
+      setUser({ ...user, face_enrolled: false });
+      setFaceMessage({ error: false, text: "人脸资料已删除" });
+    } catch (error) {
+      setFaceMessage({ error: true, text: (error as Error).message });
+    } finally {
+      setFaceDeleting(false);
+    }
+  };
 
   useEffect(() => {
     setEmail(user?.email ?? "");
@@ -236,7 +258,7 @@ export function PersonalSettingsPage() {
               {section === "account" && (
                 <SettingsSection
                   title="账户"
-                  description="当前登录身份与本机会话。"
+                  description="管理你的人脸资料与本机会话。"
                 >
                   <dl className="divide-y divide-[var(--color-border)] border-y border-[var(--color-border)]">
                     <InfoRow label="用户 ID" value={user?.id ?? "—"} />
@@ -244,26 +266,56 @@ export function PersonalSettingsPage() {
                     <InfoRow
                       label="人脸资料"
                       value={user?.face_enrolled ? "已录入" : "未录入"}
+                      action={
+                        user?.face_enrolled ? (
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            disabled={faceDeleting}
+                            onClick={handleDeleteFace}
+                            aria-label="删除人脸资料"
+                          >
+                            <Trash2 size={13} />
+                            {faceDeleting ? "删除中…" : "删除"}
+                          </Button>
+                        ) : null
+                      }
                     />
                   </dl>
-                  <div className="mt-8 flex items-center justify-between border-t border-red-200 pt-5 dark:border-red-900/50">
-                    <div>
-                      <p className="text-sm font-medium text-[var(--color-text-primary)]">
-                        退出当前会话
-                      </p>
-                      <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                        本机上的未同步数据不会被删除。
-                      </p>
-                    </div>
-                    <Button
-                      variant="danger"
-                      onClick={() => {
-                        logout();
-                        navigate("/");
-                      }}
+                  {faceMessage && (
+                    <p
+                      className={`mt-3 flex items-center gap-1.5 text-xs ${
+                        faceMessage.error
+                          ? "text-red-600"
+                          : "text-emerald-600"
+                      }`}
                     >
-                      <LogOut size={14} /> 退出登录
-                    </Button>
+                      {!faceMessage.error && <Check size={13} />}
+                      {faceMessage.text}
+                    </p>
+                  )}
+                  <div className="mt-10 rounded-lg border border-red-200 bg-red-50/50 p-4 dark:border-red-900/50 dark:bg-red-950/20">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                          退出登录
+                        </p>
+                        <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                          清除本机的访问令牌, 需要重新登录才能继续使用。
+                          本机上的未同步数据不会被删除。
+                        </p>
+                      </div>
+                      <Button
+                        variant="danger"
+                        onClick={() => {
+                          logout();
+                          navigate("/");
+                        }}
+                        aria-label="退出登录"
+                      >
+                        <LogOut size={14} /> 退出登录
+                      </Button>
+                    </div>
                   </div>
                 </SettingsSection>
               )}
@@ -428,11 +480,21 @@ function ChoiceRow({
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({
+  label,
+  value,
+  action,
+}: {
+  label: string;
+  value: string;
+  /** Optional right-aligned control (button, link, etc.). */
+  action?: React.ReactNode;
+}) {
   return (
-    <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-4 py-3 text-sm">
+    <div className="grid grid-cols-[120px_minmax(0,1fr)_auto] items-center gap-4 py-3 text-sm">
       <dt className="text-[var(--color-text-muted)]">{label}</dt>
       <dd className="truncate text-[var(--color-text-primary)]">{value}</dd>
+      {action ? <div className="shrink-0">{action}</div> : <span />}
     </div>
   );
 }
