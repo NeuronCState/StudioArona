@@ -26,11 +26,13 @@ jobs:
           - label: macos-arm64
             os: macos-latest
             target: aarch64-apple-darwin
-            bundle: dmg
+            arch: aarch64
+            bundle: app     # 只出 .app, dmg 我们自己造 (Tauri 的 dmg 含未签 .app)
           - label: macos-x64
             os: macos-14
             target: x86_64-apple-darwin
-            bundle: dmg
+            arch: x64
+            bundle: app     # 同上
           - label: windows-x64
             os: windows-latest
             target: x86_64-pc-windows-msvc
@@ -74,36 +76,77 @@ jobs:
       - name: Build client installers
         run: cd Client && pnpm install --frozen-lockfile && pnpm dlx @tauri-apps/cli@^2 build --target ${{ matrix.target }} --bundles ${{ matrix.bundle }} --ci --no-sign
 
-      # macOS Gatekeeper workaround: Tauri 2 + --no-sign 出来的 .app / .dmg 是裸的,
-      # macOS 14/15 直接报"应用已损坏"且右键→打开都救不了, 至少要 ad-hoc 签名才能走标准绕过流程.
+      # macOS Gatekeeper workaround (v3.5.3).
       #
-      # 关键: Tauri 2 的 release build 在 Mach-O 里嵌了 linker signature (LC_CODE_SIGNATURE),
-      # `codesign --force` 不会自动剥掉这个, 残留的 linker-signed 标志 + Identifier 不匹配
-      # CFBundleIdentifier 会让签名结构性失效 ("code has no resources but signature
-      # indicates they must be present"), Gatekeeper 报"应用已损坏"。
+      # 三件事必须按顺序做:
+      # 1. Tauri 2 release build 在 Mach-O 里嵌 linker signature (LC_CODE_SIGNATURE,
+      #    flags=0x20000), `codesign --force` 不会自动剥, 残留让签名结构性失效
+      #    ("code has no resources but signature indicates they must be present"),
+      #    Gatekeeper 报"应用已损坏"。
+      # 2. Tauri 的 `tauri build --bundles dmg` 在 build 完 .app 后立即把 .app 复制进
+      #    .dmg, **不**等后续 sign step。所以直接 sign .app 对 dmg 里的副本无效,
+      #    dmg 里那份永远是未签的。修法: Tauri 只出 .app (--bundles app), 我们自己
+      #    用 hdiutil 拿签好的 .app 做 dmg。
+      # 3. ad-hoc 签时显式 --identifier 跟 Info.plist 的 CFBundleIdentifier 对齐,
+      #    不让 codesign 自动生成错的 Identifier (如 studio_arona-0048d4b40c66ccc9)。
       #
-      # 解法: 先 `codesign --remove-signature` 剥掉 linker 残留, 再 ad-hoc 签, 并显式
-      # 用 --identifier 指定 CFBundleIdentifier 跟 Info.plist 对齐。
-      #
-      # ad-hoc 不需要 Apple Developer 证书, 也不花钱。
-      - name: Strip linker signature + ad-hoc sign macOS .app + .dmg
+      # ad-hoc 不需要 Apple Developer 证书, 也不花钱。spctl --assess 一定 rejected
+      # (无 Team ID), 但 `右键 → 打开` 能 bypass 启动。
+      - name: Sign macOS .app + build signed .dmg
         if: matrix.os == 'macos-latest' || matrix.os == 'macos-14'
         run: |
-          for app in $(find Client/tauri/target/${{ matrix.target }}/release/bundle/macos -name "*.app" -type d); do
-            exec_name=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$app/Contents/Info.plist")
-            bundle_id=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$app/Contents/Info.plist")
-            binary="$app/Contents/MacOS/$exec_name"
-            echo "Processing: $app"
-            echo "  exec=$exec_name  bundle_id=$bundle_id"
-            if [ -f "$binary" ]; then
-              codesign --remove-signature "$binary" || true
-            fi
-            codesign --force --deep --sign - --identifier "$bundle_id" "$app"
-            codesign --verify --deep --strict --verbose=2 "$app"
-          done
-          find Client/tauri/target/${{ matrix.target }}/release/bundle/dmg \
-            -name "*.dmg" \
-            -exec codesign --force --sign - {} \;
+          set -e
+          APP_SRC=$(find Client/tauri/target/${{ matrix.target }}/release/bundle/macos -name "*.app" -type d | head -1)
+          if [ -z "$APP_SRC" ]; then
+            echo "ERROR: no .app found in Client/tauri/target/${{ matrix.target }}/release/bundle/macos"
+            exit 1
+          fi
+          APP_NAME=$(basename "$APP_SRC")
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_SRC/Contents/Info.plist")
+          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_SRC/Contents/Info.plist")
+          EXEC_NAME=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP_SRC/Contents/Info.plist")
+          BINARY="$APP_SRC/Contents/MacOS/$EXEC_NAME"
+          echo "App:    $APP_NAME"
+          echo "Version: $VERSION"
+          echo "Bundle ID: $BUNDLE_ID"
+          echo "Binary:  $BINARY"
+
+          # 1) Strip linker signature
+          if [ -f "$BINARY" ]; then
+            codesign --remove-signature "$BINARY" || true
+          fi
+
+          # 2) Ad-hoc sign with explicit identifier
+          codesign --force --deep --sign - --identifier "$BUNDLE_ID" "$APP_SRC"
+          codesign --verify --deep --strict --verbose=2 "$APP_SRC"
+
+          # 3) Verify post-sign: Identifier matches Bundle ID, no linker-signed flag,
+          #    Sealed Resources present
+          echo "--- post-sign codesign -dv ---"
+          codesign -dv --verbose=2 "$APP_SRC"
+
+          # 4) Build .dmg from the SIGNED .app (Tauri's .dmg has un-signed copy)
+          STAGING=$(mktemp -d -t arona-dmg)
+          cp -R "$APP_SRC" "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+
+          DMG_DIR="Client/tauri/target/${{ matrix.target }}/release/bundle/dmg"
+          mkdir -p "$DMG_DIR"
+          DMG_PATH="$DMG_DIR/Studio.Arona_${VERSION}_${{ matrix.arch }}.dmg"
+
+          # Tauri uses dot-separated app name in dmg filename; mirror that for consistency
+          hdiutil create \
+            -volname "Studio Arona" \
+            -srcfolder "$STAGING" \
+            -ov -format UDZO \
+            "$DMG_PATH"
+
+          rm -rf "$STAGING"
+
+          # 5) Sign the .dmg
+          codesign --force --sign - "$DMG_PATH"
+          echo "--- post-build dmg ---"
+          ls -la "$DMG_PATH"
 
       - name: Upload installers
         if: success()
@@ -139,36 +182,28 @@ jobs:
             artifacts/**/*.msi
             artifacts/**/*.deb
           body: |
-            ## Studio Arona 3.5.2
+            ## Studio Arona 3.5.3
 
-            Patch release — 修复 macOS 安装问题 (修 v3.5.1 的修)。
+            Patch release — 修复 macOS 安装 (修 v3.5.2 的修, 真正修)。
 
             ### 🐛 修复
 
-            - **macOS 安装仍报错 (v3.5.1 没修干净)** — 第一次修用了
-              `codesign --force --deep --sign -`, 但 Tauri 2 在 Mach-O binary 里
-              嵌了 linker signature (LC_CODE_SIGNATURE, flags=0x20000),
-              `--force` 不会自动剥这个, 残留的 linker-signed + Identifier 不匹配
-              CFBundleIdentifier 让签名结构性失效
-              ("code has no resources but signature indicates they must be present"),
-              Gatekeeper 报"应用已损坏"。
+            - **v3.5.2 也没修干净** — 我之前的 strip+sign step 改的是 Tauri 输出的
+              `bundle/macos/Studio Arona.app`, 但 `bundle/dmg/Studio.Arona_X.Y.Z_*.dmg`
+              **早就冻住了** —— Tauri 在 `tauri build --bundles dmg` 跑完时
+              同步把 .app 复制进 .dmg, 不等后续 sign step。所以 dmg 里的 .app
+              永远是未签的旧版, `Identifier=studio_arona-...`, flags=0x20002,
+              `Sealed Resources=none`。
 
-              正确流程:
-              1. `codesign --remove-signature` 剥掉 linker 残留
-              2. `codesign --force --deep --sign - --identifier com.studioarona.desktop`
-                 重签, 显式指定 Identifier 跟 Info.plist 对齐
-              3. spctl --assess 仍 rejected (ad-hoc 无 Team ID, 正常), 但
-                 `右键 → 打开` 能 bypass 启动
+              修法:
+              1. Tauri 只出 .app (`--bundles app`)
+              2. CI strip linker signature + ad-hoc sign (跟 3.5.2 一样)
+              3. **CI 用 hdiutil 拿签好的 .app 自己造 .dmg**
+              4. 再 sign .dmg
 
-            ### 📦 安装包 (继承自 3.5.0)
+              这样 dmg 里那份 .app 才是真的签过的。
 
-            | 平台 | 格式 | 架构 |
-            |---|---|---|
-            | macOS | `.dmg` | Apple Silicon + Intel |
-            | Windows | `.msi` | x64 |
-            | Linux | `.deb` | x64 |
-
-            ### 📦 安装包 (继承自 3.5.0)
+            ### 📦 安装包
 
             | 平台 | 格式 | 架构 |
             |---|---|---|
