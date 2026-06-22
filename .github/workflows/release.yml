@@ -108,7 +108,35 @@ jobs:
             artifacts/**/*.msi
             artifacts/**/*.deb
           body: |
-            Release 描述请查看 Release Notes 文档或联系维护者。
-            安装包由 CI 自动构建。
+            ## Studio Arona 3.5.0
+
+            本次发布的核心改动 — Arona 模式资产就位 + Server 体验打磨。
+
+            ### ✨ 新功能
+
+            - **Arona 模式资产就位** — 拷入完整 Live2D / Spine / draco 资产 (303 个文件, ~75 MB)
+              - Live2D arona 模型: moc3 / physics3 / cdi3 / 全部 expressions + motions
+              - Spine arona / plana / workpage 模型: skel + atlas + png
+              - draco 解码器: decoder.wasm + 完整 wrapper
+              - 互动壁纸 CNAronaPlana: index.html / js / css / lib / project.json
+            - **Server TUI 面板** — `server-tui.py` 重写, 用 rich 库做设备发现 / 状态总览
+            - **设备发现** — Server 启动时扫描局域网内的 Studio Arona 实例
+            - **Home 页面重构** — Arona 风格 home (`HomeCommandPage`) 入仓, 6 入口 + 同步时间线
+            - **OCR 服务去重** — 移除 `Server/services/ocr/` 重复实现, 统一入口
+
+            ### 🐛 修复
+
+            - `server-tui.py` 自动加载 `.venv-runner` 中的 rich 库
+            - Tauri `infoPlist` 改为文件路径引用, 修复打包问题
+
+            ### 📦 安装包
+
+            | 平台 | 格式 | 架构 |
+            |---|---|---|
+            | macOS | `.dmg` | Apple Silicon + Intel |
+            | Windows | `.msi` | x64 |
+            | Linux | `.deb` | x64 |
+
+            安装包由 GitHub Actions 自动构建, 完整产物见下方 Assets。
           generate_release_notes: false
           fail_on_unmatched_files: true
