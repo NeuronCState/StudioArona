@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { isTauri } from "@/lib/storage/platform";
 
 export interface GeoCoords {
   latitude: number;
@@ -95,6 +96,53 @@ function clearCache(): void {
 }
 
 function getPosition(timeoutMs = 8000): Promise<GeoCoords> {
+  // Tauri runtime (桌面 packaged app):
+  // WKWebView 默认 setLocationManagerEnabled=NO,navigator.geolocation 直接
+  // POSITION_UNAVAILABLE。改用官方 tauri-plugin-geolocation — 它在 Rust 端
+  // 启用 WKWebView 的 location manager,真正调 CoreLocation,准确度跟系统级
+  // "地图 / 天气" 应用一致。
+  if (isTauri()) {
+    return getPositionViaTauriPlugin(timeoutMs);
+  }
+  return getPositionViaNavigator(timeoutMs);
+}
+
+/** Tauri 桌面: 用 @tauri-apps/plugin-geolocation (Rust 端启用 WKWebView location manager) */
+async function getPositionViaTauriPlugin(timeoutMs: number): Promise<GeoCoords> {
+  // 动态 import — web (浏览器) 环境不需要这个包,避免 SSR / 非 Tauri 路径
+  // 因为 import resolve 而失败
+  const { checkPermissions, requestPermissions, getCurrentPosition } =
+    await import("@tauri-apps/plugin-geolocation");
+
+  let perms = await checkPermissions();
+  if (
+    perms.location === "prompt" ||
+    perms.location === "prompt-with-rationale"
+  ) {
+    perms = await requestPermissions(["location"]);
+  }
+  if (perms.location !== "granted") {
+    throw new Error("PERMISSION_DENIED");
+  }
+
+  // Tauri 插件的 getCurrentPosition options 类型跟浏览器略有不同 — enableHighAccuracy
+  // 在桌面 iOS/macOS 上需要严格签名,这里传 false 跟 navigator 路径保持一致
+  const pos = await getCurrentPosition({
+    enableHighAccuracy: false,
+    timeout: timeoutMs,
+    maximumAge: 30 * 1000,
+  });
+
+  return {
+    latitude: pos.coords.latitude,
+    longitude: pos.coords.longitude,
+    accuracy: pos.coords.accuracy,
+    timestamp: pos.timestamp,
+  };
+}
+
+/** Browser / dev mode: 直接用 navigator.geolocation (跟旧行为一致) */
+function getPositionViaNavigator(timeoutMs: number): Promise<GeoCoords> {
   return new Promise((resolve, reject) => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       reject(new Error("Geolocation API not available"));
