@@ -86,6 +86,7 @@ jobs:
       # installer. The Tauri Rust code extracts them to `app_data_dir()/sonetto/`
       # on first launch and spawns the venv Python directly.
       - name: Install Python 3.12 + uv
+        shell: bash
         run: |
           set -e
           curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -93,12 +94,12 @@ jobs:
           uv python install 3.12
 
       - name: Build SonettoHere venv + source tarballs
+        shell: bash
         run: |
           set -e
           cd Client
           # Per-platform venv (Tauri is just a UI shell; venv must match OS/arch)
           uv venv --python 3.12 .venv-sonetto
-          source .venv-sonetto/bin/activate
           # Linux/Windows venvs don't have bin/, so check after
           if [ ! -f ".venv-sonetto/bin/python3" ] && [ ! -f ".venv-sonetto/Scripts/python.exe" ]; then
             echo "ERROR: venv not created properly"
