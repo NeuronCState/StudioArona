@@ -225,8 +225,26 @@ fn ensure_sonetto_venv(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
     let venv_python = venv_dir.join("bin").join("python3");
 
     // Already extracted — fast path
+    // 注意: 不要 canonicalize() — uv venv 的 bin/python3 是软链到
+    // ~/.local/share/uv/python/cpython-3.12.13-.../python3.12 (uv-install
+    // 的 standalone Python),canonicalize 会追到底,把 Command::new 启动时
+    // 的 argv[0] 改成 standalone 路径,Python 检测不到 pyvenv.cfg,
+    // sys.base_prefix 直接指向 uv-install 目录,不走 venv site-packages,
+    // -m uvicorn 立刻 "No module named uvicorn"。
+    //
+    // 验证:
+    //   <venv>/bin/python3 -m uvicorn --version  → ✅ 0.49.0
+    //   realpath(<venv>/bin/python3) -m uvicorn  → ❌ No module named uvicorn
+    //
+    // 之前 (v3.6.0 早期) 看起来能跑是巧合 — 当时 uv-install 目录叫
+    // cpython-3.12-... (没 .13),canonicalize 后路径软链指向 uv-install,
+    // pyvenv.cfg home 字段也指向同目录(没 .13),Python 检测 venv 通过。
+    // 某次 uv 升级,目录加 .13,canonicalize 路径跟 pyvenv.cfg 都对不上,
+    // venv 失效 — 但 base_prefix fallback 仍然 OK,所以 uvicorn 偶尔能找到
+    // 取决于 sys.path 顺序。最近这次彻底挂是因为 Python 的 site-packages
+    // 检测改了,standalone Python 路径不再 fallback 到 venv site-packages。
     if venv_python.exists() {
-        return Some(venv_python.canonicalize().unwrap_or(venv_python));
+        return Some(venv_python);
     }
 
     // First launch: extract bundled tarballs from resource dir
