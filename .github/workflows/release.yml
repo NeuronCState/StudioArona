@@ -103,12 +103,16 @@ jobs:
           cd Client
           # Per-platform venv (Tauri is just a UI shell; venv must match OS/arch)
           uv venv --python 3.12 .venv-sonetto
-          # Activate so subsequent `uv pip install` auto-targets this venv.
-          # (Passing --python explicitly also works, but `source` is shorter and
-          # is what the dev workflow uses.)
-          # shellcheck disable=SC1091
-          source .venv-sonetto/bin/activate
-          # Linux/Windows venvs don't have bin/, so check after
+          # Cross-platform venv activation without sourcing activate:
+          # - macOS/Linux venv: <venv>/bin/python3
+          # - Windows venv:     <venv>/Scripts/python.exe  (NO bin/ directory)
+          # Sourcing .venv-sonetto/bin/activate works on POSIX but fails on
+          # Windows (v3.6.1 v3 run 27939536504 Windows job — "No such file").
+          # uv respects VIRTUAL_ENV natively, so we just point it at the venv
+          # and uv pip install auto-targets that interpreter. No activate
+          # script needed.
+          export VIRTUAL_ENV="$(pwd)/.venv-sonetto"
+          # Sanity check: venv python exists at the platform-correct path
           if [ ! -f ".venv-sonetto/bin/python3" ] && [ ! -f ".venv-sonetto/Scripts/python.exe" ]; then
             echo "ERROR: venv not created properly"
             exit 1
