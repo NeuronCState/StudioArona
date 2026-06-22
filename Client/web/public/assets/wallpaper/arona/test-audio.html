@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Audio Test</title></head>
+<body style="font-family:monospace;padding:20px;background:#111;color:#0f0">
+<h2>Audio Test</h2>
+<div id="log"></div>
+<button onclick="testAll()" style="padding:10px 20px;font-size:16px">Click to Test Audio</button>
+<script>
+const log = (msg, color) => {
+  const d = document.createElement('div');
+  d.style.color = color || '#0f0';
+  d.textContent = msg;
+  document.getElementById('log').appendChild(d);
+  console.log(msg);
+};
+
+async function testFile(ext) {
+  const src = `./assets/audio/Arona/Arona_Work_Sleep_Exit_1.${ext}`;
+  log(`--- Testing .${ext} ---`, '#ff0');
+
+  // Test 1: can we fetch it?
+  try {
+    const r = await fetch(src);
+    log(`  Fetch: HTTP ${r.status} (${r.headers.get('content-type')})`);
+  } catch(e) {
+    log(`  Fetch FAILED: ${e.message}`, '#f00');
+    return;
+  }
+
+  // Test 2: can Audio() load it?
+  const a = new Audio();
+  a.volume = 0.3;
+  a.onloadedmetadata = () => log(`  loadedmetadata: duration=${a.duration}s`, '#0f0');
+  a.oncanplay = () => log(`  oncanplay fired!`, '#0f0');
+  a.onerror = () => {
+    const err = a.error;
+    log(`  Audio error: code=${err?.code} message="${err?.message}"`, '#f00');
+  };
+  a.onplay = () => log(`  onplay fired!`, '#0f0');
+
+  a.src = src;
+  log(`  src set, waiting...`);
+
+  // Try to play (with user gesture this should work)
+  try {
+    await a.play();
+    log(`  play() succeeded!`, '#0f0');
+  } catch(e) {
+    log(`  play() rejected: ${e.name} - ${e.message}`, '#f00');
+  }
+}
+
+function testAll() {
+  document.getElementById('log').innerHTML = '';
+  testFile('ogg');
+  setTimeout(() => testFile('mp3'), 2000);
+  setTimeout(() => testFile('m4a'), 4000);
+}
+</script>
+</body></html>

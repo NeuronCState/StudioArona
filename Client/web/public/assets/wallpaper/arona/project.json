@@ -1,0 +1,263 @@
+{
+	"contentrating" : "Everyone",
+	"description" : "《碧蓝档案》中阿罗娜与普拉娜的互动式 Live2D 壁纸，支持摸头、鼠标追踪和语音台词功能，角色位置也可自由调整。普拉娜角色需通过“普拉娜”选项开启，开启后还将解锁昼夜切换功能，可设置为自动切换、固定时段，或每次启动壁纸时随机切换。部分选项需要重启壁纸生效。\n\n译者注：\n语音已替换为国服中配，字幕已翻译为中文，如有侵权请联系删除。已获得原作者授权，感谢他对作品的付出与对我翻译的支持！\n原作者：Xenon257R\n原作者创意工坊主页：https://steamcommunity.com/id/xenon257r/myworkshopfiles/\n原作品链接（英文字幕，2025.09.14更新）：https://steamcommunity.com/sharedfiles/filedetails/?id=2959252463\n欢迎关注我的B站账号获取更新消息：https://space.bilibili.com/523537077\n\n原作品描述：\nA fully interactive wallpaper of Arona and Plana's Work Live2D from Blue Archive. Includes headpatting, mouse tracking and voicelines. The character may also be repositioned. Plana can be enabled using the \"Enable Plana\" option, which is disabled by default. This option also unlocks the day/night cycle, which can be set to be automated, a fixed time of day or random at every launch.\n\nWorks best in tandem with the [url=https://github.com/Xenon257R/blue-archive-rainmeter#readme]Blue Archive Rainmeter Suite[/url]  available for free, specifically the [url=https://github.com/Xenon257R/blue-archive-rainmeter#sub-hubs]Sub Hubs[/url].\n\nThe Dialog Box can be toggled to only ever be in one position or to follow the character that is speaking using the option \"Organize Dialog Boxes\". This is on by default. The Primary Dialog Box will never adhere to this option, and you must manually position it using Primary DialogX/Y if you move the character to keep it aligned to your liking.\n\nIf you want the mouse to be automatically tracked, you can toggle on the \"Auto-Track Mouse\" option under \"Mouse Tracking\", which must be toggled on as well for the former option to be available. When switched on, the character will follow your mouse after significant mouse activity and will stop looking when your mouse is idle for 1 second. The character will resume auto-looking after a 3 second downtime.\n\nYou can add a background music track using the [b]BGM File[/b] parameter. Even though file navigation will explicitly filter only [b].webm[/b], [b].ogg[/b] and [b].ogv[/b] filetypes due to [i]WallpaperEngine[/i]'s 'Image or Video filetype only' restriction, the wallpaper will still accept most audio filetypes ([b].mp3[/b], [b].wav[/b], etc.) by navigating to the directory the music file is located in, then manually writing in the filename with the correct file extension in the ([b]File name:[/b]) box yourself (e.g. Connected Sky.mp3). If this doesn't work, [b].ogg[/b] still works as an audio filetype, so you can convert your file(s) appropriately.",
+	"file" : "index.html",
+	"general" : 
+	{
+		"properties" : 
+		{
+			"autotrackmouse" : 
+			{
+				"condition" : "mouseactions.value == true && mousetracking.value == true",
+				"index" : 11,
+				"order" : 111,
+				"text" : "视线一直追随鼠标指针",
+				"type" : "bool",
+				"value" : false
+			},
+			"bgmfile" : 
+			{
+				"fileType" : "video",
+				"index" : 19,
+				"order" : 119,
+				"text" : "添加背景音乐（重启壁纸生效）",
+				"type" : "file",
+				"value" : ""
+			},
+			"bgmvolume" : 
+			{
+				"fraction" : false,
+				"index" : 20,
+				"max" : 100,
+				"min" : 0,
+				"order" : 120,
+				"text" : "背景音乐音量",
+				"type" : "slider",
+				"value" : 10
+			},
+			"bonuschar" : 
+			{
+				"index" : 2,
+				"order" : 102,
+				"text" : "普拉娜（重启壁纸生效）",
+				"type" : "bool",
+				"value" : true
+			},
+			"characterx" : 
+			{
+				"condition" : "posactions.value == true",
+				"fraction" : true,
+				"index" : 13,
+				"max" : 100,
+				"min" : 0,
+				"order" : 113,
+				"precision" : 2,
+				"step" : 0.1,
+				"text" : "X轴位置（默认20）",
+				"type" : "slider",
+				"value" : 20
+			},
+			"charactery" : 
+			{
+				"condition" : "posactions.value == true",
+				"fraction" : true,
+				"index" : 14,
+				"max" : 100,
+				"min" : 0,
+				"order" : 114,
+				"precision" : 2,
+				"step" : 0.1,
+				"text" : "Y轴位置（默认45）",
+				"type" : "slider",
+				"value" : 45
+			},
+			"dialogx" : 
+			{
+				"condition" : "posactions.value == true && showdialog.value == true",
+				"fraction" : true,
+				"index" : 16,
+				"max" : 100,
+				"min" : 0,
+				"order" : 116,
+				"precision" : 2,
+				"step" : 0.1,
+				"text" : "字幕X轴位置（默认12.5）",
+				"type" : "slider",
+				"value" : 12.5
+			},
+			"dialogy" : 
+			{
+				"condition" : "posactions.value == true && showdialog.value == true",
+				"fraction" : true,
+				"index" : 17,
+				"max" : 100,
+				"min" : 0,
+				"order" : 117,
+				"precision" : 2,
+				"step" : 0.1,
+				"text" : "字幕Y轴位置（默认75）",
+				"type" : "slider",
+				"value" : 75
+			},
+			"fixeddialog" : 
+			{
+				"condition" : "posactions.value == true && showdialog.value == true",
+				"index" : 18,
+				"order" : 118,
+				"text" : "自动调整字幕位置",
+				"type" : "bool",
+				"value" : true
+			},
+			"headpatting" : 
+			{
+				"condition" : "mouseactions.value == true",
+				"index" : 9,
+				"order" : 109,
+				"text" : "摸头",
+				"type" : "bool",
+				"value" : true
+			},
+			"idlelines" : 
+			{
+				"condition" : "introanimation.value==true",
+				"index" : 5,
+				"order" : 105,
+				"text" : "空闲时自言自语（重启壁纸生效）",
+				"type" : "bool",
+				"value" : false
+			},
+			"introanimation" : 
+			{
+				"index" : 4,
+				"order" : 104,
+				"text" : "入场动画（重启壁纸生效）",
+				"type" : "bool",
+				"value" : true
+			},
+			"mouseactions" : 
+			{
+				"index" : 6,
+				"order" : 106,
+				"text" : "展示鼠标相关设置：",
+				"type" : "bool",
+				"value" : true
+			},
+			"mousetracking" : 
+			{
+				"condition" : "mouseactions.value == true",
+				"index" : 10,
+				"order" : 110,
+				"text" : "鼠标按下时视线追随指针",
+				"type" : "bool",
+				"value" : true
+			},
+			"posactions" : 
+			{
+				"index" : 12,
+				"order" : 112,
+				"text" : "展示位置相关设置：",
+				"type" : "bool",
+				"value" : false
+			},
+			"scale" : 
+			{
+				"fraction" : true,
+				"index" : 0,
+				"max" : 2,
+				"min" : 0.8,
+				"order" : 100,
+				"precision" : 2,
+				"step" : 0.1,
+				"text" : "调整尺寸",
+				"type" : "slider",
+				"value" : 1
+			},
+			"schemecolor" : 
+			{
+				"order" : 0,
+				"text" : "ui_browse_properties_scheme_color",
+				"type" : "color",
+				"value" : "0.5490196078431373 0.7843137254901961 0.9019607843137255"
+			},
+			"showdialog" : 
+			{
+				"condition" : "posactions.value == true",
+				"index" : 15,
+				"order" : 115,
+				"text" : "展示字幕",
+				"type" : "bool",
+				"value" : true
+			},
+			"targetfps" : 
+			{
+				"fraction" : false,
+				"index" : 1,
+				"max" : 144,
+				"min" : 30,
+				"order" : 101,
+				"text" : "帧率",
+				"type" : "slider",
+				"value" : 60
+			},
+			"timeofday" : 
+			{
+				"condition" : "bonuschar.value == true",
+				"index" : 3,
+				"options" : 
+				[
+					{
+						"label" : "自动",
+						"value" : "-1"
+					},
+					{
+						"label" : "白天",
+						"value" : "12"
+					},
+					{
+						"label" : "黑夜",
+						"value" : "0"
+					},
+					{
+						"label" : "随机",
+						"value" : "-2"
+					}
+				],
+				"order" : 103,
+				"text" : "昼夜切换（重启壁纸生效）",
+				"type" : "combo",
+				"value" : "-1"
+			},
+			"voicelines" : 
+			{
+				"condition" : "mouseactions.value == true",
+				"index" : 7,
+				"order" : 107,
+				"text" : "点击互动语音",
+				"type" : "bool",
+				"value" : true
+			},
+			"voicevolume" : 
+			{
+				"condition" : "mouseactions.value == true && voicelines.value == true",
+				"fraction" : false,
+				"index" : 8,
+				"max" : 100,
+				"min" : 0,
+				"order" : 108,
+				"text" : "语音音量",
+				"type" : "slider",
+				"value" : 50
+			}
+		}
+	},
+	"preview" : "preview.jpg",
+	"ratingsex" : "none",
+	"ratingviolence" : "none",
+	"tags" : [ "Anime" ],
+	"title" : "【碧蓝档案互动Live2D】阿罗娜与普拉娜（中配中字）",
+	"type" : "web",
+	"version" : 5,
+	"visibility" : "public",
+	"workshopid" : "3655949173",
+	"workshopurl" : "steam://url/CommunityFilePage/3655949173"
+}

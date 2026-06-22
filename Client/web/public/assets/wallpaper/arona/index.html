@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Blue Archive Arona & Plana</title>
+    <script src="lib/spine-webgl.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/style.css">
+  </head>
+  <body>
+    <div id='textbox' class='textbox'></div>
+    <canvas id="canvas"></canvas>
+    <script src="js/main.js"></script>
+    <script>
+      if (window.wallpaperPropertyListener && window.wallpaperPropertyListener.applyUserProperties) {
+        window.wallpaperPropertyListener.applyUserProperties({
+          scale: { value: 1 },
+          targetfps: { value: 60 },
+          bonuschar: { value: true },
+          timeofday: { value: '-1' },
+          introanimation: { value: true },
+          idlelines: { value: true },
+          mouseactions: { value: true },
+          mousetracking: { value: true },
+          headpatting: { value: true },
+          voicelines: { value: true },
+          voicevolume: { value: 30 },
+          autotrackmouse: { value: true },
+          schemecolor: { value: "0.55 0.78 0.90" }
+        });
+      }
+    </script>
+  </body>
+</html>
