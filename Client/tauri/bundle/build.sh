@@ -30,13 +30,23 @@ echo "[bundle] OUT_DIR=$OUT_DIR"
 # Sanity checks
 if [ ! -d "$VENV_DIR" ]; then
   echo "ERROR: venv not found at $VENV_DIR"
-  echo "  Create it: cd $CLIENT_ROOT && uv venv --python ~/.local/bin/python3.12 .venv-sonetto"
-  echo "  Install:   uv pip install --python $VENV_DIR/bin/python3 -r $SONETTO_SRC/requirements.txt -r $CLIENT_ROOT/services/ocr/requirements.txt"
+  echo "  Create it: cd $CLIENT_ROOT && uv venv --python 3.12 .venv-sonetto"
+  echo "  Install:   cd $CLIENT_ROOT && VIRTUAL_ENV=$VENV_DIR uv pip install -r $SONETTO_SRC/requirements.txt -r $CLIENT_ROOT/services/ocr/requirements.txt"
   exit 1
 fi
 
-if [ ! -f "$VENV_DIR/bin/python3" ]; then
-  echo "ERROR: venv is broken (no bin/python3)"
+# Detect venv Python interpreter cross-platform.
+# - macOS / Linux venv: <venv>/bin/python3
+# - Windows venv:       <venv>/Scripts/python.exe  (NO bin/ directory)
+# uv creates platform-correct layout, so $VENV_DIR/bin/python3 only
+# works on POSIX. Hardcoding `bin/` breaks Windows CI (v3.6.1 v4 run
+# 27965278175 — "ERROR: venv is broken (no bin/python3)").
+if [ -f "$VENV_DIR/bin/python3" ]; then
+  VENV_PY="$VENV_DIR/bin/python3"
+elif [ -f "$VENV_DIR/Scripts/python.exe" ]; then
+  VENV_PY="$VENV_DIR/Scripts/python.exe"
+else
+  echo "ERROR: venv is broken (no python3 at bin/ or Scripts/)"
   exit 1
 fi
 
@@ -59,7 +69,7 @@ find "$VENV_DIR" -path "*.dist-info" -type d -exec rm -rf {} + 2>/dev/null || tr
 
 # Verify venv still works
 echo "[bundle] verifying stripped venv..."
-"$VENV_DIR/bin/python3" -c "import langchain, fastapi, uvicorn; print(f'  langchain {langchain.__version__}')" || {
+"$VENV_PY" -c "import langchain, fastapi, uvicorn; print(f'  langchain {langchain.__version__}')" || {
   echo "ERROR: stripped venv is broken"
   exit 1
 }
