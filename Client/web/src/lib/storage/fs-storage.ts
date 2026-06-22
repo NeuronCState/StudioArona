@@ -32,15 +32,18 @@ async function filePath(table: Table, id: string): Promise<string> {
   // 但我们想要 ~/Documents/, 所以用 $HOME + 拼
   // Tauri 2 没直接给 $HOME, 但 fs scope 已经 allow $HOME/Documents/studioarona/**
   const home = await homeDir();
-  // 拼: $HOME/Documents/studioarona/<table>/<id>.json
-  // 不用 sep, Tauri fs 在 macOS 接受正斜杠
-  return `${home}Documents/studioarona/${table}/${id}.json`;
+  // homeDir() 返回的路径 **不带尾斜杠** (Tauri 2 + dirs crate 行为),
+  // 必须显式加 `/`,否则拼成 `/Users/xxxDocuments/...` (中间缺 /),
+  // 会落在 fs scope 白名单之外,writeTextFile 抛 permission denied。
+  // (v3.6.1 安装后创建日程无效就是这个 bug — 用户点提交,数据写不出去,
+  // 抽屉也不关。Web 端不受影响,Web 走 IDB 不走 fs。)
+  return `${home}/Documents/studioarona/${table}/${id}.json`;
 }
 
 /** 解析目录路径: $HOME/Documents/studioarona/<table>/ */
 async function dirPath(table: Table): Promise<string> {
   const home = await homeDir();
-  return `${home}Documents/studioarona/${table}`;
+  return `${home}/Documents/studioarona/${table}`;
 }
 
 async function ensureDir(dir: string): Promise<void> {
