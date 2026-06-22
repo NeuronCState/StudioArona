@@ -90,6 +90,9 @@ jobs:
         run: |
           set -e
           curl -LsSf https://astral.sh/uv/install.sh | sh
+          # GITHUB_PATH only propagates to SUBSEQUENT steps; export inline so
+          # the `uv python install` below finds the binary in THIS step.
+          export PATH="$HOME/.local/bin:$PATH"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           uv python install 3.12
 
