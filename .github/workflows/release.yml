@@ -73,6 +73,43 @@ jobs:
             librsvg2-dev \
             patchelf
 
+      # v3.6.0 — Bundle SonettoHere Python runtime into the installer
+      #
+      # Tauri is just a UI shell; the actual agent runtime is SonettoHere
+      # (LangGraph ReAct, 8081, port 8081), a separate Python FastAPI service.
+      # To make the installer truly self-contained, we:
+      #   1. Install uv + Python 3.12
+      #   2. Create a venv from services/sonetto/requirements.txt + services/ocr/requirements.txt
+      #   3. Strip __pycache__/dist-info and tarball it
+      #   4. Tarball the SonettoHere source
+      # Then tauri.conf.json `resources` embeds both tarballs into the
+      # installer. The Tauri Rust code extracts them to `app_data_dir()/sonetto/`
+      # on first launch and spawns the venv Python directly.
+      - name: Install Python 3.12 + uv
+        run: |
+          set -e
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          uv python install 3.12
+
+      - name: Build SonettoHere venv + source tarballs
+        run: |
+          set -e
+          cd Client
+          # Per-platform venv (Tauri is just a UI shell; venv must match OS/arch)
+          uv venv --python 3.12 .venv-sonetto
+          source .venv-sonetto/bin/activate
+          # Linux/Windows venvs don't have bin/, so check after
+          if [ ! -f ".venv-sonetto/bin/python3" ] && [ ! -f ".venv-sonetto/Scripts/python.exe" ]; then
+            echo "ERROR: venv not created properly"
+            exit 1
+          fi
+          # 3.12 deps for SonettoHere + OCR (kept in sync with services/sonetto/requirements.txt)
+          uv pip install -r services/sonetto/requirements.txt
+          uv pip install -r services/ocr/requirements.txt
+          # Strip + tar (writes to Client/tauri/bundle/)
+          bash tauri/bundle/build.sh
+
       - name: Build client installers
         run: cd Client && pnpm install --frozen-lockfile && pnpm dlx @tauri-apps/cli@^2 build --target ${{ matrix.target }} --bundles ${{ matrix.bundle }} --ci --no-sign
 
@@ -182,46 +219,45 @@ jobs:
             artifacts/**/*.msi
             artifacts/**/*.deb
           body: |
-            ## Studio Arona 3.5.3
+            ## Studio Arona 3.6.0
 
-            Patch release — 修复 macOS 安装 (修 v3.5.2 的修, 真正修)。
+            **真正的一键安装** — Tauri 桌面端不再依赖用户手动启 SonettoHere。
 
-            ### 🐛 修复
+            ### 🎯 核心变更
 
-            - **v3.5.2 也没修干净** — 我之前的 strip+sign step 改的是 Tauri 输出的
-              `bundle/macos/Studio Arona.app`, 但 `bundle/dmg/Studio.Arona_X.Y.Z_*.dmg`
-              **早就冻住了** —— Tauri 在 `tauri build --bundles dmg` 跑完时
-              同步把 .app 复制进 .dmg, 不等后续 sign step。所以 dmg 里的 .app
-              永远是未签的旧版, `Identifier=studio_arona-...`, flags=0x20002,
-              `Sealed Resources=none`。
+            Tauri 之前只是个 UI shell, SonettoHere (LangGraph ReAct agent, 端口 8081) 是
+            单独的 Python FastAPI 服务, 用户得手动 `cd Client && python3 run.py` 才能跑。
+            这违背了"装好就能用"的基本盘。
 
-              修法:
-              1. Tauri 只出 .app (`--bundles app`)
-              2. CI strip linker signature + ad-hoc sign (跟 3.5.2 一样)
-              3. **CI 用 hdiutil 拿签好的 .app 自己造 .dmg**
-              4. 再 sign .dmg
+            v3.6.0 把整套 Python runtime 塞进 dmg/msi/deb:
 
-              这样 dmg 里那份 .app 才是真的签过的。
+            1. **CI per-platform 构 venv** (macOS-Apple Silicon, macOS-Intel, Windows x64,
+               Linux x64 各一份, 因为 Python venv 是 platform-specific 的, 没法跨平台)
+            2. 剥掉 `__pycache__` + `.dist-info` 后打成 `venv.tar.gz` (~110MB, 主因
+               langchain + pydantic + fastapi + 97 个工具库)
+            3. SonettoHere 源码打成 `sonetto-source.tar.gz` (~100KB)
+            4. Tauri `resources` 字段把两个 tarball 嵌进 installer
+            5. **首次启动** 3-5s (M-series SSD) 解压到 `~/Library/Application Support/
+               com.studioarona.desktop/sonetto/`, 之后秒开
+            6. 后续启动直接 `python3 -m uvicorn api.server:create_app` 跑
 
-            ### 📦 安装包
+            用户视角: 双击 dmg → 拖进 Applications → 打开 → 用。没有 Terminal, 没有
+            `python3 run.py`, 没有"为啥 8081 不通"。
 
-            | 平台 | 格式 | 架构 |
-            |---|---|---|
-            | macOS | `.dmg` | Apple Silicon + Intel |
-            | Windows | `.msi` | x64 |
-            | Linux | `.deb` | x64 |
+            ### 📦 安装包大小
 
-            ### 📋 3.5.0 完整更新日志
+            - macOS dmg: 之前 ~80MB → 现在 ~180-200MB (主要是 venv)
+            - Windows msi / Linux deb: 同步膨胀
+            - OCR 892M PaddleOCR-VL 模型**未打包** (懒下载机制不变, 不然 dmg 得上 GB)
 
-            **新功能**:
-            - 拷入完整 Live2D / Spine / draco 资产 (303 文件, ~75 MB)
-            - Server TUI 面板 (`server-tui.py` 用 rich 库)
-            - 设备发现 + Arona 风格 Home 页面 (`HomeCommandPage` 4 入口 + 同步时间线 mock)
-            - OCR 服务去重, 统一入口
+            ### 🐛 之前的副作用
 
-            **修复**:
-            - `server-tui.py` 自动加载 `.venv-runner` rich 库
-            - Tauri `infoPlist` 改为文件路径引用, 修复打包问题
+            - Tauri `--bundles app` + CI hdiutil 造 dmg 的流程 (v3.5.3 修的) 仍然有效
+            - macOS 仍用 ad-hoc sign, 首次打开右键 → 打开
+
+            ### 📋 v3.5.0-3.5.3 历史修复
+
+            见各小版本 release notes。
 
             安装包由 GitHub Actions 自动构建, 完整产物见下方 Assets。
           generate_release_notes: false

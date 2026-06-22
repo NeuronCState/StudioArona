@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Studio Arona",
-  "version": "3.5.3",
+  "version": "3.6.0",
   "identifier": "com.studioarona.desktop",
   "build": {
     "frontendDist": "../web/dist",
@@ -35,11 +35,8 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../services/sonetto/api": "services/sonetto/api",
-      "../services/sonetto/requirements.txt": "services/sonetto/requirements.txt",
-      "../services/sonetto/config": "services/sonetto/config",
-      "../services/ocr/main.py": "services/ocr/main.py",
-      "../services/ocr/requirements.txt": "services/ocr/requirements.txt"
+      "bundle/venv.tar.gz": "sonetto/venv.tar.gz",
+      "bundle/sonetto-source.tar.gz": "sonetto/source.tar.gz"
     },
     "externalBin": [],
     "macOS": {

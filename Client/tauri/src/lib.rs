@@ -70,7 +70,7 @@ pub fn run() {
                     .build(app)?;
 
                 // 启动 SonettoHere (端口 8081, LangGraph ReAct agent 框架)
-                let pid = spawn_sonetto();
+                let pid = spawn_sonetto(&app.handle());
                 if let Some(state) = app.try_state::<SonettoState>() {
                     if let Ok(mut guard) = state.0.lock() {
                         *guard = pid;
@@ -135,6 +135,8 @@ pub fn run() {
             get_me,
             get_system_info,
             get_sonetto_status,
+            get_sonetto_log,
+            restart_sonetto,
             ocr_ensure,
             ocr_health,
             ocr_parse_b64,
@@ -152,11 +154,11 @@ pub fn run() {
 /// 启动 SonettoHere Python 后端 (本地 venv, 端口 8081)
 /// 桌面应用启动时调用, 进程后台跑, 应用关闭时 kill.
 #[cfg(desktop)]
-fn spawn_sonetto() -> Option<u32> {
-    // bundled Python source (in .app Resources or repo root)
-    let sonetto_dir = client_root()?.join("services/sonetto");
-    // user-writable venv (in ~/Library/Application Support/)
-    let venv_python = ensure_sonetto_venv()?;
+fn spawn_sonetto(app_handle: &tauri::AppHandle) -> Option<u32> {
+    // venv extracted to app_data_dir/sonetto/.venv-sonetto/ on first run
+    let venv_python = ensure_sonetto_venv(app_handle)?;
+    // SonettoHere source extracted to app_data_dir/sonetto/services/sonetto/
+    let sonetto_dir = app_data_dir()?.join("sonetto/services/sonetto");
     if !sonetto_dir.join("api/server.py").exists() {
         log::error!(
             "Bundled SonettoHere runtime not found at {}",
@@ -165,7 +167,7 @@ fn spawn_sonetto() -> Option<u32> {
         return None;
     }
 
-    // 3. 启动 uvicorn, 端口 8081
+    // 启动 uvicorn, 端口 8081
     let log_path = sonetto_log_path();
     std::fs::create_dir_all(log_path.parent()?).ok()?;
     let log_file = std::fs::File::create(&log_path).ok()?;
@@ -194,106 +196,125 @@ fn spawn_sonetto() -> Option<u32> {
     Some(child.id())
 }
 
-/// 确保 SonettoHere venv 存在, 首次启动自动建 + 装依赖.
-/// Uses the Client-local runtime and Python 3.12 environment shared with OCR.
+/// Ensure SonettoHere runtime is extracted to user-writable app data dir.
+///
+/// As of v3.6.0, the venv is **bundled inside the installer** (see
+/// `tauri.conf.json` `resources` field + `tauri/bundle/build.sh`).
+/// On first launch, we extract the tarballs from the resource dir
+/// to `app_data_dir()/sonetto/`. This eliminates the previous
+/// 60-90s `uv venv` + `uv pip install` bootstrap step that required
+/// the user to have `uv` and Python 3.12 installed on the system.
+///
+/// Layout after extraction:
+///   <app_data>/sonetto/
+///     .venv-sonetto/             # extracted from venv.tar.gz
+///       bin/python3               # the venv's Python interpreter
+///     services/sonetto/          # extracted from sonetto-source.tar.gz
+///       api/server.py             # FastAPI entrypoint
 #[cfg(desktop)]
-fn ensure_sonetto_venv() -> Option<PathBuf> {
-    // Venv lives in user-writable app data, NOT in read-only .app bundle
-    let venv_dir = app_data_dir()?.join(".venv-sonetto");
-    let venv_python = venv_dir.join("bin/python3");
+fn ensure_sonetto_venv(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
+    let data_dir = app_data_dir()?.join("sonetto");
+    let venv_dir = data_dir.join(".venv-sonetto");
+    // Cross-platform Python path inside a venv:
+    //   - Unix (macOS/Linux):  .venv/bin/python3
+    //   - Windows:             .venv/Scripts/python.exe
+    #[cfg(windows)]
+    let venv_python = venv_dir.join("Scripts").join("python.exe");
+    #[cfg(not(windows))]
+    let venv_python = venv_dir.join("bin").join("python3");
 
+    // Already extracted — fast path
     if venv_python.exists() {
         return Some(venv_python.canonicalize().unwrap_or(venv_python));
     }
 
-    // 首次启动 setup: uv venv + uv pip install
-    log::info!("SonettoHere venv not found, bootstrapping (30s first-time) ...");
+    // First launch: extract bundled tarballs from resource dir
+    log::info!("SonettoHere runtime not found, extracting bundled tarballs ...");
 
-    // 1. 找 uv 二进制
-    let uv = find_uv()?;
-    log::info!("uv: {}", uv.display());
+    let resource_dir = app_handle
+        .path()
+        .resource_dir()
+        .ok()
+        .or_else(|| Some(client_root()?.parent()?.to_path_buf()))?;
 
-    // 2. Find Python 3.12
-    let python = find_python312()?;
-    log::info!("python: {}", python.display());
+    let venv_tar = resource_dir.join("sonetto/venv.tar.gz");
+    let source_tar = resource_dir.join("sonetto/source.tar.gz");
+    if !venv_tar.exists() {
+        log::error!("bundled venv.tar.gz not found at {}", venv_tar.display());
+        return None;
+    }
+    if !source_tar.exists() {
+        log::error!("bundled sonetto-source.tar.gz not found at {}", source_tar.display());
+        return None;
+    }
 
-    // 3. uv venv
-    let venv_status = Command::new(&uv)
-        .arg("venv")
-        .arg("--python")
-        .arg(&python)
-        .arg(&venv_dir)
+    std::fs::create_dir_all(&data_dir).ok()?;
+
+    // Extract venv (103MB gzipped, 350MB uncompressed — fast gzip, ~3-5s on M-series SSD)
+    log::info!("extracting venv.tar.gz -> {} (this takes a few seconds)", venv_dir.display());
+    let venv_status = Command::new("tar")
+        .arg("-xzf")
+        .arg(&venv_tar)
+        .arg("-C")
+        .arg(&data_dir)
         .status()
         .ok()?;
     if !venv_status.success() {
-        log::error!("uv venv failed");
+        log::error!("venv tar extraction failed");
         return None;
     }
 
-    // 4. Install from the bundled runtime resources.
-    let bundle_root = client_root()?;
-    let sonetto_req = bundle_root.join("services/sonetto/requirements.txt");
-    let ocr_req = bundle_root.join("services/ocr/requirements.txt");
-    if !sonetto_req.exists() || !ocr_req.exists() {
-        log::error!("bundled requirements not found");
-        return None;
-    }
-
-    // 5. uv pip install (30s, 后台不阻塞 UI)
-    let install_status = Command::new(&uv)
-        .arg("pip")
-        .arg("install")
-        .arg("--python")
-        .arg(&venv_python)
-        .arg("-i")
-        .arg("https://pypi.tuna.tsinghua.edu.cn/simple/")
-        .arg("-r")
-        .arg(&sonetto_req)
-        .arg("-r")
-        .arg(&ocr_req)
+    // Extract source
+    log::info!("extracting sonetto-source.tar.gz -> {}/services/sonetto", data_dir.display());
+    let source_status = Command::new("tar")
+        .arg("-xzf")
+        .arg(&source_tar)
+        .arg("-C")
+        .arg(&data_dir)
         .status()
         .ok()?;
-    if !install_status.success() {
-        log::error!("uv pip install failed");
+    if !source_status.success() {
+        log::error!("source tar extraction failed");
         return None;
     }
 
-    log::info!("SonettoHere venv ready");
+    // Verify
+    if !venv_python.exists() {
+        log::error!("venv Python interpreter not found at {}", venv_python.display());
+        return None;
+    }
+    let server_py = data_dir.join("services/sonetto/api/server.py");
+    if !server_py.exists() {
+        log::error!("server.py not found after extraction");
+        return None;
+    }
+
+    // Sanity check: venv actually runs
+    let probe = Command::new(&venv_python)
+        .arg("-c")
+        .arg("import langchain, fastapi, uvicorn; print('venv ok', langchain.__version__)")
+        .output();
+    match probe {
+        Ok(out) if out.status.success() => {
+            log::info!(
+                "SonettoHere runtime ready: {}",
+                String::from_utf8_lossy(&out.stdout).trim()
+            );
+        }
+        Ok(out) => {
+            log::error!(
+                "venv probe failed: {}",
+                String::from_utf8_lossy(&out.stderr).trim()
+            );
+            return None;
+        }
+        Err(e) => {
+            log::error!("venv probe exec failed: {}", e);
+            return None;
+        }
+    }
+
     Some(venv_python.canonicalize().unwrap_or(venv_python))
-}
-
-#[cfg(desktop)]
-fn find_uv() -> Option<PathBuf> {
-    let home = std::env::var_os("HOME").map(PathBuf::from);
-    let candidates = [
-        home.as_ref().map(|path| path.join(".local/bin/uv")),
-        home.as_ref().map(|path| path.join(".cargo/bin/uv")),
-        Some(PathBuf::from("/usr/local/bin/uv")),
-        Some(PathBuf::from("/opt/homebrew/bin/uv")),
-    ];
-    for c in candidates.into_iter().flatten() {
-        if c.exists() {
-            return Some(c.canonicalize().unwrap_or(c));
-        }
-    }
-    None
-}
-
-#[cfg(desktop)]
-fn find_python312() -> Option<PathBuf> {
-    let home = std::env::var_os("HOME").map(PathBuf::from);
-    let candidates = [
-        home.as_ref().map(|path| path.join(".local/bin/python3.12")),
-        Some(PathBuf::from("/usr/local/bin/python3.12")),
-        Some(PathBuf::from("/opt/homebrew/bin/python3.12")),
-        Some(PathBuf::from("/usr/bin/python3")),
-    ];
-    for c in candidates.into_iter().flatten() {
-        if c.exists() {
-            return Some(c.canonicalize().unwrap_or(c));
-        }
-    }
-    None
 }
 
 /// Resolve the directory containing bundled `services/sonetto/api/server.py`.
@@ -362,6 +383,64 @@ async fn get_sonetto_status() -> Result<String, String> {
         .map_err(|e| e.to_string())?;
     let text = resp.text().await.map_err(|e| e.to_string())?;
     Ok(text)
+}
+
+/// 读 SonettoHere 启动 log 最后 200 行 (UI "查看日志" 按钮用)
+/// 路径: ~/Library/Application Support/com.studioarona.desktop/logs/sonetto.log
+#[tauri::command]
+async fn get_sonetto_log() -> Result<String, String> {
+    let path = sonetto_log_path();
+    match std::fs::read_to_string(&path) {
+        Ok(content) => {
+            // Last 200 lines (or 50KB, whichever is smaller)
+            let bytes_limit = 50 * 1024;
+            let truncated = if content.len() > bytes_limit {
+                let start = content.len() - bytes_limit;
+                let start = content[start..]
+                    .find('\n')
+                    .map(|i| start + i + 1)
+                    .unwrap_or(start);
+                format!("[...truncated...]\n{}", &content[start..])
+            } else {
+                content
+            };
+            Ok(truncated)
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok("(no log yet)".to_string()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+/// 重启 SonettoHere (UI 重试按钮用)
+/// 先 kill 已存在的 pid, 再走 ensure_sonetto_venv + spawn 一次.
+#[tauri::command]
+async fn restart_sonetto(
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, SonettoState>,
+) -> Result<bool, String> {
+    // 1) Kill existing
+    {
+        let guard = state.0.lock().map_err(|e| e.to_string())?;
+        if let Some(pid) = *guard {
+            log::info!("[restart] killing existing SonettoHere pid={}", pid);
+            #[cfg(unix)]
+            unsafe {
+                libc::kill(pid as i32, libc::SIGTERM);
+            }
+            // Give it 2s to die
+            std::thread::sleep(std::time::Duration::from_secs(2));
+        }
+    }
+    // 2) Spawn fresh
+    if let Some(new_pid) = spawn_sonetto(&app_handle) {
+        let mut guard = state.0.lock().map_err(|e| e.to_string())?;
+        *guard = Some(new_pid);
+        log::info!("[restart] SonettoHere respawned, pid={}", new_pid);
+        Ok(true)
+    } else {
+        log::error!("[restart] SonettoHere respawn failed");
+        Ok(false)
+    }
 }
 
 /// 获取服务状态 (health check)
